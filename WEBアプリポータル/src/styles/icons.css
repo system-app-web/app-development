@@ -1,0 +1,173 @@
+.app-icon {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #0f72d6 0%, #4ac6f7 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(17, 118, 216, 0.2);
+  overflow: hidden;
+}
+
+.app-icon::after {
+  position: absolute;
+  inset: auto -18px -22px auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  content: "";
+}
+
+.icon-mark,
+.icon-mark::before,
+.icon-mark::after {
+  position: absolute;
+  display: block;
+  content: "";
+}
+
+.app-icon.check .icon-mark {
+  width: 30px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(13, 74, 130, 0.16);
+}
+
+.app-icon.check .icon-mark::before {
+  top: 9px;
+  left: 7px;
+  width: 16px;
+  height: 8px;
+  border-bottom: 4px solid #1476d4;
+  border-left: 4px solid #1476d4;
+  transform: rotate(-45deg);
+}
+
+.app-icon.check .icon-mark::after {
+  right: -6px;
+  bottom: 6px;
+  width: 18px;
+  height: 18px;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+}
+
+.app-icon.fax {
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #057f9a 0%, #5fd5e8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(15, 138, 165, 0.2);
+}
+
+.app-icon.fax .icon-mark {
+  width: 36px;
+  height: 26px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(6, 91, 112, 0.16);
+}
+
+.app-icon.fax .icon-mark::before {
+  top: -11px;
+  left: 7px;
+  width: 22px;
+  height: 15px;
+  border-radius: 6px 6px 2px 2px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.app-icon.fax .icon-mark::after {
+  right: 7px;
+  bottom: 7px;
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: #0a859f;
+  box-shadow: 0 7px 0 rgba(10, 133, 159, 0.55);
+}
+
+.app-icon.memo {
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #5167eb 0%, #8fc8ff 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(81, 103, 235, 0.2);
+}
+
+.app-icon.memo .icon-mark {
+  width: 32px;
+  height: 38px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(61, 75, 170, 0.16);
+}
+
+.app-icon.memo .icon-mark::before {
+  top: 10px;
+  left: 8px;
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+  background: #566ce9;
+  box-shadow:
+    0 8px 0 rgba(86, 108, 233, 0.62),
+    0 16px 0 rgba(86, 108, 233, 0.34);
+}
+
+.app-icon.memo .icon-mark::after {
+  right: -4px;
+  bottom: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: #dceeff;
+  transform: rotate(45deg);
+}
+
+.app-icon.people {
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #178e74 0%, #72dcc1 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(31, 159, 128, 0.2);
+}
+
+.app-icon.people .icon-mark {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    -13px 6px 0 rgba(255, 255, 255, 0.78),
+    13px 6px 0 rgba(255, 255, 255, 0.78),
+    0 8px 18px rgba(14, 105, 84, 0.16);
+}
+
+.app-icon.people .icon-mark::before {
+  top: 20px;
+  left: -10px;
+  width: 36px;
+  height: 15px;
+  border-radius: 15px 15px 8px 8px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.app-icon.people .icon-mark::after {
+  top: 24px;
+  left: -19px;
+  width: 18px;
+  height: 10px;
+  border-radius: 10px 10px 6px 6px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 37px 0 0 rgba(255, 255, 255, 0.68);
+}

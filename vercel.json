@@ -1,0 +1,12 @@
+{
+  "framework": "vite",
+  "installCommand": "cd WEBアプリポータル && npm install",
+  "buildCommand": "cd WEBアプリポータル && npm run build",
+  "outputDirectory": "WEBアプリポータル/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -4,13 +4,6 @@ type AppCardProps = {
   app: PortalApp;
 };
 
-const iconLabels: Record<string, string> = {
-  check: '✓',
-  fax: 'FAX',
-  memo: '文',
-  people: '共',
-};
-
 export function AppCard({ app }: AppCardProps) {
   const appReady = Boolean(app.url);
   const manualReady = Boolean(app.manualUrl);
@@ -19,7 +12,7 @@ export function AppCard({ app }: AppCardProps) {
     <article className="app-card">
       <div className="app-card-top">
         <div className={`app-icon ${app.icon}`} aria-hidden="true">
-          {iconLabels[app.icon] ?? 'APP'}
+          <span className="icon-mark" />
         </div>
         <div>
           <h3>{app.name}</h3>

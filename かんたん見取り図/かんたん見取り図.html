@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>かんたん見取り図</title>
+<style>
+:root {
+  --bg: #eefaf8;
+  --panel: #ffffff;
+  --accent: #47b8c8;
+  --accent-strong: #247a8a;
+  --text: #1f2933;
+  --muted: #6b8790;
+  --border: #d5ecef;
+  --shadow: 0 12px 32px rgba(71, 184, 200, 0.12);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(182, 238, 232, 0.65) 0, transparent 30%),
+    radial-gradient(circle at bottom right, rgba(198, 231, 255, 0.6) 0, transparent 28%),
+    linear-gradient(180deg, #f4fffe 0%, #eaf7fb 100%);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+header {
+  background: rgba(250,255,255,0.96);
+  border-bottom: 1px solid #d9eff2;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent-strong);
+  letter-spacing: 0;
+}
+.spacer { flex: 1; }
+.btn {
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary {
+  background: linear-gradient(135deg, #2daec0, #63cfd2);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(45, 174, 192, 0.24);
+}
+.btn-soft {
+  background: #f5feff;
+  color: #3c7680;
+  border: 1px solid #d6edf0;
+}
+.btn-soft:hover { background: #e9f9fb; }
+.main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+  gap: 14px;
+}
+.input-panel {
+  width: 312px;
+  min-width: 230px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 18px 36px rgba(70, 155, 168, 0.10);
+}
+.side-intro {
+  padding: 16px;
+  background: linear-gradient(180deg, #ffffff, #f2fbfc);
+  border-bottom: 1px solid var(--border);
+}
+.side-kicker {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #ebf8fb;
+  color: #2d7c88;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.side-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent-strong);
+  line-height: 1.35;
+}
+.side-sub {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.template-block {
+  border-bottom: 1px solid var(--border);
+  padding: 12px;
+}
+.template-hero-btn {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #effbfd, #ddf6f8);
+  color: var(--accent-strong);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px #d7edf1;
+}
+.template-hero-cta {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 4px 9px 5px;
+  border-radius: 999px;
+  background: #fff;
+  color: #2d7f8d;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid #d4edf1;
+}
+.template-hero-label {
+  font-size: 16px;
+  font-weight: 800;
+}
+.template-hero-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #4d8b94;
+}
+.template-panel-body {
+  display: none;
+  padding-top: 10px;
+  gap: 8px;
+  flex-direction: column;
+}
+.template-block.open .template-panel-body { display: flex; }
+.template-btns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.preset-btn {
+  border: 1px solid #cdeaf0;
+  background: #f5fdff;
+  color: #2e7884;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+.preset-btn:hover { background: #e8f9fd; }
+.panel-hd {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.room-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+.room-card {
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,251,252,0.96));
+  box-shadow: 0 10px 18px rgba(67, 155, 168, 0.06);
+}
+.room-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.room-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #cfeff2;
+  color: var(--accent-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+.room-name {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+}
+.icon-btn {
+  border: none;
+  background: #fee2e2;
+  color: #d33a3a;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-weight: 800;
+}
+.room-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.room-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.room-grid input, .room-grid select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 7px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+}
+.full { grid-column: span 2; }
+.add-btn {
+  margin: 0 12px 12px;
+  border: none;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #edfafd, #e4f5f7);
+  color: #2d7d89;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.add-btn:hover { background: linear-gradient(135deg, #e3f7fb, #d8f1f4); }
+.canvas-wrap {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid #d9edf1;
+  background: #fff;
+  box-shadow: 0 22px 42px rgba(74, 166, 180, 0.10);
+}
+#svg-main {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-image:
+    linear-gradient(to right, rgba(0,0,0,0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.canvas-tools {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.canvas-tools-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+}
+.dtool-btn, .size-btn, .item-btn {
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid #cde7eb;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  color: #4b6c73;
+  font-size: 15px;
+}
+.dtool-btn:hover, .item-btn:hover, .size-btn:hover {
+  background: #edfafd;
+  border-color: #7ac5cf;
+}
+.dtool-btn.active, .item-btn.active, .size-btn.active {
+  background: #dff5f8;
+  border-color: #2daec0;
+  box-shadow: 0 0 0 2px rgba(45, 174, 192, 0.18);
+}
+.floating-picker {
+  position: absolute;
+  display: none;
+  z-index: 35;
+  background: rgba(255,255,255,0.96);
+  border: 1px solid #d8eef1;
+  border-radius: 16px;
+  box-shadow: 0 16px 28px rgba(71, 184, 200, 0.14);
+}
+.canvas-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  text-align: center;
+}
+.canvas-hint .txt {
+  color: #5f8c93;
+  line-height: 1.8;
+  font-size: 14px;
+  background: rgba(248,255,255,0.9);
+  padding: 16px 20px;
+  border-radius: 16px;
+  border: 1px solid #d8eef1;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(70px);
+  background: #1e293b;
+  color: #fff;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  transition: transform 0.24s;
+  z-index: 100;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+@media (max-width: 768px) {
+  .main { padding: 10px; gap: 10px; }
+  .input-panel { width: 230px; min-width: 170px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>かんたん見取り図</h1>
+  <button class="btn btn-soft" onclick="clearAll()">リセット</button>
+  <button class="btn btn-soft" onclick="loadDefaultTemplate()">標準テンプレート</button>
+  <div class="spacer"></div>
+  <button class="btn btn-primary" onclick="exportPNG()">フォルダ保存</button>
+</header>
+
+<div class="main">
+  <div class="input-panel">
+    <div class="side-intro">
+      <div class="side-kicker">MAPPING</div>
+      <div class="side-title">白黒の見取り図を作成</div>
+      <div class="side-sub">一般的な間取りを選んでから、部屋名・位置・大きさを手入力で調整できます。</div>
+    </div>
+    <div id="templateBlock" class="template-block open">
+      <div class="template-hero-btn" onclick="toggleTemplatePanel()">
+        <div class="template-hero-cta">テンプレート</div>
+        <div class="template-hero-label">間取りを選ぶ</div>
+        <div class="template-hero-sub">1L、1DK、1LDK、2LDK など</div>
+      </div>
+      <div class="template-panel-body">
+        <div id="templateBtns" class="template-btns"></div>
+      </div>
+    </div>
+    <div class="panel-hd">部屋・設備リスト</div>
+    <div id="roomList" class="room-list"></div>
+    <button class="add-btn" onclick="addRoom()">＋ 部屋を追加</button>
+  </div>
+
+  <div class="canvas-wrap">
+    <div class="canvas-tools">
+      <div class="canvas-tools-row">
+        <button id="palette-toggle" onclick="togglePalette()" title="アイテムメニュー" class="dtool-btn">☰</button>
+        <button class="dtool-btn" onclick="toggleStrokePicker()" title="線の太さ">〓</button>
+        <button class="dtool-btn" id="dtool-line" onclick="setDrawMode('line', this)" title="直線">／</button>
+        <button class="dtool-btn" id="dtool-dash-line" onclick="setDrawMode('dash-line', this)" title="点線">┄</button>
+        <button class="dtool-btn" id="dtool-enclose" onclick="setDrawMode('enclose', this)" title="楕円">○</button>
+        <button class="dtool-btn" id="dtool-rect-enc" onclick="setDrawMode('rect-enc', this)" title="四角">□</button>
+        <button class="dtool-btn" id="dtool-pen" onclick="setDrawMode('pen', this)" title="ペン">P</button>
+        <button class="dtool-btn" id="dtool-text" onclick="setDrawMode('text', this)" title="テキスト">A</button>
+        <button class="dtool-btn" onclick="deleteSelected()" title="削除">×</button>
+        <button class="dtool-btn" onclick="undoAction()" title="元に戻す">↩</button>
+      </div>
+    </div>
+
+    <div id="stroke-size-picker" class="floating-picker" style="top:10px;left:54px;padding:8px;">
+      <div style="display:flex;gap:6px;">
+        <button class="size-btn" onclick="setStrokeWidth(1.5,this)" title="細">細</button>
+        <button class="size-btn active" onclick="setStrokeWidth(3,this)" title="中">中</button>
+        <button class="size-btn" onclick="setStrokeWidth(5,this)" title="太">太</button>
+      </div>
+    </div>
+
+    <div id="item-palette" class="floating-picker" style="top:10px;left:54px;padding:8px;">
+      <div style="display:flex;gap:6px;">
+        <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
+        <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
+        <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
+        <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
+      </div>
+    </div>
+
+    <div id="text-size-picker" class="floating-picker" style="top:10px;left:54px;padding:10px;flex-direction:column;align-items:center;gap:6px;">
+      <div style="font-size:10px;color:#6e8f94;font-weight:700;">文字サイズ</div>
+      <input id="text-size-input" type="number" min="6" max="96" step="1" value="28" style="width:56px;text-align:center;border:1px solid #bcdfe4;border-radius:6px;padding:4px 5px;font-size:14px;font-weight:700;" oninput="setTextSize(parseInt(this.value)||28)">
+      <div style="display:flex;gap:4px;">
+        <button id="text-dir-h" onclick="setTextDir('h')" class="dtool-btn active" style="width:auto;padding:0 10px;">横</button>
+        <button id="text-dir-v" onclick="setTextDir('v')" class="dtool-btn" style="width:auto;padding:0 10px;">縦</button>
+      </div>
+    </div>
+
+    <svg id="svg-main" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+      <g id="canvas-offset">
+        <g id="layer-lines"></g>
+        <g id="layer-nodes"></g>
+        <g id="layer-draw"></g>
+        <g id="layer-handles"></g>
+      </g>
+    </svg>
+    <div id="canvasHint" class="canvas-hint">
+      <div class="txt">左のテンプレートから<br>一般的な見取り図を作成できます</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const templates = [
+  {
+    name: "1L",
+    rooms: [
+      { name: "居室", type: "room", x: 80, y: 70, w: 720, h: 560 },
+      { name: "トイレ", type: "toilet", x: 80, y: 630, w: 260, h: 120 },
+      { name: "洗面", type: "wet", x: 820, y: 500, w: 260, h: 120 },
+      { name: "収納", type: "storage", x: 820, y: 370, w: 260, h: 120 },
+      { name: "ドア", type: "door", x: 480, y: 748, w: 260, h: 26 },
+      { name: "ベッド", type: "bed", x: 150, y: 105, w: 260, h: 380 },
+      { name: "TV", type: "furniture", x: 890, y: 120, w: 90, h: 260 }
+    ]
+  },
+  {
+    name: "1DK",
+    rooms: [
+      { name: "洋室", type: "room", x: 70, y: 70, w: 500, h: 360 },
+      { name: "DK", type: "room", x: 570, y: 70, w: 520, h: 360 },
+      { name: "玄関", type: "entry", x: 570, y: 620, w: 220, h: 120 },
+      { name: "トイレ", type: "toilet", x: 70, y: 500, w: 220, h: 210 },
+      { name: "浴室", type: "wet", x: 820, y: 500, w: 270, h: 210 },
+      { name: "収納", type: "storage", x: 310, y: 500, w: 230, h: 210 }
+    ]
+  },
+  {
+    name: "1LDK",
+    rooms: [
+      { name: "寝室", type: "room", x: 70, y: 70, w: 360, h: 300 },
+      { name: "LDK", type: "room", x: 430, y: 70, w: 660, h: 430 },
+      { name: "廊下", type: "hall", x: 70, y: 370, w: 1020, h: 90 },
+      { name: "トイレ", type: "toilet", x: 70, y: 500, w: 200, h: 220 },
+      { name: "洗面", type: "wet", x: 300, y: 500, w: 220, h: 220 },
+      { name: "浴室", type: "wet", x: 540, y: 500, w: 240, h: 220 },
+      { name: "玄関", type: "entry", x: 820, y: 590, w: 270, h: 130 }
+    ]
+  },
+  {
+    name: "2LDK",
+    rooms: [
+      { name: "洋室1", type: "room", x: 70, y: 70, w: 330, h: 270 },
+      { name: "洋室2", type: "room", x: 70, y: 360, w: 330, h: 270 },
+      { name: "LDK", type: "room", x: 430, y: 70, w: 660, h: 380 },
+      { name: "廊下", type: "hall", x: 430, y: 450, w: 660, h: 90 },
+      { name: "トイレ", type: "toilet", x: 430, y: 560, w: 190, h: 170 },
+      { name: "洗面", type: "wet", x: 650, y: 560, w: 210, h: 170 },
+      { name: "浴室", type: "wet", x: 880, y: 560, w: 210, h: 170 },
+      { name: "玄関", type: "entry", x: 70, y: 650, w: 330, h: 90 }
+    ]
+  }
+];
+
+let rooms = [];
+let dragState = null;
+let currentStrokeWidth = 3;
+let currentDrawMode = "";
+let currentPlaceMode = "";
+let currentTextSize = 28;
+let currentTextDir = "h";
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function createRoom(data = {}) {
+  return {
+    id: data.id || uid(),
+    name: data.name || "部屋",
+    type: data.type || "room",
+    x: Number(data.x ?? 90),
+    y: Number(data.y ?? 90),
+    w: Number(data.w ?? 180),
+    h: Number(data.h ?? 120)
+  };
+}
+
+function toggleTemplatePanel() {
+  document.getElementById("templateBlock").classList.toggle("open");
+}
+
+function renderTemplateButtons() {
+  const wrap = document.getElementById("templateBtns");
+  wrap.innerHTML = "";
+  templates.forEach((tpl) => {
+    const btn = document.createElement("button");
+    btn.className = "preset-btn";
+    btn.textContent = tpl.name;
+    btn.onclick = () => applyTemplate(tpl);
+    wrap.appendChild(btn);
+  });
+}
+
+function applyTemplate(template) {
+  rooms = template.rooms.map((room) => createRoom(room));
+  renderAll();
+  showToast(`${template.name} を読み込みました`);
+}
+
+function loadDefaultTemplate() {
+  applyTemplate(templates[0]);
+}
+
+function addRoom() {
+  rooms.push(createRoom({ name: `部屋${rooms.length + 1}`, x: 90 + rooms.length * 18, y: 90 + rooms.length * 18 }));
+  renderAll();
+}
+
+function removeRoom(id) {
+  rooms = rooms.filter((room) => room.id !== id);
+  renderAll();
+}
+
+function updateRoom(id, key, value) {
+  const room = rooms.find((item) => item.id === id);
+  if (!room) return;
+  room[key] = ["x", "y", "w", "h"].includes(key) ? Number(value || 0) : value;
+  if (key === "w") room.w = Math.max(40, room.w);
+  if (key === "h") room.h = Math.max(24, room.h);
+  renderAll(false);
+}
+
+function renderRoomList() {
+  const wrap = document.getElementById("roomList");
+  wrap.innerHTML = "";
+  rooms.forEach((room, index) => {
+    const card = document.createElement("div");
+    card.className = "room-card";
+    card.innerHTML = `
+      <div class="room-top">
+        <div class="room-badge">${index + 1}</div>
+        <input class="room-name" value="${escapeHtml(room.name)}" data-id="${room.id}" data-key="name">
+        <button class="icon-btn" data-del="${room.id}">×</button>
+      </div>
+      <div class="room-grid">
+        <label>種類
+          <select data-id="${room.id}" data-key="type">
+            <option value="room" ${room.type === "room" ? "selected" : ""}>部屋</option>
+            <option value="hall" ${room.type === "hall" ? "selected" : ""}>廊下</option>
+            <option value="entry" ${room.type === "entry" ? "selected" : ""}>玄関</option>
+            <option value="toilet" ${room.type === "toilet" ? "selected" : ""}>トイレ</option>
+            <option value="wet" ${room.type === "wet" ? "selected" : ""}>水回り</option>
+            <option value="storage" ${room.type === "storage" ? "selected" : ""}>収納</option>
+            <option value="bed" ${room.type === "bed" ? "selected" : ""}>ベッド</option>
+            <option value="furniture" ${room.type === "furniture" ? "selected" : ""}>家具</option>
+            <option value="door" ${room.type === "door" ? "selected" : ""}>ドア</option>
+          </select>
+        </label>
+        <label>幅
+          <input type="number" min="40" data-id="${room.id}" data-key="w" value="${room.w}">
+        </label>
+        <label>X
+          <input type="number" data-id="${room.id}" data-key="x" value="${room.x}">
+        </label>
+        <label>Y
+          <input type="number" data-id="${room.id}" data-key="y" value="${room.y}">
+        </label>
+        <label class="full">高さ
+          <input type="number" min="24" data-id="${room.id}" data-key="h" value="${room.h}">
+        </label>
+      </div>
+    `;
+    wrap.appendChild(card);
+  });
+  wrap.querySelectorAll("[data-key]").forEach((el) => {
+    el.addEventListener("input", (event) => updateRoom(event.target.dataset.id, event.target.dataset.key, event.target.value));
+  });
+  wrap.querySelectorAll("[data-del]").forEach((el) => {
+    el.addEventListener("click", () => removeRoom(el.dataset.del));
+  });
+}
+
+function renderSVG(showHint = true) {
+  const layerNodes = document.getElementById("layer-nodes");
+  if (!layerNodes) return;
+  layerNodes.innerHTML = "";
+  rooms.forEach((room) => {
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.setAttribute("transform", `translate(${room.x} ${room.y})`);
+    group.dataset.id = room.id;
+    group.style.cursor = "grab";
+
+    if (room.type === "bed") renderBed(group, room);
+    else if (room.type === "door") renderDoor(group, room);
+    else if (room.type === "furniture") renderFurniture(group, room);
+    else renderSpace(group, room);
+
+    layerNodes.appendChild(group);
+    group.addEventListener("pointerdown", (event) => startDrag(event, room.id));
+  });
+  document.getElementById("canvasHint").style.display = showHint && rooms.length === 0 ? "flex" : "none";
+}
+
+function renderSpace(group, room) {
+  const rect = svgEl("rect", {
+    width: room.w,
+    height: room.h,
+    rx: room.type === "toilet" || room.type === "wet" ? 2 : 0,
+    fill: "#fff",
+    stroke: "#000",
+    "stroke-width": room.type === "hall" ? 3 : 5
+  });
+  group.appendChild(rect);
+  addLabel(group, room.name, room.w / 2, room.h / 2 + 10, room.type === "storage" ? 34 : 42);
+
+  if (room.type === "toilet") {
+    group.appendChild(svgEl("ellipse", { cx: room.w / 2 + 16, cy: room.h / 2 + 28, rx: 58, ry: 38, fill: "none", stroke: "#000", "stroke-width": 5 }));
+    group.appendChild(svgEl("rect", { x: 22, y: room.h / 2, width: 62, height: 72, rx: 10, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
+  }
+  if (room.type === "wet") {
+    group.appendChild(svgEl("rect", { x: 26, y: room.h - 92, width: room.w - 52, height: 70, rx: 10, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
+    group.appendChild(svgEl("circle", { cx: room.w / 2, cy: room.h - 56, r: 7, fill: "#000" }));
+  }
+}
+
+function renderBed(group, room) {
+  group.appendChild(svgEl("rect", { width: room.w, height: room.h, rx: 14, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
+  group.appendChild(svgEl("rect", { x: 28, y: 20, width: room.w - 56, height: 70, rx: 14, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
+  group.appendChild(svgEl("line", { x1: 0, y1: 110, x2: room.w, y2: 110, stroke: "#000", "stroke-width": 5 }));
+  addLabel(group, room.name, room.w / 2, room.h / 2 + 20, 42);
+}
+
+function renderDoor(group, room) {
+  group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "#fff", stroke: "#000", "stroke-width": 3 }));
+  group.appendChild(svgEl("line", { x1: 0, y1: room.h / 2, x2: room.w, y2: room.h / 2, stroke: "#000", "stroke-width": 3 }));
+  addLabel(group, room.name, room.w / 2, room.h + 44, 42);
+}
+
+function renderFurniture(group, room) {
+  group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
+  group.appendChild(svgEl("line", { x1: room.w / 2, y1: 30, x2: room.w / 2, y2: room.h - 30, stroke: "#000", "stroke-width": 8 }));
+  addLabel(group, room.name, -42, room.h / 2, 42);
+}
+
+function addLabel(group, text, x, y, size) {
+  const label = svgEl("text", {
+    x, y,
+    "text-anchor": "middle",
+    "font-size": size,
+    "font-weight": 800,
+    fill: "#000",
+    "font-family": "Hiragino Sans, Yu Gothic UI, Meiryo, sans-serif"
+  });
+  label.textContent = text;
+  group.appendChild(label);
+}
+
+function svgEl(name, attrs) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", name);
+  Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+  return el;
+}
+
+function renderAll(showHint = true) {
+  renderRoomList();
+  renderSVG(showHint);
+}
+
+function startDrag(event, id) {
+  const room = rooms.find((item) => item.id === id);
+  if (!room) return;
+  dragState = { id, startX: event.clientX, startY: event.clientY, origX: room.x, origY: room.y };
+}
+
+window.addEventListener("pointermove", (event) => {
+  if (!dragState) return;
+  const svg = document.getElementById("svg-main");
+  const scaleX = 1200 / svg.clientWidth;
+  const scaleY = 800 / svg.clientHeight;
+  const room = rooms.find((item) => item.id === dragState.id);
+  if (!room) return;
+  room.x = Math.max(0, Math.round(dragState.origX + (event.clientX - dragState.startX) * scaleX));
+  room.y = Math.max(0, Math.round(dragState.origY + (event.clientY - dragState.startY) * scaleY));
+  renderAll(false);
+});
+
+window.addEventListener("pointerup", () => {
+  dragState = null;
+});
+
+function clearAll() {
+  rooms = [];
+  ["layer-lines", "layer-nodes", "layer-draw", "layer-handles"].forEach((id) => {
+    const layer = document.getElementById(id);
+    if (layer) layer.innerHTML = "";
+  });
+  renderAll();
+  showToast("見取り図をリセットしました");
+}
+
+function showToast(message) {
+  const el = document.getElementById("toast");
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => el.classList.remove("show"), 1800);
+}
+
+function togglePalette() {
+  const palette = document.getElementById("item-palette");
+  palette.style.display = palette.style.display === "none" || !palette.style.display ? "block" : "none";
+}
+
+function toggleStrokePicker() {
+  const picker = document.getElementById("stroke-size-picker");
+  picker.style.display = picker.style.display === "none" || !picker.style.display ? "block" : "none";
+}
+
+function setStrokeWidth(width, button) {
+  currentStrokeWidth = width;
+  document.querySelectorAll(".size-btn").forEach((el) => el.classList.remove("active"));
+  if (button) button.classList.add("active");
+  showToast(`線の太さを ${width} にしました`);
+}
+
+function setDrawMode(mode, button) {
+  currentDrawMode = currentDrawMode === mode ? "" : mode;
+  currentPlaceMode = "";
+  document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
+  document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
+  if (currentDrawMode && button) button.classList.add("active");
+  document.getElementById("text-size-picker").style.display = currentDrawMode === "text" ? "flex" : "none";
+  showToast(currentDrawMode ? `${mode} を選択しました` : "描画モードを解除しました");
+}
+
+function setPlaceMode(mode, button) {
+  currentPlaceMode = currentPlaceMode === mode ? "" : mode;
+  currentDrawMode = "";
+  document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
+  document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
+  if (currentPlaceMode && button) button.classList.add("active");
+  showToast(currentPlaceMode ? `${mode} を選択しました` : "アイテム選択を解除しました");
+}
+
+function deleteSelected() {
+  showToast("削除ボタンは配置済みです");
+}
+
+function undoAction() {
+  showToast("元に戻すボタンは配置済みです");
+}
+
+function setTextSize(size) {
+  currentTextSize = size;
+}
+
+function setTextDir(dir) {
+  currentTextDir = dir;
+  document.getElementById("text-dir-h").classList.toggle("active", dir === "h");
+  document.getElementById("text-dir-v").classList.toggle("active", dir === "v");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function exportPNG() {
+  const svg = document.getElementById("svg-main");
+  const xml = new XMLSerializer().serializeToString(svg);
+  const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+
+  img.onload = async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 800;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+
+    const fileName = `見取り図_${new Date().toISOString().slice(0, 10)}.png`;
+    try {
+      if (window.showSaveFilePicker) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: fileName,
+          types: [{ description: "PNG画像", accept: { "image/png": [".png"] } }]
+        });
+        const writable = await handle.createWritable();
+        const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        await writable.write(pngBlob);
+        await writable.close();
+        showToast("見取り図を保存しました");
+      } else {
+        const a = document.createElement("a");
+        a.href = canvas.toDataURL("image/png");
+        a.download = fileName;
+        a.click();
+        showToast("見取り図をダウンロードしました");
+      }
+    } catch (error) {
+      if (error && error.name !== "AbortError") alert("保存に失敗しました。");
+    }
+  };
+  img.src = url;
+}
+
+renderTemplateButtons();
+renderAll();
+</script>
+</body>
+</html>

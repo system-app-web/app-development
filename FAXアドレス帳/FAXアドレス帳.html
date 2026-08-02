@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAXアドレス帳</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Meiryo','Yu Gothic',sans-serif;background:#f4f8fd;color:#1e3a5f}
+header{background:linear-gradient(135deg,#1e3a5f 0%,#2d5a8e 100%);color:white;padding:12px 20px;display:flex;align-items:center;gap:12px;box-shadow:0 3px 16px rgba(30,58,95,0.35);flex-wrap:wrap}
+header h1{font-size:19px;font-weight:800;white-space:nowrap}
+.search-box{flex:1;min-width:160px;max-width:340px;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.4);border-radius:20px;padding:7px 14px;color:white;font-size:13px}
+.search-box::placeholder{color:rgba(255,255,255,0.65)}
+.search-box:focus{outline:none;background:rgba(255,255,255,0.25)}
+.btn-header{padding:7px 14px;background:rgba(255,255,255,0.15);color:white;border:2px solid rgba(255,255,255,0.45);border-radius:20px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:700;transition:all 0.15s;white-space:nowrap}
+.btn-header:hover{background:rgba(255,255,255,0.28)}
+.layout{display:flex;height:calc(100vh - 58px)}
+.sidebar{width:210px;background:#fff;border-right:2px solid #dce3ec;overflow-y:auto;flex-shrink:0}
+.sidebar-section{padding:9px 12px 5px;font-size:10px;font-weight:800;color:#2d5a8e;letter-spacing:0.08em;border-bottom:1px solid #dce3ec;background:#eef2f7;text-transform:uppercase}
+.name-item{padding:9px 13px;cursor:grab;border-bottom:1px solid #f0f4f8;transition:background 0.1s;display:flex;flex-direction:column;user-select:none}
+.name-item:hover{background:#eef2f7}
+.name-item.active{background:#e0eaf6;border-left:3px solid #2d5a8e}
+.name-item.dragging{opacity:0.4;background:#dce8f5}
+.name-item.drag-over{border-top:2px solid #2d5a8e}
+.name-item .kanji{font-size:15px;font-weight:700;color:#1e3a5f}
+.main{flex:1;overflow-y:auto;padding:18px 22px}
+.category-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.cat-btn{padding:6px 14px;border:2px solid #c5d4e6;border-radius:20px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.15s;font-family:inherit;color:#2d5a8e}
+.cat-btn:hover{border-color:#2d5a8e;background:#eef2f7}
+.cat-btn.active{background:linear-gradient(135deg,#1e3a5f,#2d5a8e);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(30,58,95,0.25)}
+.facility-table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(30,58,95,0.1);margin-bottom:20px;border:1px solid #dce3ec}
+.facility-table thead tr{background:linear-gradient(90deg,#1e3a5f,#2d5a8e);color:white}
+.facility-table th{padding:11px 15px;text-align:left;font-size:12px;font-weight:700}
+.facility-table td{padding:10px 15px;font-size:13px;border-bottom:1px solid #f0f4f8;vertical-align:middle}
+.facility-table tr:last-child td{border-bottom:none}
+.facility-table tbody tr:hover{background:#f4f8fd}
+.fax-number{font-family:monospace;font-size:15px;letter-spacing:0.05em;font-weight:800;color:#c0392b;cursor:pointer;user-select:all;padding:3px 7px;border-radius:6px;background:#fdf0ee}
+.fax-number:hover{background:#fad7d2}
+.copy-btn{padding:4px 10px;background:#eef2f7;border:1px solid #c5d4e6;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:600;color:#2d5a8e;transition:all 0.1s;white-space:nowrap}
+.copy-btn:hover{background:#dce8f5}
+.copy-btn.copied{background:#d4edda;border-color:#a3d4b0;color:#1a6b33}
+.cat-badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600}
+.cat-病院{background:#fde8e6;color:#a93226}
+.cat-訪問{background:#d5f5e3;color:#1a6b33}
+.cat-保護{background:#ede7f6;color:#5b2c87}
+.cat-事業{background:#e3f0fc;color:#1a5276}
+.empty-msg{text-align:center;padding:60px 20px;color:#90a8c4;font-size:15px;font-weight:500}
+.action-bar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+.action-bar h2{flex:1;font-size:16px;font-weight:800;color:#1e3a5f}
+.btn-primary{padding:7px 15px;background:linear-gradient(135deg,#1e3a5f,#2d5a8e);color:white;border:none;border-radius:20px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:700;box-shadow:0 2px 8px rgba(30,58,95,0.25);transition:opacity 0.15s;white-space:nowrap}
+.btn-primary:hover{opacity:0.85}
+.btn-danger{padding:4px 10px;background:#fdf0ee;color:#c0392b;border:1px solid #f1a99e;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:600;transition:all 0.1s}
+.btn-danger:hover{background:#fad7d2}
+.btn-edit{padding:4px 10px;background:#eef2f7;color:#2d5a8e;border:1px solid #c5d4e6;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:600}
+.btn-edit:hover{background:#dce8f5}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.modal-overlay.open{display:flex}
+.modal{background:white;border-radius:14px;padding:26px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.18);border-top:4px solid #2d5a8e}
+.modal h3{font-size:16px;font-weight:800;margin-bottom:18px;color:#1e3a5f}
+.form-row{margin-bottom:13px}
+.form-row label{display:block;font-size:11px;font-weight:700;color:#2d5a8e;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em}
+.form-row input,.form-row select{width:100%;padding:9px 12px;border:2px solid #c5d4e6;border-radius:8px;font-size:14px;font-family:inherit;background:#fafcff}
+.form-row input:focus,.form-row select:focus{outline:none;border-color:#2d5a8e;box-shadow:0 0 0 3px rgba(45,90,142,0.12)}
+.hint{font-size:11px;color:#c0392b;margin-top:4px;font-weight:600}
+.modal-btns{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.btn-cancel{padding:9px 18px;background:#eef2f7;border:2px solid #c5d4e6;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600;color:#2d5a8e}
+.btn-cancel:hover{background:#dce8f5}
+.btn-save{padding:9px 20px;background:linear-gradient(135deg,#1e3a5f,#2d5a8e);color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700;box-shadow:0 2px 8px rgba(30,58,95,0.25)}
+.btn-save:hover{opacity:0.88}
+.modal-tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #dce3ec}
+.modal-tab{padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700;color:#90a8c4;border-bottom:3px solid transparent;margin-bottom:-2px;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.modal-tab.active{color:#2d5a8e;border-bottom-color:#2d5a8e}
+.facility-search-box{width:100%;padding:8px 12px;border:2px solid #c5d4e6;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:10px;background:#fafcff}
+.facility-search-box:focus{outline:none;border-color:#2d5a8e}
+.facility-check-list{max-height:220px;overflow-y:auto;border:2px solid #c5d4e6;border-radius:10px}
+.facility-check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid #f0f4f8;cursor:pointer;transition:background 0.1s}
+.facility-check-item:last-child{border-bottom:none}
+.facility-check-item:hover{background:#f4f8fd}
+.facility-check-item input[type=checkbox]{margin-top:2px;width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#2d5a8e}
+.fc-name{font-size:13px;line-height:1.4;font-weight:500}
+.fc-fax{font-size:12px;color:#c0392b;font-family:monospace;font-weight:800}
+.fc-cat{font-size:11px;color:#90a8c4;margin-top:2px}
+.selected-count{font-size:12px;color:#2d5a8e;font-weight:700}
+.no-result{padding:20px;text-align:center;color:#90a8c4;font-size:13px}
+.toast{position:fixed;bottom:22px;right:22px;background:#1e3a5f;color:white;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transform:translateY(10px);transition:all 0.3s;pointer-events:none;z-index:200;display:flex;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2)}
+.toast.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.toast-undo{padding:4px 10px;background:#f0c040;color:#1e3a5f;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;font-family:inherit;white-space:nowrap}
+.count-label{font-size:11px;color:#90a8c4;margin-left:6px;font-weight:600}
+.kagami-modal{background:white;border-radius:14px;width:700px;max-width:97vw;max-height:90vh;box-shadow:0 24px 64px rgba(0,0,0,0.18);display:flex;flex-direction:column;overflow:hidden;border-top:4px solid #2d5a8e}
+.kagami-header{padding:16px 22px;border-bottom:2px solid #dce3ec;display:flex;align-items:center;gap:10px;background:#eef2f7}
+.kagami-header h3{font-size:16px;font-weight:800;flex:1;color:#1e3a5f}
+.kagami-body{display:flex;flex:1;overflow:hidden;min-height:400px}
+.kagami-list{width:150px;border-right:2px solid #dce3ec;overflow-y:auto;background:#eef2f7;flex-shrink:0}
+.kagami-list-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid #dce3ec;font-size:13px;font-weight:600;color:#1e3a5f}
+.kagami-list-item:hover{background:#dce8f5}
+.kagami-list-item.active{background:#e0eaf6;border-left:3px solid #2d5a8e;color:#2d5a8e}
+.kagami-list-add{padding:10px 14px;cursor:pointer;font-size:12px;color:#90a8c4;border-top:1px solid #dce3ec;font-weight:600}
+.kagami-list-add:hover{background:#eef2f7;color:#2d5a8e}
+.kagami-editor{flex:1;padding:18px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.tpl-name-input{width:100%;padding:8px 12px;border:2px solid #c5d4e6;border-radius:8px;font-size:15px;font-weight:700;font-family:inherit;color:#1e3a5f;background:#fafcff}
+.tpl-name-input:focus{outline:none;border-color:#2d5a8e;box-shadow:0 0 0 3px rgba(45,90,142,0.12)}
+.kagami-textarea{width:100%;min-height:260px;padding:12px;border:2px solid #c5d4e6;border-radius:8px;font-size:14px;font-family:'Meiryo','Yu Gothic',sans-serif;line-height:1.9;resize:vertical;background:#fafcff}
+.kagami-textarea:focus{outline:none;border-color:#2d5a8e;box-shadow:0 0 0 3px rgba(45,90,142,0.12)}
+.kagami-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-copy-kagami{padding:9px 20px;background:linear-gradient(135deg,#1e3a5f,#2d5a8e);color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700;box-shadow:0 2px 8px rgba(30,58,95,0.25)}
+.btn-copy-kagami:hover{opacity:0.88}
+.btn-copy-kagami.copied{background:#1a6b33}
+.btn-save-tpl{padding:9px 16px;background:#eef2f7;border:2px solid #c5d4e6;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600;color:#2d5a8e}
+.btn-save-tpl:hover{background:#dce8f5}
+.btn-del-tpl{margin-left:auto;padding:9px 14px;background:#fdf0ee;color:#c0392b;border:1px solid #f1a99e;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600}
+.btn-del-tpl:hover{background:#fad7d2}
+.kagami-empty{flex:1;display:flex;align-items:center;justify-content:center;color:#90a8c4;font-size:14px}
+.pcat-btn{padding:4px 10px;border:1.5px solid #c5d4e6;border-radius:14px;background:#fff;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;color:#2d5a8e;transition:all 0.12s;white-space:nowrap}
+.pcat-btn:hover{border-color:#2d5a8e;background:#eef2f7}
+.pcat-btn.pcat-active{background:linear-gradient(135deg,#1e3a5f,#2d5a8e);color:#fff;border-color:transparent}
+</style>
+</head>
+<body>
+<header>
+  <h1>📠 FAXアドレス帳</h1>
+  <input class="search-box" id="searchBox" type="text" placeholder="名前・事業所を検索…" oninput="applyFilters()">
+  <button class="btn-header" onclick="openKagami()">📄 FAXかがみ</button>
+  <button class="btn-header" onclick="openModal('add-person')">👤 利用者 新規登録</button>
+  <button class="btn-header" onclick="openModal('add-facility-global')">🏥 事業所 新規登録</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main" id="main">
+    <div class="category-bar" id="categoryBar"></div>
+    <div id="content"><div class="empty-msg">← 左から利用者を選ぶか、カテゴリで絞り込んでください</div></div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnOverlay(event)">
+  <div class="modal">
+    <h3 id="modalTitle">新規登録</h3>
+    <div class="modal-tabs" id="modalTabs" style="display:none">
+      <button class="modal-tab active" id="tabExist" onclick="switchTab('exist')">既存から選ぶ</button>
+      <button class="modal-tab" id="tabNew" onclick="switchTab('new')">新規入力</button>
+    </div>
+    <div id="panelExist" style="display:none">
+      <div id="selectedCount" class="selected-count" style="margin-bottom:8px"></div>
+      <input class="facility-search-box" id="facilitySearch" type="text" placeholder="事業所名・FAX番号で絞り込み…" oninput="filterFacilityList()">
+      <div class="facility-check-list" id="facilityCheckList"></div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-save" onclick="saveExistingFacilities()">選択した事業所を追加</button>
+      </div>
+    </div>
+    <div id="panelNew">
+      <div class="form-row" id="rowName">
+        <label>利用者名</label>
+        <input id="fName">
+      </div>
+      <div id="rowFacilitySelect" style="display:none">
+        <div style="font-size:11px;font-weight:700;color:#2d5a8e;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">関係事業所（任意・複数選択可）</div>
+        <div id="personCatFilter" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px"></div>
+        <input class="facility-search-box" id="personFacilitySearch" type="text" placeholder="事業所名・FAX番号で絞り込み…" oninput="filterPersonFacilityList()">
+        <div class="facility-check-list" id="personFacilityList"></div>
+        <div id="personSelectedCount" class="selected-count" style="margin-top:6px"></div>
+      </div>
+      <div id="rowFacilityFields">
+        <div class="form-row">
+          <label>事業所名（担当者名）</label>
+          <input id="fFacility">
+        </div>
+        <div class="form-row">
+          <label>FAX番号 ※要確認</label>
+          <input id="fFax" oninput="validateFax()">
+          <div class="hint" id="faxHint" style="display:none">⚠ FAX番号は数字のみで入力してください（間違い厳禁）</div>
+        </div>
+        <div class="form-row">
+          <label>カテゴリ</label>
+          <select id="fCategory">
+            <option value="">-- 選択 --</option>
+            <option>病院・薬局・歯科</option>
+            <option>訪問看護</option>
+            <option>保護課</option>
+            <option>事業所</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-save" onclick="saveEntry()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="kagamiOverlay" onclick="closeKagamiOnOverlay(event)">
+  <div class="kagami-modal">
+    <div class="kagami-header">
+      <h3>📄 FAXかがみ テンプレート</h3>
+      <button class="btn-cancel" onclick="closeKagami()">閉じる</button>
+    </div>
+    <div class="kagami-body">
+      <div class="kagami-list" id="kagamiList"></div>
+      <div class="kagami-editor" id="kagamiEditor"><div class="kagami-empty">← テンプレートを選択してください</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY='fax_address_book_v1';
+const ORDER_KEY='fax_name_order_v1';
+const TEMPLATE_KEY='fax_kagami_templates_v1';
+const INITIAL_DATA=[{"name":"いい　飯尾文明","facility":"やすだクリニック 御中　ご担当者様","fax":"0924075001","category":"病院・薬局・歯科"},{"name":"いし　石原孝子","facility":"宮崎内科クリニック 御中　牛島様","fax":"0926818759","category":"病院・薬局・歯科"},{"name":"いし　石原孝子","facility":"きらり薬局　次郎丸店 御中　ご担当者様","fax":"0928346861","category":"病院・薬局・歯科"},{"name":"いし　石原孝子","facility":"早良区保護課 御中　ノブCW様","fax":"0928315744","category":"保護課"},{"name":"いし　石原孝子","facility":"周船寺ハローパークペガサス歯科クリニック 御中　山脇様","fax":"0924070737","category":"病院・薬局・歯科"},{"name":"いし　石原孝子","facility":"西福岡病院　地域医療連携室 御中　ご担当者様","fax":"05037304538","category":"病院・薬局・歯科"},{"name":"うえ　上杉哲生","facility":"松口内科・循環器科クリニック 御中　ご担当者様","fax":"0928346900","category":"病院・薬局・歯科"},{"name":"うえ　上杉哲生","facility":"医師会訪問看護ステーション西部 御中　桑原様","fax":"0928446419","category":"訪問看護"},{"name":"うめ　梅本八重美","facility":"南折立病院 御中　ご担当者様","fax":"0925017676","category":"病院・薬局・歯科"},{"name":"うめ　梅本八重美","facility":"南区保護課 御中　比嘉ケースワーカー様","fax":"0925595147","category":"保護課"},{"name":"おお　大宅伸康","facility":"きらり薬局　姪浜店 御中　ご担当者様","fax":"0928342010","category":"病院・薬局・歯科"},{"name":"おく　奥田玲子","facility":"つつみクリニック福岡 御中　ご担当者様","fax":"0922732221","category":"病院・薬局・歯科"},{"name":"おく　奥田玲子","facility":"日本調剤 城南薬局 御中　ご担当者様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"おく　奥田玲子","facility":"グランダ博多ケアステーション 御中　加茂様　藤田様","fax":"0924193501","category":"事業所"},{"name":"おく　奥田玲子","facility":"ソフィアメディ訪問看護ステーション福岡南 御中　ご担当者様","fax":"0925588703","category":"事業所"},{"name":"おく　奥田玲子","facility":"㈱サニクリーン九州福祉用具サービス 御中　関様","fax":"0924742033","category":"事業所"},{"name":"おぞ　尾園房子","facility":"よかデイサービスそよかぜ 御中　大和様","fax":"0925028576","category":"事業所"},{"name":"おぞ　尾園房子","facility":"伊原春日クリニック 御中　ご担当者様","fax":"0925828431","category":"病院・薬局・歯科"},{"name":"おぞ　尾園房子","facility":"博多区保護課 御中　松尾ケースワーカー様","fax":"0924340021","category":"保護課"},{"name":"おに　鬼丸祐輔","facility":"つつみクリニック福岡 御中　ご担当者様","fax":"0922732221","category":"病院・薬局・歯科"},{"name":"おに　鬼丸祐輔","facility":"きらり薬局　姪浜店 御中　ご担当者様","fax":"0928342010","category":"病院・薬局・歯科"},{"name":"おに　鬼丸祐輔","facility":"PDハウス有田 御中　矢加部様　末藤様","fax":"0928418808","category":"事業所"},{"name":"おに　鬼丸祐輔","facility":"はかた中央歯科 御中　ご担当者様","fax":"0928925133","category":"病院・薬局・歯科"},{"name":"かい　甲斐紀子","facility":null,"fax":null,"category":null},{"name":"かた　片山久子","facility":"たろうクリニック 御中　ご担当者様","fax":"0924103332","category":"病院・薬局・歯科"},{"name":"かた　片山久子","facility":"つきやま歯科 御中　福原様","fax":"0924015433","category":"病院・薬局・歯科"},{"name":"かた　片山久子","facility":"日本調剤 城南薬局 御中　ご担当者様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"かた　片山久子","facility":"グランダ博多ケアステーション 御中　加茂様　藤田様","fax":"0924193501","category":"事業所"},{"name":"かみ　上村清史","facility":"あまねクリニック 御中　ご担当者様","fax":"0926921237","category":"病院・薬局・歯科"},{"name":"かみ　上村清史","facility":"アクトデンタルクリニック 御中　ご担当者様","fax":"0926452617","category":"病院・薬局・歯科"},{"name":"かみ　上村清史","facility":"きらり薬局　姪浜店 御中　ご担当者様","fax":"0928342010","category":"病院・薬局・歯科"},{"name":"かみ　上村清史","facility":"ふくおか西ヘルパーステーション 御中　辻川様","fax":"0928951601","category":"事業所"},{"name":"かみ　上村清史","facility":"西区保護課 御中 トウドウ　ケースワーカー様","fax":"0928820448","category":"保護課"},{"name":"かみ　上村清史","facility":"箱崎ふ頭歯科 御中　ご担当者様","fax":"0926516077","category":"病院・薬局・歯科"},{"name":"かみ　上村清史","facility":"きらり薬局　志免店 御中　藤本様","fax":"0927108946","category":"病院・薬局・歯科"},{"name":"かわ　川上妙眞","facility":"つつみクリニック福岡 御中　ご担当者様","fax":"0922732221","category":"病院・薬局・歯科"},{"name":"かわ　川上妙眞","facility":"日本調剤 城南薬局 御中　ご担当者様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"かわ　川上妙眞","facility":"つきやま歯科 御中　福原様","fax":"0924015433","category":"病院・薬局・歯科"},{"name":"かわ　川上妙眞","facility":"グランダ博多ケアステーション 御中　加茂様　藤田様","fax":"0924193501","category":"事業所"},{"name":"くに　國松義隆","facility":"日本調剤 城南薬局 御中　松口様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"くら　倉本德江","facility":"訪問看護ステーションユーフィット御中　杉野様","fax":"0924032088","category":"事業所"},{"name":"くら　倉本德江","facility":"はまゆう訪問介護サービス 御中　福山様","fax":"0927381826","category":"事業所"},{"name":"こじ　児島惠子","facility":null,"fax":null,"category":null},{"name":"こじ　児島大次郎","facility":null,"fax":null,"category":null},{"name":"ごし　御所明美","facility":null,"fax":null,"category":null},{"name":"さか　酒井修","facility":"博愛訪問リハステーションささおか 御中　江頭様　齊藤様","fax":"0927357050","category":"事業所"},{"name":"さか　坂口直利","facility":null,"fax":null,"category":null},{"name":"すぎ　杉山留美子","facility":"たろうクリニック 御中　ご担当者様","fax":"0924103332","category":"病院・薬局・歯科"},{"name":"すぎ　杉山留美子","facility":"きらり薬局　姪浜店 御中　ご担当者様","fax":"0928342010","category":"病院・薬局・歯科"},{"name":"すぎ　杉山留美子","facility":"周船寺ハローパークペガサス歯科クリニック 御中　山脇様","fax":"0924070737","category":"病院・薬局・歯科"},{"name":"すぎ　杉山留美子","facility":"メディケア癒し四番館有田 御中　ご担当者様","fax":"0927077479","category":"事業所"},{"name":"たぐ　田口ミヨ","facility":"日本調剤 城南薬局 御中　二宮様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"たぐ　田口ミヨ","facility":"アンブル歯科 御中　ご担当者様","fax":"0925664867","category":"病院・薬局・歯科"},{"name":"たぐ　田口ミヨ","facility":"グランダ高宮ケアステーション 御中　結城様","fax":"0925545567","category":"事業所"},{"name":"たに　谷崎紀子","facility":"メディケア癒し四番館有田 御中　ご担当者様","fax":"0927077479","category":"事業所"},{"name":"たに　谷崎紀子","facility":"きらり薬局　姪浜店 御中　ご担当者様","fax":"0928342010","category":"病院・薬局・歯科"},{"name":"たに　谷本榮子","facility":"ケアサービスさくらんぼ 御中　中村様","fax":"0927072014","category":"事業所"},{"name":"つだ　津田友惠","facility":"まつおクリニック 御中　ご担当者様","fax":"0928330334","category":"病院・薬局・歯科"},{"name":"つだ　津田友惠","facility":"ハロー薬局前原店 御中　ご担当者様","fax":"0923318760","category":"病院・薬局・歯科"},{"name":"つだ　津田友惠","facility":"メディケア癒やし五番館長住 御中　ご担当者様","fax":"0925557892","category":"事業所"},{"name":"とう　藤キメ","facility":"クリニック ホームドクターズ　春日院 御中　ご担当者様","fax":"0923033841","category":"病院・薬局・歯科"},{"name":"とう　藤キメ","facility":"あったかいご弥永 御中　ご担当者様","fax":"0924040997","category":"事業所"},{"name":"とう　藤キメ","facility":"きらり薬局 野多目店 御中　ご担当者様","fax":"0924085101","category":"病院・薬局・歯科"},{"name":"なか　中島澄子","facility":"南折立病院 御中　ご担当者様","fax":"0925017676","category":"病院・薬局・歯科"},{"name":"なか　中島澄子","facility":"きらり薬局南福岡店 御中　ご担当者様","fax":"0929851017","category":"病院・薬局・歯科"},{"name":"なか　中島澄子","facility":"南区保護課 御中　岡ケースワーカー様","fax":"0925595147","category":"保護課"},{"name":"なか　中島弘道","facility":"寺塚クリニック 御中　ご担当者様","fax":"0925547006","category":"病院・薬局・歯科"},{"name":"なか　中島弘道","facility":"しらきはら歯科 御中　ご担当者様","fax":"0924082459","category":"病院・薬局・歯科"},{"name":"なか　中島弘道","facility":"裕生堂薬局　寺塚店 御中　ご担当者様","fax":"0925541556","category":"病院・薬局・歯科"},{"name":"なか　中島弘道","facility":"機能回復デイケア　さきがけ 御中　加藤様","fax":"0925597212","category":"事業所"},{"name":"なか　中島弘道","facility":"ヘルパーネットえがおで寺塚 御中　村田様","fax":"0925597212","category":"事業所"},{"name":"なかは　中畑由美子","facility":"かめい内科クリニック 御中　ご担当者様","fax":"0925412620","category":"病院・薬局・歯科"},{"name":"なかは　中畑由美子","facility":"新生堂薬局 長住店 御中　ご担当者様","fax":"0925110367","category":"病院・薬局・歯科"},{"name":"なかは　中畑由美子","facility":"南区保護課 御中　大野ケースワーカー様","fax":"0925595147","category":"保護課"},{"name":"なかは　中畑由美子","facility":"ヒューマンライフケア福岡 御中　タケオカ様","fax":"0925572612","category":"事業所"},{"name":"なかや　中安恵理子","facility":"アンブル歯科 御中　ご担当者様","fax":"0925664867","category":"病院・薬局・歯科"},{"name":"なかや　中安恵理子","facility":"きらり薬局　清川店 御中　ご担当者様","fax":"0927915492","category":"病院・薬局・歯科"},{"name":"はす　蓮井直樹","facility":"ホワイト花満クリニック 御中　末満先生","fax":"0928018740","category":"病院・薬局・歯科"},{"name":"はす　蓮井直樹","facility":"パルスケア訪問看護ステーション 御中　久富様","fax":"0927535479","category":"事業所"},{"name":"はせ　長谷菊代","facility":"つつみクリニック福岡 御中　ご担当者様","fax":"0922732221","category":"病院・薬局・歯科"},{"name":"はせ　長谷菊代","facility":"日本調剤 城南薬局 御中　二宮様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"はせ　長谷菊代","facility":"たかきやすたか歯科クリニック 御中　ご担当者様","fax":"0924091380","category":"病院・薬局・歯科"},{"name":"はせ　長谷菊代","facility":"つつみクリニック福岡 訪問リハビリテーション 御中　永徳様","fax":"0922607028","category":"事業所"},{"name":"はせ　長谷菊代","facility":"グランダ高宮ケアステーション 御中　結城様","fax":"0925545567","category":"事業所"},{"name":"はせ　長谷菊代","facility":"訪問看護ステーションさんらいと南福岡 御中　ご担当者様","fax":"0925582230","category":"事業所"},{"name":"はつ　服部育子","facility":"南折立病院 御中　ご担当者様","fax":"0925017676","category":"病院・薬局・歯科"},{"name":"はつ　服部育子","facility":"南区保護課　第2課第3係 御中　森ケースワーカー様","fax":"0925595147","category":"保護課"},{"name":"はな　花田絹枝","facility":"原病院通所リハビリテーション事業所 御中　永井様","fax":"0925521002","category":"事業所"},{"name":"はら　原田壯治","facility":"クリニック ホームドクターズ　春日院 御中　ご担当者様","fax":"0923033841","category":"病院・薬局・歯科"},{"name":"はら　原田壯治","facility":"きらり薬局 野多目店 御中　ご担当者様","fax":"0924085101","category":"病院・薬局・歯科"},{"name":"はら　原田壯治","facility":"あったかいご弥永 御中　ご担当者様","fax":"0924040997","category":"事業所"},{"name":"はら　原田壯治","facility":"南区保護課 御中　ご担当者様","fax":"0925595147","category":"保護課"},{"name":"はら　原田道子","facility":null,"fax":null,"category":null},{"name":"ふじ　藤原直子","facility":"薬院内科循環器クリニック 御中　ご担当者様","fax":"0927380080","category":"病院・薬局・歯科"},{"name":"ふじ　藤原直子","facility":"日本調剤 城南薬局 御中　ご担当者様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"ふじ　藤原直子","facility":"つきやま歯科 御中　福原様","fax":"0924015433","category":"病院・薬局・歯科"},{"name":"ふじ　藤原直子","facility":"グランダ博多ケアステーション 御中　加茂様　藤田様","fax":"0924193501","category":"事業所"},{"name":"ふじ　藤原直子","facility":"BisCo Day Re'sela 御中　ご担当者様","fax":"0925215894","category":"事業所"},{"name":"まつ　松岡徳二郎","facility":"さかい在宅クリニック 御中　ご担当者様","fax":"05038524229","category":"病院・薬局・歯科"},{"name":"まつ　松岡徳二郎","facility":"西日本ヘルパーステーション 御中　ご担当者様","fax":"0927615077","category":"事業所"},{"name":"まつ　松岡徳二郎","facility":"地域の薬局　那珂川さくらホス 御中　ご担当者様","fax":"0924033288","category":"病院・薬局・歯科"},{"name":"まつ　松岡徳二郎","facility":"グランドマスト大橋南 御中　酒本様","fax":"0925532466","category":"事業所"},{"name":"まつ　松岡徳二郎","facility":"訪問看護ステーションユーフィット 御中　杉野様","fax":"0924032088","category":"事業所"},{"name":"まつ　松尾貴子","facility":"つつみクリニック福岡 御中　ご担当者様","fax":"0922732221","category":"病院・薬局・歯科"},{"name":"まつ　松尾貴子","facility":"日本調剤 城南薬局 御中　ご担当者様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"まつ　松尾貴子","facility":"グランダ博多ケアステーション 御中　加茂様　藤田様","fax":"0924193501","category":"事業所"},{"name":"まつ　松尾秀雄","facility":"グランダ博多ケアステーション 御中　加茂様　藤田様","fax":"0924193501","category":"事業所"},{"name":"まつ　松崎好夫","facility":"たかえ内科クリニック 御中　ミズクサ様","fax":"0925556887","category":"病院・薬局・歯科"},{"name":"みや　宮内嘉子","facility":"たろうクリニック 御中　ご担当者様","fax":"0924103332","category":"病院・薬局・歯科"},{"name":"みや　宮内嘉子","facility":"日本調剤 城南薬局 御中　ご担当者様","fax":"0924078731","category":"病院・薬局・歯科"},{"name":"みや　宮内嘉子","facility":"グランダ博多ケアステーション 御中　加茂様　藤田様","fax":"0924193501","category":"事業所"},{"name":"みや　宮崎忠","facility":"宮崎内科クリニック 御中　牛島様","fax":"0926818759","category":"病院・薬局・歯科"},{"name":"みや　宮崎忠代","facility":"宮崎内科クリニック 御中　牛島様","fax":"0926818759","category":"病院・薬局・歯科"},{"name":"みや　宮田久世","facility":"このはな薬局 御中　ご担当者様","fax":"0928747062","category":"病院・薬局・歯科"},{"name":"みや　宮田久世","facility":"花岡歯科医院 御中　花岡先生","fax":"0925210178","category":"病院・薬局・歯科"},{"name":"みや　宮田久世","facility":"グリーンケア・サービス 御中　田中様","fax":"0925542178","category":"事業所"},{"name":"みや　宮田久世","facility":"はまゆう訪問介護サービス 御中　福山様","fax":"0927381826","category":"事業所"},{"name":"みや　宮田保枝","facility":"グリーンケア・サービス 御中　田中様","fax":"0925542178","category":"事業所"},{"name":"みや　宮田保枝","facility":"このはな薬局 御中　ご担当者様","fax":"0928747062","category":"病院・薬局・歯科"},{"name":"よし　吉田光政","facility":"つくしクリニック 御中　ご担当者様","fax":"0924141274","category":"病院・薬局・歯科"},{"name":"よし　吉本智明","facility":"福岡信和病院 御中　野田MSW様","fax":"0925571885","category":"病院・薬局・歯科"}];
+
+function loadData(){try{const s=localStorage.getItem(STORAGE_KEY);if(s)return JSON.parse(s);}catch(e){}return JSON.parse(JSON.stringify(INITIAL_DATA));}
+function saveData(){localStorage.setItem(STORAGE_KEY,JSON.stringify(allData));}
+let allData=loadData();
+(function(){let c=false;allData.forEach(r=>{if(r.category==='薬局'||r.category==='病院・クリニック・歯科'){r.category='病院・薬局・歯科';c=true;}});if(c)saveData();})();
+
+let selectedName=null,selectedCategory=null,editIndex=null,lastDeleted=null,undoTimer=null;
+function loadOrder(){try{const s=localStorage.getItem(ORDER_KEY);if(s)return JSON.parse(s);}catch(e){}return null;}
+function saveOrder(n){localStorage.setItem(ORDER_KEY,JSON.stringify(n));}
+function getDisplayName(n){if(!n)return'';const p=n.split(/[\s　]+/);return p.length>1?p.slice(1).join(' '):n;}
+function getUniqueNames(){const seen=new Set();const dn=allData.filter(r=>{if(!r.name||seen.has(r.name))return false;seen.add(r.name);return true;}).map(r=>r.name);const saved=loadOrder();if(!saved)return dn;const ord=saved.filter(n=>dn.includes(n));dn.forEach(n=>{if(!ord.includes(n))ord.push(n);});return ord;}
+function getCategories(){const c=new Set();allData.forEach(r=>{if(r.category)c.add(r.category);});return Array.from(c).sort();}
+function catClass(c){if(!c)return'';if(c.includes('病院')||c.includes('歯科')||c.includes('薬局'))return'cat-病院';if(c.includes('訪問'))return'cat-訪問';if(c.includes('保護'))return'cat-保護';return'cat-事業';}
+function escHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+function renderSidebar(names){
+  const sb=document.getElementById('sidebar');
+  if(!names.length){sb.innerHTML='<div style="padding:20px;color:#a0aec0;font-size:13px">該当なし</div>';return;}
+  let h=`<div class="sidebar-section">利用者 <span class="count-label">${names.length}名</span></div>`;
+  names.forEach(name=>{
+    const k=getDisplayName(name),a=name===selectedName?' active':'';
+    h+=`<div class="name-item${a}" draggable="true" data-name="${escHtml(name)}" onclick="selectName(this.dataset.name)"><span class="kanji">${escHtml(k)}</span></div>`;
+  });
+  sb.innerHTML=h;initDrag();
+}
+let dragSrc=null;
+function initDrag(){
+  document.querySelectorAll('.name-item[draggable]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{dragSrc=el;el.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+    el.addEventListener('dragend',()=>{el.classList.remove('dragging');document.querySelectorAll('.name-item').forEach(i=>i.classList.remove('drag-over'));});
+    el.addEventListener('dragover',e=>{e.preventDefault();document.querySelectorAll('.name-item').forEach(i=>i.classList.remove('drag-over'));if(el!==dragSrc)el.classList.add('drag-over');});
+    el.addEventListener('drop',e=>{
+      e.preventDefault();if(!dragSrc||dragSrc===el)return;
+      const all=getUniqueNames(),fi=all.indexOf(dragSrc.dataset.name),ti=all.indexOf(el.dataset.name);
+      if(fi<0||ti<0)return;all.splice(fi,1);all.splice(ti,0,dragSrc.dataset.name);saveOrder(all);render();
+    });
+  });
+}
+function renderCategoryBar(){
+  const cats=getCategories();
+  let h=`<button class="cat-btn${!selectedCategory?' active':''}" onclick="selectCategory(null)">すべて</button>`;
+  cats.forEach(c=>{h+=`<button class="cat-btn${selectedCategory===c?' active':''}" onclick="selectCategory('${escHtml(c)}')">${escHtml(c)}</button>`;});
+  document.getElementById('categoryBar').innerHTML=h;
+}
+function renderContent(){
+  const content=document.getElementById('content');
+  let rows=allData;
+  if(selectedName)rows=rows.filter(r=>r.name===selectedName);
+  if(selectedCategory)rows=rows.filter(r=>r.category===selectedCategory);
+  const q=document.getElementById('searchBox').value.trim();
+  if(q&&!selectedName)rows=rows.filter(r=>(r.name&&r.name.includes(q))||(r.facility&&r.facility.includes(q))||(r.fax&&r.fax.includes(q)));
+  if(selectedName){
+    const nl=getDisplayName(selectedName);
+    let h=`<div class="action-bar"><h2>${escHtml(nl)} 様の関係事業所</h2><button class="btn-primary" onclick="openModal('add-facility')">＋ 事業所追加</button><button class="btn-danger" onclick="deletePerson()">利用者ごと削除</button></div>`;
+    const f=rows.filter(r=>r.facility);
+    if(!f.length){h+='<div class="empty-msg">事業所が登録されていません</div>';}
+    else{
+      h+=`<table class="facility-table"><thead><tr><th>事業所名（担当者名）</th><th>FAX番号</th><th>カテゴリ</th><th>操作</th></tr></thead><tbody>`;
+      f.forEach(r=>{
+        const gi=allData.indexOf(r);
+        h+=`<tr><td>${escHtml(r.facility)}</td><td><span class="fax-number">${escHtml(r.fax)}</span></td><td><span class="cat-badge ${catClass(r.category)}">${escHtml(r.category)}</span></td><td style="white-space:nowrap;display:flex;gap:6px;align-items:center"><button class="copy-btn" onclick="copyFax(this,'${escHtml(r.fax)}')">コピー</button><button class="btn-edit" onclick="openModal('edit',${gi})">編集</button><button class="btn-danger" onclick="deleteRecord(${gi})">削除</button></td></tr>`;
+      });
+      h+='</tbody></table>';
+    }
+    content.innerHTML=h;
+  }else if(selectedCategory||q){
+    const f=rows.filter(r=>r.facility);
+    const title=selectedCategory?`【${selectedCategory}】の事業所一覧`:`「${q}」の検索結果`;
+    let h=`<div class="action-bar"><h2>${escHtml(title)} <span class="count-label">${f.length}件</span></h2></div>`;
+    if(!f.length){h+='<div class="empty-msg">該当なし</div>';}
+    else{
+      h+=`<table class="facility-table"><thead><tr><th>利用者</th><th>事業所名（担当者名）</th><th>FAX番号</th><th>カテゴリ</th><th></th></tr></thead><tbody>`;
+      f.forEach(r=>{h+=`<tr><td style="white-space:nowrap">${escHtml(getDisplayName(r.name))}</td><td>${escHtml(r.facility)}</td><td><span class="fax-number">${escHtml(r.fax)}</span></td><td><span class="cat-badge ${catClass(r.category)}">${escHtml(r.category)}</span></td><td><button class="copy-btn" onclick="copyFax(this,'${escHtml(r.fax)}')">コピー</button></td></tr>`;});
+      h+='</tbody></table>';
+    }
+    content.innerHTML=h;
+  }else{content.innerHTML='<div class="empty-msg">← 左から利用者を選ぶか、カテゴリで絞り込んでください</div>';}
+}
+function render(){
+  const q=document.getElementById('searchBox').value.trim();
+  let names=getUniqueNames();
+  if(q&&!selectedName){const m=new Set(allData.filter(r=>(r.name&&r.name.includes(q))||(r.facility&&r.facility.includes(q))||(r.fax&&r.fax.includes(q))).map(r=>r.name).filter(Boolean));names=names.filter(n=>m.has(n));}
+  renderSidebar(names);renderCategoryBar();renderContent();
+}
+function selectName(name){selectedName=selectedName===name?null:name;selectedCategory=null;document.getElementById('searchBox').value='';render();}
+function selectCategory(c){selectedCategory=c;selectedName=null;render();}
+function applyFilters(){selectedName=null;selectedCategory=null;render();}
+function copyFax(btn,fax){navigator.clipboard.writeText(fax).then(()=>{btn.textContent='✓ コピー済';btn.classList.add('copied');setTimeout(()=>{btn.textContent='コピー';btn.classList.remove('copied');},2000);showToast('FAX番号 '+fax+' をコピーしました');});}
+
+let modalMode=null;
+function openModal(mode,idx){
+  modalMode=mode;editIndex=idx!==undefined?idx:null;
+  document.getElementById('faxHint').style.display='none';
+  document.getElementById('modalTabs').style.display='none';
+  document.getElementById('panelExist').style.display='none';
+  document.getElementById('panelNew').style.display='block';
+  document.getElementById('rowFacilitySelect').style.display='none';
+  document.getElementById('rowFacilityFields').style.display='block';
+  document.getElementById('rowName').style.display='block';
+  if(mode==='edit'&&idx!=null){
+    const r=allData[idx];
+    document.getElementById('modalTitle').textContent='事業所を編集';
+    document.getElementById('fName').value=r.name||'';document.getElementById('fFacility').value=r.facility||'';
+    document.getElementById('fFax').value=r.fax||'';document.getElementById('fCategory').value=r.category||'';
+    document.getElementById('fName').disabled=false;
+  }else if(mode==='add-facility'){
+    document.getElementById('modalTitle').textContent='事業所を追加';
+    document.getElementById('fName').value=selectedName||'';document.getElementById('fFacility').value='';
+    document.getElementById('fFax').value='';document.getElementById('fCategory').value='';
+    document.getElementById('fName').disabled=!!selectedName;document.getElementById('rowName').style.display='none';
+    const ex=getUniqueFacilities().filter(f=>!isAlreadyAdded(f.facility));
+    if(ex.length>0){document.getElementById('modalTabs').style.display='flex';switchTab('exist');}
+  }else if(mode==='add-facility-global'){
+    document.getElementById('modalTitle').textContent='事業所 新規登録';
+    document.getElementById('fName').value='';document.getElementById('fFacility').value='';
+    document.getElementById('fFax').value='';document.getElementById('fCategory').value='';
+    document.getElementById('rowName').style.display='none';
+  }else{
+    document.getElementById('modalTitle').textContent='利用者 新規登録';
+    document.getElementById('fName').value='';document.getElementById('fName').disabled=false;
+    document.getElementById('rowFacilityFields').style.display='none';
+    document.getElementById('rowFacilitySelect').style.display='block';
+    personCatSelected=null;document.getElementById('personFacilitySearch').value='';renderPersonCatFilter();renderPersonFacilityList('');
+  }
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+function closeModalOnOverlay(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
+function switchTab(tab){
+  document.getElementById('tabExist').classList.toggle('active',tab==='exist');
+  document.getElementById('tabNew').classList.toggle('active',tab==='new');
+  document.getElementById('panelExist').style.display=tab==='exist'?'block':'none';
+  document.getElementById('panelNew').style.display=tab==='new'?'block':'none';
+  if(tab==='exist'){document.getElementById('facilitySearch').value='';renderFacilityCheckList('');}
+}
+function getUniqueFacilities(){const seen=new Set();return allData.filter(r=>{if(!r.facility||seen.has(r.facility))return false;seen.add(r.facility);return true;});}
+function isAlreadyAdded(f){return allData.some(r=>r.name===selectedName&&r.facility===f);}
+function renderFacilityCheckList(q){
+  const list=document.getElementById('facilityCheckList');
+  let items=getUniqueFacilities().filter(f=>!isAlreadyAdded(f.facility));
+  if(q)items=items.filter(f=>(f.facility&&f.facility.includes(q))||(f.fax&&f.fax.includes(q)));
+  if(!items.length){list.innerHTML='<div class="no-result">該当なし</div>';updateSelectedCount();return;}
+  list.innerHTML=items.map(f=>`<label class="facility-check-item"><input type="checkbox" class="fc-checkbox" data-facility="${escHtml(f.facility)}" data-fax="${escHtml(f.fax)}" data-category="${escHtml(f.category||'')}" onchange="updateSelectedCount()"><div><div class="fc-name">${escHtml(f.facility)}</div><div class="fc-fax">${escHtml(f.fax)}</div><div class="fc-cat">${escHtml(f.category||'')}</div></div></label>`).join('');
+  updateSelectedCount();
+}
+function updateSelectedCount(){const n=document.querySelectorAll('.fc-checkbox:checked').length;document.getElementById('selectedCount').textContent=n>0?n+'件を選択中':'';}
+function filterFacilityList(){renderFacilityCheckList(document.getElementById('facilitySearch').value.trim());}
+let personCatSelected=null;
+function renderPersonCatFilter(){
+  const cats=Array.from(new Set(getUniqueFacilities().map(f=>f.category).filter(Boolean))).sort();
+  let h='<button class="pcat-btn'+(personCatSelected===null?' pcat-active':'')+'" onclick="selectPersonCat(null)">すべて</button>';
+  cats.forEach(c=>{h+='<button class="pcat-btn'+(personCatSelected===c?' pcat-active':'')+'" onclick="selectPersonCat(\''+escHtml(c)+'\')">'+escHtml(c)+'</button>';});
+  document.getElementById('personCatFilter').innerHTML=h;
+}
+function selectPersonCat(cat){personCatSelected=cat;renderPersonCatFilter();renderPersonFacilityList(document.getElementById('personFacilitySearch').value.trim());}
+function renderPersonFacilityList(q){
+  const list=document.getElementById('personFacilityList');
+  let items=getUniqueFacilities();
+  if(personCatSelected)items=items.filter(f=>f.category===personCatSelected);
+  if(q)items=items.filter(f=>(f.facility&&f.facility.includes(q))||(f.fax&&f.fax.includes(q)));
+  if(!items.length){list.innerHTML='<div class="no-result">該当なし</div>';updatePersonSelectedCount();return;}
+  list.innerHTML=items.map(f=>`<label class="facility-check-item"><input type="checkbox" class="pfc-checkbox" data-facility="${escHtml(f.facility)}" data-fax="${escHtml(f.fax)}" data-category="${escHtml(f.category||'')}" onchange="updatePersonSelectedCount()"><div><div class="fc-name">${escHtml(f.facility)}</div><div class="fc-fax">${escHtml(f.fax)}</div><div class="fc-cat">${escHtml(f.category||'')}</div></div></label>`).join('');
+  updatePersonSelectedCount();
+}
+function filterPersonFacilityList(){renderPersonFacilityList(document.getElementById('personFacilitySearch').value.trim());}
+function updatePersonSelectedCount(){const n=document.querySelectorAll('.pfc-checkbox:checked').length;document.getElementById('personSelectedCount').textContent=n>0?n+'件選択中':'';}
+function saveExistingFacilities(){
+  const cbs=document.querySelectorAll('.fc-checkbox:checked');
+  if(!cbs.length){alert('事業所を1件以上選択してください');return;}
+  cbs.forEach(cb=>allData.push({name:selectedName,facility:cb.dataset.facility,fax:cb.dataset.fax,category:cb.dataset.category}));
+  saveData();closeModal();render();showToast(cbs.length+'件の事業所を追加しました');
+}
+function validateFax(){const v=document.getElementById('fFax').value;document.getElementById('faxHint').style.display=v&&!/^[\d-]+$/.test(v)?'block':'none';}
+function saveEntry(){
+  if(modalMode==='add-person'){
+    const name=document.getElementById('fName').value.trim();
+    if(!name){alert('利用者名を入力してください');return;}
+    const cbs=document.querySelectorAll('.pfc-checkbox:checked');
+    if(cbs.length>0){cbs.forEach(cb=>allData.push({name,facility:cb.dataset.facility,fax:cb.dataset.fax,category:cb.dataset.category}));}
+    else{allData.push({name,facility:null,fax:null,category:null});}
+    saveData();closeModal();selectedName=name;render();showToast('「'+getDisplayName(name)+'」さんを登録しました');return;
+  }
+  const nameEl=document.getElementById('rowName');
+  const name=nameEl.style.display==='none'?(selectedName||''):document.getElementById('fName').value.trim();
+  const facility=document.getElementById('fFacility').value.trim();
+  const fax=document.getElementById('fFax').value.trim();
+  const category=document.getElementById('fCategory').value;
+  if(facility&&!fax){alert('FAX番号も入力してください');return;}
+  if(fax&&!/^[\d-]+$/.test(fax)){if(!confirm('FAX番号に数字・ハイフン以外が含まれています。このまま保存しますか？'))return;}
+  if(editIndex!==null){allData[editIndex]={name,facility,fax,category};}
+  else{allData.push({name,facility,fax,category});}
+  saveData();closeModal();if(name&&!selectedName)selectedName=name;render();
+  showToast(editIndex!==null?'更新しました':'登録しました');
+}
+function deletePerson(){
+  const label=getDisplayName(selectedName);
+  if(!confirm('「'+label+'」さんと関係事業所をすべて削除しますか？'))return;
+  const removed=allData.filter(r=>r.name===selectedName);
+  const indices=allData.reduce((a,r,i)=>{if(r.name===selectedName)a.push(i);return a;},[]);
+  lastDeleted={person:selectedName,records:removed,indices};
+  allData=allData.filter(r=>r.name!==selectedName);
+  selectedName=null;saveData();render();showToastWithUndo('「'+label+'」さんを削除しました');
+}
+function deleteRecord(idx){
+  const r=allData[idx];
+  if(!confirm('「'+(r.facility||r.name)+'」を削除しますか？'))return;
+  lastDeleted={record:Object.assign({},r),idx};
+  allData.splice(idx,1);saveData();render();showToastWithUndo('削除しました：'+(r.facility||r.name));
+}
+function undoDelete(){
+  if(!lastDeleted)return;
+  if(lastDeleted.person){lastDeleted.records.forEach((r,i)=>allData.splice(lastDeleted.indices[i],0,r));selectedName=lastDeleted.person;}
+  else{allData.splice(lastDeleted.idx,0,lastDeleted.record);}
+  lastDeleted=null;if(undoTimer){clearTimeout(undoTimer);undoTimer=null;}
+  saveData();render();showToast('元に戻しました');
+}
+function showToast(msg){const t=document.getElementById('toast');t.innerHTML='<span>'+msg+'</span>';t.classList.add('show');if(undoTimer)clearTimeout(undoTimer);undoTimer=setTimeout(()=>t.classList.remove('show'),2500);}
+function showToastWithUndo(msg){const t=document.getElementById('toast');t.innerHTML='<span>'+msg+'</span><button class="toast-undo" onclick="undoDelete()">元に戻す</button>';t.classList.add('show');if(undoTimer)clearTimeout(undoTimer);undoTimer=setTimeout(()=>{t.classList.remove('show');lastDeleted=null;},10000);}
+
+const DEFAULT_TEMPLATES=[
+  {id:'tpl_1',name:'提供票',body:'○○　御中\n担当　○○様\n\nお世話になっております。\n○○居宅介護支援事業所　○○です。\n\nサービス提供票・別表をお送りします。\n\nご確認のほど、よろしくお願いいたします。\n\n━━━━━━━━━━━━━━━━\n○○居宅介護支援事業所\nTEL：xxx-xxxx-xxxx\nFAX：xxx-xxxx-xxxx\n━━━━━━━━━━━━━━━━'},
+  {id:'tpl_2',name:'照会',body:'○○　御中\n担当　○○様\n\nお世話になっております。\n○○居宅介護支援事業所　○○です。\n\n以下の件についてご照会申し上げます。\n\n【照会内容】\n\n\n【対象者】\n氏名：\n生年月日：\n\nご回答のほど、よろしくお願いいたします。\n\n━━━━━━━━━━━━━━━━\n○○居宅介護支援事業所\nTEL：xxx-xxxx-xxxx\nFAX：xxx-xxxx-xxxx\n━━━━━━━━━━━━━━━━'}
+];
+function loadTemplates(){try{const s=localStorage.getItem(TEMPLATE_KEY);if(s)return JSON.parse(s);}catch(e){}return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));}
+function saveTemplates(){localStorage.setItem(TEMPLATE_KEY,JSON.stringify(templates));}
+let templates=loadTemplates();
+let selectedTplId=null;
+function openKagami(){document.getElementById('kagamiOverlay').classList.add('open');renderKagamiList();if(templates.length&&!selectedTplId)selectTemplate(templates[0].id);else renderKagamiEditor();}
+function closeKagami(){document.getElementById('kagamiOverlay').classList.remove('open');}
+function closeKagamiOnOverlay(e){if(e.target===document.getElementById('kagamiOverlay'))closeKagami();}
+function renderKagamiList(){
+  let h='';
+  templates.forEach(t=>{h+='<div class="kagami-list-item'+(t.id===selectedTplId?' active':'')+'" onclick="selectTemplate(\''+t.id+'\')">'+escHtml(t.name)+'</div>';});
+  h+='<div class="kagami-list-add" onclick="addNewTemplate()">＋ テンプレート追加</div>';
+  document.getElementById('kagamiList').innerHTML=h;
+}
+function selectTemplate(id){selectedTplId=id;renderKagamiList();renderKagamiEditor();}
+function renderKagamiEditor(){
+  const ed=document.getElementById('kagamiEditor');
+  const tpl=templates.find(t=>t.id===selectedTplId);
+  if(!tpl){ed.innerHTML='<div class="kagami-empty">← テンプレートを選択してください</div>';return;}
+  ed.innerHTML='<div><label style="font-size:12px;font-weight:700;color:#2d5a8e;display:block;margin-bottom:5px">テンプレート名</label><input class="tpl-name-input" id="tplName" value="'+escHtml(tpl.name)+'"></div>'
+    +'<div style="flex:1;display:flex;flex-direction:column;gap:6px"><label style="font-size:12px;font-weight:700;color:#2d5a8e">文面（自由に編集できます）</label><textarea class="kagami-textarea" id="tplBody">'+escHtml(tpl.body)+'</textarea></div>'
+    +'<div class="kagami-actions"><button class="btn-copy-kagami" id="copyKagamiBtn" onclick="copyKagami()">📋 文面をコピー</button><button class="btn-save-tpl" onclick="saveTemplate()">保存</button><button class="btn-del-tpl" onclick="deleteTemplate(\''+tpl.id+'\')">削除</button></div>';
+}
+function copyKagami(){navigator.clipboard.writeText(document.getElementById('tplBody').value).then(()=>{const btn=document.getElementById('copyKagamiBtn');btn.textContent='✓ コピーしました';btn.classList.add('copied');setTimeout(()=>{btn.textContent='📋 文面をコピー';btn.classList.remove('copied');},2000);showToast('かがみ文面をコピーしました');});}
+function saveTemplate(){const name=document.getElementById('tplName').value.trim();if(!name){alert('テンプレート名を入力してください');return;}const tpl=templates.find(t=>t.id===selectedTplId);if(tpl){tpl.name=name;tpl.body=document.getElementById('tplBody').value;}saveTemplates();renderKagamiList();showToast('テンプレートを保存しました');}
+function addNewTemplate(){const t={id:'tpl_'+Date.now(),name:'新しいテンプレート',body:''};templates.push(t);saveTemplates();selectedTplId=t.id;renderKagamiList();renderKagamiEditor();setTimeout(()=>document.getElementById('tplName').select(),50);}
+function deleteTemplate(id){const tpl=templates.find(t=>t.id===id);if(!tpl||!confirm('「'+tpl.name+'」を削除しますか？'))return;templates=templates.filter(t=>t.id!==id);saveTemplates();selectedTplId=templates.length?templates[0].id:null;renderKagamiList();renderKagamiEditor();showToast('削除しました');}
+
+render();
+</script>
+</body>
+</html>

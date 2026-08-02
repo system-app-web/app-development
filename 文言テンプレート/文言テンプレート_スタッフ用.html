@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文言テンプレート</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Meiryo', 'Yu Gothic', sans-serif;
+    background: #eef2f7;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    color: #2d3748;
+  }
+
+  header {
+    background: linear-gradient(135deg, #3a6d8f, #1e4d6b);
+    color: white;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.06em; }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 52px);
+  }
+
+  /* ── サイドバー ── */
+  .sidebar {
+    width: 40%;
+    flex-shrink: 0;
+    background: #1e3a4f;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 200px;
+    max-width: 80%;
+  }
+
+  .resize-handle {
+    width: 6px;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.2);
+    cursor: col-resize;
+    position: relative;
+    transition: background 0.15s;
+    z-index: 10;
+  }
+  .resize-handle:hover,
+  .resize-handle.dragging { background: #4a7c9e; }
+  .resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 40px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 2px;
+  }
+
+  .sidebar-head {
+    padding: 12px 16px 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+
+  .cat-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+  }
+  .cat-list::-webkit-scrollbar { width: 5px; }
+  .cat-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+  /* ドラッグ */
+  .drag-over-group { border-top: 2px solid rgba(255,255,255,0.45); }
+  .drag-over-cat   { border-top: 2px solid #4a7c9e; }
+  .dragging        { opacity: 0.4; }
+
+  .drag-handle {
+    color: rgba(255,255,255,0.18);
+    font-size: 0.8rem;
+    cursor: grab;
+    padding: 0 6px 0 4px;
+    flex-shrink: 0;
+    user-select: none;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .group-header:hover .drag-handle { color: rgba(255,255,255,0.45); }
+  .cat-item:hover .drag-handle     { color: rgba(255,255,255,0.45); }
+
+  /* グループヘッダー */
+  .group-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px 6px 10px;
+    margin-top: 6px;
+    cursor: default;
+    gap: 5px;
+  }
+
+  .group-toggle {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.65rem;
+    cursor: pointer;
+    width: 14px;
+    flex-shrink: 0;
+    padding: 0;
+    font-family: inherit;
+    transition: color 0.15s;
+  }
+  .group-toggle:hover { color: rgba(255,255,255,0.7); }
+
+  .group-label {
+    flex: 1;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .group-btns {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    position: relative;
+  }
+
+  .grp-menu-btn {
+    font-size: 0.75rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    background: none;
+    color: rgba(255,255,255,0.5);
+    transition: all 0.15s;
+    line-height: 1;
+  }
+  .grp-menu-btn:hover { color: white; }
+
+  .grp-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: #2a3a4a;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    z-index: 200;
+    min-width: 110px;
+    overflow: hidden;
+    flex-direction: column;
+  }
+  .grp-dropdown.open { display: flex; }
+
+  .grp-dd-item {
+    padding: 9px 16px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.8);
+    cursor: pointer;
+    white-space: nowrap;
+    border: none;
+    background: none;
+    font-family: inherit;
+    text-align: left;
+    transition: background 0.12s;
+  }
+  .grp-dd-item:hover { background: rgba(255,255,255,0.1); color: white; }
+  .grp-dd-item.del { color: #ff8a80; }
+  .grp-dd-item.del:hover { background: rgba(231,76,60,0.25); color: white; }
+
+  /* カテゴリ行 */
+  .cat-item {
+    display: flex;
+    align-items: center;
+    margin: 2px 10px 2px 24px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: background 0.15s;
+    overflow: hidden;
+    min-height: 38px;
+  }
+  .cat-item:hover { background: rgba(255,255,255,0.09); }
+  .cat-item.active {
+    background: rgba(74,124,158,0.3);
+    border-color: rgba(74,124,158,0.5);
+  }
+
+  .cat-color-bar {
+    width: 4px;
+    align-self: stretch;
+    flex-shrink: 0;
+    background: #4a7c9e;
+  }
+
+  .cat-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 6px 0 10px;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .cat-name {
+    flex: 1;
+    font-size: 0.88rem;
+    color: rgba(255,255,255,0.82);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    line-height: 1.2;
+    padding: 10px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .cat-item.active .cat-name { color: white; font-weight: 600; }
+
+  .cat-item-btns {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    padding-right: 6px;
+  }
+
+  .cat-btn {
+    font-size: 0.72rem;
+    padding: 4px 9px;
+    border-radius: 5px;
+    border: 1px solid;
+    cursor: pointer;
+    font-family: inherit;
+    background: none;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .cat-btn.copy { border-color: rgba(74,124,158,0.6); color: #7ec8e3; }
+  .cat-btn.copy:hover { background: rgba(74,124,158,0.3); color: white; }
+  .cat-btn.copy.copied { background: rgba(56,161,105,0.3); border-color: #38a169; color: #9ae6b4; }
+  .cat-btn.edit { border-color: rgba(255,255,255,0.22); color: rgba(255,255,255,0.65); }
+  .cat-btn.edit:hover { background: rgba(255,255,255,0.12); color: white; }
+  .cat-btn.del  { border-color: rgba(231,76,60,0.4); color: #ff8a80; }
+  .cat-btn.del:hover  { background: rgba(231,76,60,0.3); color: white; }
+
+  /* グループなし */
+  .no-group-label {
+    padding: 8px 10px 4px 12px;
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.3);
+    font-style: italic;
+  }
+
+  .sidebar-footer {
+    padding: 8px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+  }
+
+  .btn-add-group {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.75);
+    border: 1px dashed rgba(255,255,255,0.2);
+    border-radius: 7px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-add-group:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.4);
+    color: white;
+  }
+
+  /* ── 右エディタ ── */
+  .editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #eef2f7;
+  }
+
+  .editor-placeholder {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a0aec0;
+    font-size: 0.9rem;
+  }
+
+  .editor-panel {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .editor-panel.visible { display: flex; }
+
+  .editor-header {
+    background: white;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid #4a7c9e;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  .editor-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: #a0aec0;
+  }
+  .editor-breadcrumb .group-name { color: #718096; }
+  .editor-breadcrumb .sep { color: #cbd5e0; }
+  .editor-breadcrumb .cat-label-main {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2d3748;
+  }
+
+  .actions { display: flex; gap: 8px; }
+
+  .btn {
+    padding: 4px 11px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .btn-reset { background: #f0f4f8; color: #718096; border: 1.5px solid #cbd5e0; }
+  .btn-reset:hover { background: #e2e8f0; }
+  .btn-edit { background: #f0f4f8; color: #4a5568; border: 1.5px solid #cbd5e0; }
+  .btn-edit:hover { background: #e2e8f0; }
+  .btn-del { background: rgba(231,76,60,0.12); color: #e74c3c; border: 1.5px solid rgba(231,76,60,0.35); }
+  .btn-del:hover { background: rgba(231,76,60,0.25); }
+  .btn-copy { background: #4a7c9e; color: white; min-width: 100px; }
+  .btn-copy:hover { filter: brightness(0.88); }
+  .btn-copy.copied { background: #38a169 !important; }
+
+  .editor-body {
+    flex: 1;
+    padding: 16px 20px 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .editor-body textarea {
+    flex: 1;
+    width: 100%;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 0.92rem;
+    font-family: 'Meiryo', 'Yu Gothic', monospace;
+    line-height: 1.9;
+    color: #2d3748;
+    resize: none;
+    transition: border-color 0.2s;
+    background: white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .editor-body textarea:focus { outline: none; border-color: #4a7c9e; }
+  .editor-save-row { display: flex; justify-content: flex-end; padding: 6px 2px 8px; }
+  .btn-save { background: #4a7c9e; color: white; border: none; border-radius: 7px; padding: 7px 22px; font-size: 0.85rem; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+  .btn-save:hover { filter: brightness(0.88); }
+  .btn-save.saved { background: #38a169; }
+
+  /* ── モーダル共通 ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; animation: fadeIn 0.15s; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .modal {
+    background: white;
+    border-radius: 14px;
+    width: 560px;
+    max-width: 95vw;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-header h2 { font-size: 1rem; font-weight: 700; color: #2d3748; }
+  .modal-close { background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #a0aec0; }
+  .modal-close:hover { color: #718096; }
+
+  .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block; font-size: 0.8rem; font-weight: 700;
+    color: #4a5568; margin-bottom: 6px;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    border: 1.5px solid #cbd5e0;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 0.9rem;
+    font-family: 'Meiryo', 'Yu Gothic', monospace;
+    color: #2d3748;
+    background: #fafbfc;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: #4a7c9e; background: white;
+  }
+  .form-group textarea { min-height: 240px; resize: vertical; line-height: 1.8; }
+
+  .modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .btn-cancel { background: #f0f4f8; color: #718096; border: 1.5px solid #cbd5e0; }
+  .btn-cancel:hover { background: #e2e8f0; }
+  .btn-primary { background: #3a6d8f; color: white; border: none; }
+  .btn-primary:hover { background: #1e4d6b; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📋 文言テンプレート</h1>
+</header>
+
+<div class="main">
+
+  <div class="sidebar">
+    <div class="sidebar-head">カテゴリ</div>
+    <div class="cat-list" id="catList"></div>
+    <div class="sidebar-footer">
+      <button class="btn-add-group" id="btnAddGroup">＋ グループ追加</button>
+    </div>
+  </div>
+
+  <div class="resize-handle" id="resizeHandle"></div>
+
+  <div class="editor-area">
+    <div class="editor-placeholder" id="editorPlaceholder">← カテゴリを選択してください</div>
+    <div class="editor-panel" id="editorPanel">
+      <div class="editor-header">
+        <div class="editor-breadcrumb">
+          <span class="group-name" id="editorGroupName"></span>
+          <span class="sep" id="editorSep">›</span>
+          <span class="cat-label-main" id="catLabel"></span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-edit" id="btnEdit">編集</button>
+          <button class="btn btn-del" id="btnDel">削除</button>
+          <button class="btn btn-copy" id="btnCopy">📋 コピー</button>
+        </div>
+      </div>
+      <div class="editor-body">
+        <textarea id="noteArea" spellcheck="false"></textarea>
+        <div class="editor-save-row"><button class="btn-save" id="btnSave">保存</button></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- グループ モーダル -->
+<div class="modal-overlay" id="groupModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="groupModalTitle">グループを追加</h2>
+      <button class="modal-close" id="groupModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>グループ名</label>
+        <input type="text" id="groupModalName" placeholder="例：アセスメント系">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" id="groupModalCancel">キャンセル</button>
+      <button class="btn btn-primary" id="groupModalSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- カテゴリ モーダル -->
+<div class="modal-overlay" id="catModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="catModalTitle">カテゴリを追加</h2>
+      <button class="modal-close" id="catModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>グループ</label>
+        <select id="catModalGroup"></select>
+      </div>
+      <div class="form-group">
+        <label>カテゴリ名</label>
+        <input type="text" id="catModalName" placeholder="例：モニタリング">
+      </div>
+      <div class="form-group">
+        <label>テンプレート文言</label>
+        <textarea id="catModalTemplate" placeholder="ここにテンプレートを入力してください。"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" id="catModalCancel">キャンセル</button>
+      <button class="btn btn-primary" id="catModalSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── デフォルトデータ ──
+const DEFAULT_DATA = {
+  groups: [],
+  categories: []
+};
+
+// ── ストレージ ──
+function getData() {
+  try {
+    const s = localStorage.getItem('tmpl_data_v4_staff');
+    return s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA));
+  } catch { return JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+}
+
+function saveData(data) {
+  localStorage.setItem('tmpl_data_v4_staff', JSON.stringify(data));
+}
+
+// ── 状態 ──
+let currentCatId = null;
+let collapsedGroups = {};  // groupId → true で折りたたみ
+
+// 編集中
+let editingGroupId = null;
+let editingCatId   = null;
+
+// ── ドラッグ状態 ──
+let dragType = null; // 'group' | 'cat'
+let dragId   = null;
+
+// ── サイドバー描画 ──
+function renderSidebar() {
+  const data = getData();
+  const list = document.getElementById('catList');
+  list.innerHTML = '';
+
+  data.groups.forEach(group => {
+    const collapsed = collapsedGroups[group.id];
+
+    // グループヘッダー
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.draggable = true;
+    header.dataset.groupId = group.id;
+
+    header.addEventListener('dragstart', e => {
+      dragType = 'group'; dragId = group.id;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => header.classList.add('dragging'), 0);
+    });
+    header.addEventListener('dragend', () => {
+      header.classList.remove('dragging');
+      document.querySelectorAll('.drag-over-group,.drag-over-cat').forEach(el => {
+        el.classList.remove('drag-over-group','drag-over-cat');
+      });
+    });
+    header.addEventListener('dragover', e => {
+      if (dragType !== 'group') return;
+      e.preventDefault();
+      document.querySelectorAll('.drag-over-group').forEach(el => el.classList.remove('drag-over-group'));
+      header.classList.add('drag-over-group');
+    });
+    header.addEventListener('drop', e => {
+      e.preventDefault();
+      header.classList.remove('drag-over-group');
+      if (dragType !== 'group' || dragId === group.id) return;
+      const d = getData();
+      const fromIdx = d.groups.findIndex(g => g.id === dragId);
+      const toIdx   = d.groups.findIndex(g => g.id === group.id);
+      const [moved] = d.groups.splice(fromIdx, 1);
+      d.groups.splice(toIdx, 0, moved);
+      saveData(d);
+      renderSidebar();
+    });
+
+    // ドラッグハンドル
+    const handle = document.createElement('span');
+    handle.className = 'drag-handle';
+    handle.textContent = '⠿';
+    handle.title = 'ドラッグで並び替え';
+
+    const toggle = document.createElement('button');
+    toggle.className = 'group-toggle';
+    toggle.textContent = collapsed ? '▶' : '▼';
+    toggle.onclick = () => {
+      collapsedGroups[group.id] = !collapsedGroups[group.id];
+      renderSidebar();
+    };
+
+    const lbl = document.createElement('span');
+    lbl.className = 'group-label';
+    lbl.textContent = group.label;
+
+    const gBtns = document.createElement('div');
+    gBtns.className = 'group-btns';
+
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'grp-menu-btn';
+    menuBtn.textContent = '…';
+    menuBtn.title = 'メニュー';
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'grp-dropdown';
+
+    const ddNew = document.createElement('button');
+    ddNew.className = 'grp-dd-item';
+    ddNew.textContent = '新規';
+    ddNew.onclick = () => { dropdown.classList.remove('open'); openCatModal(null, group.id); };
+
+    const ddEdit = document.createElement('button');
+    ddEdit.className = 'grp-dd-item';
+    ddEdit.textContent = '編集';
+    ddEdit.onclick = () => { dropdown.classList.remove('open'); openGroupModal(group.id); };
+
+    const ddDel = document.createElement('button');
+    ddDel.className = 'grp-dd-item del';
+    ddDel.textContent = '削除';
+    ddDel.onclick = () => { dropdown.classList.remove('open'); deleteGroup(group.id); };
+
+    dropdown.appendChild(ddNew);
+    dropdown.appendChild(ddEdit);
+    dropdown.appendChild(ddDel);
+
+    menuBtn.onclick = (e) => {
+      e.stopPropagation();
+      const isOpen = dropdown.classList.contains('open');
+      document.querySelectorAll('.grp-dropdown.open').forEach(d => d.classList.remove('open'));
+      if (!isOpen) dropdown.classList.add('open');
+    };
+
+    gBtns.appendChild(menuBtn);
+    gBtns.appendChild(dropdown);
+    header.appendChild(handle);
+    header.appendChild(toggle);
+    header.appendChild(lbl);
+    header.appendChild(gBtns);
+    list.appendChild(header);
+
+    if (!collapsed) {
+      const cats = data.categories.filter(c => c.groupId === group.id);
+      cats.forEach(cat => list.appendChild(makeCatItem(cat, group.id)));
+
+      if (cats.length === 0) {
+        // 空グループへのドロップゾーン
+        const empty = document.createElement('div');
+        empty.style.cssText = 'padding:6px 12px 6px 34px;font-size:0.75rem;color:rgba(255,255,255,0.25);font-style:italic;';
+        empty.textContent = 'カテゴリなし';
+        empty.addEventListener('dragover', e => {
+          if (dragType !== 'cat') return;
+          e.preventDefault();
+          empty.style.borderTop = '2px solid #4a7c9e';
+        });
+        empty.addEventListener('dragleave', () => { empty.style.borderTop = ''; });
+        empty.addEventListener('drop', e => {
+          e.preventDefault();
+          empty.style.borderTop = '';
+          if (dragType !== 'cat') return;
+          const d = getData();
+          const cat = d.categories.find(c => c.id === dragId);
+          if (cat) { cat.groupId = group.id; saveData(d); renderSidebar(); }
+        });
+        list.appendChild(empty);
+      }
+    }
+  });
+
+  // グループなしカテゴリ
+  const groupIds = data.groups.map(g => g.id);
+  const ungrouped = data.categories.filter(c => !groupIds.includes(c.groupId));
+  if (ungrouped.length > 0) {
+    const lbl = document.createElement('div');
+    lbl.className = 'no-group-label';
+    lbl.textContent = 'グループなし';
+    list.appendChild(lbl);
+    ungrouped.forEach(cat => list.appendChild(makeCatItem(cat, null)));
+  }
+}
+
+function makeCatItem(cat, groupId) {
+  const item = document.createElement('div');
+  item.className = 'cat-item' + (currentCatId === cat.id ? ' active' : '');
+  item.draggable = true;
+  item.dataset.catId = cat.id;
+
+  item.addEventListener('dragstart', e => {
+    dragType = 'cat'; dragId = cat.id;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => item.classList.add('dragging'), 0);
+  });
+  item.addEventListener('dragend', () => {
+    item.classList.remove('dragging');
+    document.querySelectorAll('.drag-over-group,.drag-over-cat').forEach(el => {
+      el.classList.remove('drag-over-group','drag-over-cat');
+    });
+  });
+  item.addEventListener('dragover', e => {
+    if (dragType !== 'cat' || dragId === cat.id) return;
+    e.preventDefault();
+    document.querySelectorAll('.drag-over-cat').forEach(el => el.classList.remove('drag-over-cat'));
+    item.classList.add('drag-over-cat');
+  });
+  item.addEventListener('drop', e => {
+    e.preventDefault();
+    item.classList.remove('drag-over-cat');
+    if (dragType !== 'cat' || dragId === cat.id) return;
+    const d = getData();
+    const fromIdx = d.categories.findIndex(c => c.id === dragId);
+    const toIdx   = d.categories.findIndex(c => c.id === cat.id);
+    const [moved] = d.categories.splice(fromIdx, 1);
+    moved.groupId = cat.groupId;
+    d.categories.splice(toIdx, 0, moved);
+    saveData(d);
+    renderSidebar();
+  });
+
+  // ドラッグハンドル
+  const handle = document.createElement('span');
+  handle.className = 'drag-handle';
+  handle.textContent = '⠿';
+  handle.title = 'ドラッグで並び替え';
+
+  const bar = document.createElement('div');
+  bar.className = 'cat-color-bar';
+
+  // カード本体
+  const body = document.createElement('div');
+  body.className = 'cat-body';
+
+  const nameBtn = document.createElement('button');
+  nameBtn.className = 'cat-name';
+  nameBtn.textContent = cat.label;
+  nameBtn.onclick = () => selectCat(cat.id);
+
+  const btns = document.createElement('div');
+  btns.className = 'cat-item-btns';
+
+  // コピーボタン（テンプレートをそのままコピー）
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'cat-btn copy';
+  copyBtn.textContent = 'コピー';
+  copyBtn.onclick = async (e) => {
+    e.stopPropagation();
+    const d = getData();
+    const c = d.categories.find(x => x.id === cat.id);
+    try { await navigator.clipboard.writeText(c.template); }
+    catch {
+      const tmp = document.createElement('textarea');
+      tmp.value = c.template; document.body.appendChild(tmp); tmp.select();
+      document.execCommand('copy'); document.body.removeChild(tmp);
+    }
+    copyBtn.textContent = '✅ コピー完了';
+    copyBtn.classList.add('copied');
+    setTimeout(() => { copyBtn.textContent = 'コピー'; copyBtn.classList.remove('copied'); }, 1800);
+  };
+
+  btns.appendChild(copyBtn);
+  body.appendChild(nameBtn);
+  body.appendChild(btns);
+  item.appendChild(handle);
+  item.appendChild(bar);
+  item.appendChild(body);
+  return item;
+}
+
+// ── カテゴリ選択 ──
+function selectCat(id) {
+  const data = getData();
+  const cat = data.categories.find(c => c.id === id);
+  if (!cat) return;
+  currentCatId = id;
+  renderSidebar();
+
+  const group = data.groups.find(g => g.id === cat.groupId);
+  document.getElementById('editorGroupName').textContent = group ? group.label : '';
+  document.getElementById('editorSep').style.display = group ? '' : 'none';
+  document.getElementById('catLabel').textContent = cat.label;
+  document.getElementById('noteArea').value = cat.template;
+  document.getElementById('editorPlaceholder').style.display = 'none';
+  document.getElementById('editorPanel').classList.add('visible');
+  document.getElementById('noteArea').focus({ preventScroll: true });
+}
+
+// ── カテゴリ削除 ──
+function deleteCat(id) {
+  const data = getData();
+  const cat = data.categories.find(c => c.id === id);
+  if (!confirm(`「${cat.label}」を削除しますか？`)) return;
+  data.categories = data.categories.filter(c => c.id !== id);
+  saveData(data);
+  if (currentCatId === id) {
+    currentCatId = null;
+    document.getElementById('editorPanel').classList.remove('visible');
+    document.getElementById('editorPlaceholder').style.display = 'flex';
+  }
+  renderSidebar();
+}
+
+// ── グループ削除 ──
+function deleteGroup(id) {
+  const data = getData();
+  const group = data.groups.find(g => g.id === id);
+  const catCount = data.categories.filter(c => c.groupId === id).length;
+  const msg = catCount > 0
+    ? `「${group.label}」を削除しますか？\n※ このグループのカテゴリ（${catCount}件）も一緒に削除されます。`
+    : `「${group.label}」を削除しますか？`;
+  if (!confirm(msg)) return;
+  data.groups = data.groups.filter(g => g.id !== id);
+  data.categories = data.categories.filter(c => c.groupId !== id);
+  saveData(data);
+  if (currentCatId && !data.categories.find(c => c.id === currentCatId)) {
+    currentCatId = null;
+    document.getElementById('editorPanel').classList.remove('visible');
+    document.getElementById('editorPlaceholder').style.display = 'flex';
+  }
+  renderSidebar();
+}
+
+// ── グループモーダル ──
+function openGroupModal(id = null) {
+  editingGroupId = id;
+  const data = getData();
+  document.getElementById('groupModalTitle').textContent = id ? 'グループを編集' : 'グループを追加';
+  document.getElementById('groupModalName').value = id ? data.groups.find(g => g.id === id).label : '';
+  document.getElementById('groupModalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('groupModalName').focus(), 50);
+}
+
+function closeGroupModal() { document.getElementById('groupModalOverlay').classList.remove('open'); }
+
+document.getElementById('btnAddGroup').onclick = () => openGroupModal(null);
+document.getElementById('groupModalClose').onclick = closeGroupModal;
+document.getElementById('groupModalCancel').onclick = closeGroupModal;
+document.getElementById('groupModalOverlay').onclick = (e) => { if (e.target === e.currentTarget) closeGroupModal(); };
+
+document.getElementById('groupModalSave').onclick = () => {
+  const name = document.getElementById('groupModalName').value.trim();
+  if (!name) { alert('グループ名を入力してください。'); return; }
+  const data = getData();
+  if (editingGroupId) {
+    data.groups.find(g => g.id === editingGroupId).label = name;
+  } else {
+    data.groups.push({ id: 'g_' + Date.now(), label: name });
+  }
+  saveData(data);
+  closeGroupModal();
+  renderSidebar();
+};
+
+// ── カテゴリモーダル ──
+function openCatModal(id = null, defaultGroupId = null) {
+  editingCatId = id;
+  const data = getData();
+
+  document.getElementById('catModalTitle').textContent = id ? 'カテゴリを編集' : 'カテゴリを追加';
+
+  // グループ選択肢
+  const sel = document.getElementById('catModalGroup');
+  sel.innerHTML = '';
+  data.groups.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = g.label;
+    sel.appendChild(opt);
+  });
+
+  if (id) {
+    const cat = data.categories.find(c => c.id === id);
+    sel.value = cat.groupId;
+    document.getElementById('catModalName').value = cat.label;
+    document.getElementById('catModalTemplate').value = cat.template;
+  } else {
+    if (defaultGroupId) sel.value = defaultGroupId;
+    document.getElementById('catModalName').value = '';
+    document.getElementById('catModalTemplate').value = '';
+  }
+
+  document.getElementById('catModalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('catModalName').focus(), 50);
+}
+
+function closeCatModal() { document.getElementById('catModalOverlay').classList.remove('open'); }
+
+document.getElementById('catModalClose').onclick = closeCatModal;
+document.getElementById('catModalCancel').onclick = closeCatModal;
+document.getElementById('catModalOverlay').onclick = (e) => { if (e.target === e.currentTarget) closeCatModal(); };
+
+document.getElementById('catModalSave').onclick = () => {
+  const groupId = document.getElementById('catModalGroup').value;
+  const name    = document.getElementById('catModalName').value.trim();
+  const tmpl    = document.getElementById('catModalTemplate').value;
+  if (!name) { alert('カテゴリ名を入力してください。'); return; }
+  const data = getData();
+  if (editingCatId) {
+    const cat = data.categories.find(c => c.id === editingCatId);
+    cat.groupId  = groupId;
+    cat.label    = name;
+    cat.template = tmpl;
+    saveData(data);
+    if (currentCatId === editingCatId) {
+      const group = data.groups.find(g => g.id === groupId);
+      document.getElementById('catLabel').textContent = name;
+      document.getElementById('editorGroupName').textContent = group ? group.label : '';
+    }
+  } else {
+    data.categories.push({ id: 'cat_' + Date.now(), groupId, label: name, template: tmpl });
+    saveData(data);
+  }
+  closeCatModal();
+  renderSidebar();
+};
+
+// ── エディタ ──
+document.getElementById('btnSave').onclick = () => {
+  if (!currentCatId) return;
+  const data = getData();
+  const cat = data.categories.find(c => c.id === currentCatId);
+  if (!cat) return;
+  cat.template = document.getElementById('noteArea').value;
+  saveData(data);
+  const btn = document.getElementById('btnSave');
+  btn.textContent = '✅ 保存しました';
+  btn.classList.add('saved');
+  setTimeout(() => { btn.textContent = '保存'; btn.classList.remove('saved'); }, 1800);
+};
+
+function updateCount() {
+  // removed
+}
+
+document.getElementById('btnEdit').onclick = () => {
+  if (!currentCatId) return;
+  openCatModal(currentCatId);
+};
+
+document.getElementById('btnDel').onclick = () => {
+  if (!currentCatId) return;
+  deleteCat(currentCatId);
+};
+
+document.getElementById('btnCopy').onclick = async () => {
+  const val = document.getElementById('noteArea').value;
+  try { await navigator.clipboard.writeText(val); }
+  catch { const a = document.getElementById('noteArea'); a.select(); document.execCommand('copy'); }
+  const btn = document.getElementById('btnCopy');
+  btn.textContent = '✅ コピー完了';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = '📋 コピー'; btn.classList.remove('copied'); }, 1800);
+};
+
+renderSidebar();
+
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.grp-dropdown.open').forEach(d => d.classList.remove('open'));
+});
+
+// ── リサイズハンドル ──
+(function() {
+  const handle  = document.getElementById('resizeHandle');
+  const sidebar = document.querySelector('.sidebar');
+  const main    = document.querySelector('.main');
+  let dragging  = false;
+
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const rect  = main.getBoundingClientRect();
+    const newW  = e.clientX - rect.left;
+    const min   = 200;
+    const max   = rect.width - 200;
+    sidebar.style.width = Math.min(max, Math.max(min, newW)) + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+</script>
+</body>
+</html>

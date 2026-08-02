@@ -1,0 +1,17 @@
+.DS_Store
+node_modules/
+dist/
+.vercel/
+.pnpm-store/
+.agents/
+.codex/
+tmp/
+
+# Local preview/runtime files
+.tools/
+.preview/
+
+# Personal or exported data
+利用者チェック表/利用者チェック表_個人データ_*.json
+利用者チェック表/利用者チェック表_個人データ_*.json
+利用者チェック表/build_urakoshi_json.py

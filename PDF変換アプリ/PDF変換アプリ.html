@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF変換アプリ</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1f1f1f;
+      --muted: #666;
+      --line: #d8d8d8;
+      --paper: #fff;
+      --bg: #f4f5f7;
+      --accent: #0f766e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .app {
+      width: min(760px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .header {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .lead {
+      color: #64748b;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.45;
+      margin-top: -3px;
+    }
+
+    .section-label {
+      justify-self: start;
+      position: relative;
+      color: #fff;
+      background: #334155;
+      border-radius: 999px;
+      padding: 7px 13px;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: -6px;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, .14);
+    }
+
+    .section-label::after {
+      content: "";
+      position: absolute;
+      left: 22px;
+      bottom: -6px;
+      width: 12px;
+      height: 12px;
+      background: #334155;
+      transform: rotate(45deg);
+    }
+
+    .doc-type {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      width: 100%;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .doc-type label {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 42px;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--muted);
+      border: 1px solid #e5e7eb;
+      background: #f8fafc;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, .05);
+      transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+
+    .doc-type label:hover {
+      border-color: var(--accent);
+      background: #f0fdfa;
+    }
+
+    .doc-type input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .doc-type label:has(input:checked) {
+      color: #fff;
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35);
+    }
+
+    .notice {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #475569;
+      padding: 9px 12px;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .tools {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .rotate-btn {
+      width: auto;
+      min-height: 32px;
+      min-width: 68px;
+      padding: 6px 9px;
+      font-size: 12px;
+      line-height: 1.2;
+      background: #475569;
+    }
+
+    .rotate-btn.hidden {
+      display: none;
+    }
+
+    .reset-btn {
+      width: auto;
+      min-height: 32px;
+      min-width: 72px;
+      padding: 6px 10px;
+      font-size: 12px;
+      line-height: 1.2;
+      background: #b45309;
+    }
+
+    .control-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      width: 100%;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .control-row.hidden {
+      display: none;
+    }
+
+    .contrast-options {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .contrast-btn,
+    .size-btn {
+      width: auto;
+      min-height: 32px;
+      min-width: 70px;
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .contrast-btn.active {
+      background: #0f766e;
+      border-color: #0f766e;
+      color: #fff;
+    }
+
+    .size-btn.active {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+
+    .drop {
+      min-height: 420px;
+      border: 2px dashed #aaa;
+      border-radius: 8px;
+      background: #fff;
+      padding: 18px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .drop.merge-preview {
+      align-items: start;
+      overflow-y: auto;
+      gap: 14px;
+    }
+
+    .drop.dragover {
+      border-color: var(--accent);
+      background: #ecfdf5;
+      color: #064e3b;
+    }
+
+    .placeholder {
+      font-size: 16px;
+      line-height: 1.8;
+    }
+
+    .loading {
+      display: grid;
+      gap: 14px;
+      justify-items: center;
+      color: #334155;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .spinner {
+      width: 46px;
+      height: 46px;
+      border: 5px solid #cbd5e1;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    .loading-dots::after {
+      content: "";
+      animation: dots 1.2s steps(4, end) infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes dots {
+      0% { content: ""; }
+      25% { content: "."; }
+      50% { content: ".."; }
+      75%, 100% { content: "..."; }
+    }
+
+    .sheet {
+      width: min(100%, 594px);
+      aspect-ratio: 210 / 297;
+      background: var(--paper);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, .16);
+      position: relative;
+    }
+
+    .sheet.landscape {
+      width: min(100%, 760px);
+      aspect-ratio: 297 / 210;
+    }
+
+    .sheet canvas {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      max-width: calc(100% - 24px);
+      max-height: calc(100% - 24px);
+    }
+
+    .merge-page {
+      width: 100%;
+      display: grid;
+      gap: 6px;
+      justify-items: center;
+    }
+
+    .merge-page-number {
+      width: 28px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      background: #e5e7eb;
+      color: #374151;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    button {
+      width: 100%;
+      appearance: none;
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      padding: 14px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #b8b8b8;
+      cursor: not-allowed;
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .drop { min-height: 340px; padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <h1>PDF変換アプリ</h1>
+      <div class="lead">介護保険証、負担割合証などをちょうどいいサイズに変換し、中央に揃えてくれるアプリです。<br>複数のPDF書類を一つにまとめる結合機能付き。</div>
+    </div>
+
+    <div class="section-label">項目を選択</div>
+    <div class="doc-type" aria-label="証書の種類">
+      <label><input type="radio" name="docType" value="merge" checked><span>PDF結合</span></label>
+      <label><input type="radio" name="docType" value="care"><span>介護保険証（横印刷）</span></label>
+      <label><input type="radio" name="docType" value="burden"><span>負担割合証（縦印刷）</span></label>
+    </div>
+
+    <div class="notice">白黒のみ対応。カラーやグレースケールは黒くなったり、影になったりします。</div>
+
+    <div class="tools">
+      <button id="rotateLeftBtn" class="rotate-btn" type="button" title="左に90度回転">↺ 反転</button>
+      <button id="rotateRightBtn" class="rotate-btn" type="button" title="右に90度回転">反転 ↻</button>
+      <button id="resetBtn" class="reset-btn" type="button">リセット</button>
+    </div>
+
+    <div class="control-row contrast">
+      <span>黒の濃さ</span>
+      <div class="contrast-options">
+        <button class="contrast-btn" type="button" data-threshold="115">薄い</button>
+        <button class="contrast-btn active" type="button" data-threshold="172">標準</button>
+        <button class="contrast-btn" type="button" data-threshold="190">濃い</button>
+        <button class="contrast-btn" type="button" data-threshold="235">最濃</button>
+      </div>
+    </div>
+
+    <div class="control-row size-control">
+      <span>サイズ</span>
+      <div class="contrast-options">
+        <button class="size-btn" type="button" data-scale="0.9">小</button>
+        <button class="size-btn active" type="button" data-scale="1">標準</button>
+        <button class="size-btn" type="button" data-scale="1.12">大</button>
+      </div>
+    </div>
+
+    <button id="saveBtn" type="button" disabled>PDF保存</button>
+
+    <div id="drop" class="drop">
+      <div id="placeholder" class="placeholder">
+        白黒の写真またはPDFを<br>ここにドラッグ
+      </div>
+    </div>
+
+    <div id="status" class="status">A4白背景の中央に原寸大で配置します。出力は白黒PDFのみです。</div>
+  </div>
+
+  <script type="module">
+    import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+
+    const A4 = { wMm: 210, hMm: 297, wPt: 595.28, hPt: 841.89 };
+    const DPI = 300;
+    const MM_TO_PX = DPI / 25.4;
+    const originalSizes = {
+      portrait: { wMm: 91, hMm: 128 },
+      landscape: { wMm: 128, hMm: 91 }
+    };
+
+    const drop = document.getElementById("drop");
+    const placeholder = document.getElementById("placeholder");
+    const saveBtn = document.getElementById("saveBtn");
+    const rotateLeftBtn = document.getElementById("rotateLeftBtn");
+    const rotateRightBtn = document.getElementById("rotateRightBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const contrastButtons = Array.from(document.querySelectorAll(".contrast-btn"));
+    const sizeButtons = Array.from(document.querySelectorAll(".size-btn"));
+    const statusEl = document.getElementById("status");
+    let loadedCanvases = [];
+    let sourceCanvases = [];
+    let outputCanvases = [];
+    let outputDirectory = null;
+    let blackThreshold = 172;
+    let sizeScale = 1;
+    const rotations = { merge: 0, care: 0, burden: 0 };
+    const modeStates = {
+      merge: emptyModeState(),
+      care: emptyModeState(),
+      burden: emptyModeState()
+    };
+    let currentDocType = "merge";
+
+    const setStatus = (text) => { statusEl.textContent = text; };
+    const selectedDocType = () => document.querySelector("input[name='docType']:checked").value;
+    const selectedOrientation = () => selectedDocType() === "care" ? "landscape" : "portrait";
+    const isMergeMode = () => selectedDocType() === "merge";
+
+    document.querySelectorAll("input[name='docType']").forEach((input) => {
+      input.addEventListener("change", () => {
+        saveModeState(currentDocType);
+        currentDocType = selectedDocType();
+        updateRotateButtons();
+        updateControlsVisibility();
+        loadModeState(currentDocType);
+      });
+    });
+
+    rotateLeftBtn.addEventListener("click", () => {
+      rotateSelected(-90);
+      if (outputCanvases.length) showPreview(outputCanvases[0]);
+    });
+
+    rotateRightBtn.addEventListener("click", () => {
+      rotateSelected(90);
+      if (outputCanvases.length) showPreview(outputCanvases[0]);
+    });
+
+    resetBtn.addEventListener("click", () => {
+      resetLoadedFiles();
+    });
+
+    contrastButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        blackThreshold = Number(button.dataset.threshold);
+        updateContrastButtons();
+        updateContrastPreview();
+        saveModeState(currentDocType);
+      });
+    });
+
+    sizeButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        sizeScale = Number(button.dataset.scale);
+        updateSizeButtons();
+        if (outputCanvases.length) showPreview();
+        saveModeState(currentDocType);
+      });
+    });
+
+    async function updateContrastPreview() {
+      if (isMergeMode()) return;
+      showLoading();
+      await nextFrame();
+      if (!sourceCanvases.length && loadedCanvases.length) rebuildForCurrentMode();
+      if (!sourceCanvases.length) return;
+      refreshOutputCanvases();
+      showPreview();
+    }
+
+    function nextFrame() {
+      return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+
+    updateRotateButtons();
+    updateControlsVisibility();
+    updateContrastButtons();
+    updateSizeButtons();
+
+    ["dragenter", "dragover"].forEach((name) => {
+      drop.addEventListener(name, (event) => {
+        event.preventDefault();
+        drop.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((name) => {
+      drop.addEventListener(name, () => drop.classList.remove("dragover"));
+    });
+
+    drop.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      const files = Array.from(event.dataTransfer.files || []);
+      if (!files.length) return;
+      await loadFiles(files);
+    });
+
+    saveBtn.addEventListener("click", async () => {
+      if (!outputCanvases.length) return;
+      saveBtn.disabled = true;
+      try {
+        if (isMergeMode()) {
+          await saveSingleBlob(buildMergedPdfBlob(outputCanvases), "PDF結合.pdf");
+          setStatus("PDFを結合して保存しました。");
+          return;
+        }
+        if (outputCanvases.length > 1 && window.showDirectoryPicker) {
+          if (!outputDirectory || !(await canWriteToDirectory(outputDirectory))) {
+            outputDirectory = await window.showDirectoryPicker({
+              id: "pdf-converter-output",
+              mode: "readwrite",
+              startIn: "desktop"
+            });
+          }
+          for (let index = 0; index < outputCanvases.length; index++) {
+            setStatus(`${index + 1}/${outputCanvases.length}件目を保存中です。`);
+            const handle = await outputDirectory.getFileHandle(buildSuggestedName(index), { create: true });
+            const writable = await handle.createWritable();
+            await writable.write(buildPdfBlob(outputCanvases[index]));
+            await writable.close();
+          }
+          setStatus(`${outputCanvases.length}件を同じフォルダに保存しました。`);
+          return;
+        }
+        if (window.showSaveFilePicker) {
+          await saveSingleBlob(buildPdfBlob(outputCanvases[0]), buildSuggestedName(0));
+          setStatus("保存しました。");
+          return;
+        }
+        outputCanvases.forEach((canvas, index) => {
+          const url = URL.createObjectURL(buildPdfBlob(canvas));
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = buildSuggestedName(index);
+          link.click();
+          URL.revokeObjectURL(url);
+        });
+        setStatus(`${outputCanvases.length}件をダウンロード保存しました。`);
+      } catch (error) {
+        console.error(error);
+        setStatus("保存を中止しました。");
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
+    function buildSuggestedName(index) {
+      return outputCanvases.length === 1 ? "PDF変換.pdf" : `PDF変換_${index + 1}.pdf`;
+    }
+
+    async function saveSingleBlob(blob, suggestedName) {
+      if (window.showSaveFilePicker) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName,
+          startIn: "desktop",
+          types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = suggestedName;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function updateRotateButtons() {
+      const hidden = isMergeMode();
+      rotateLeftBtn.classList.toggle("hidden", hidden);
+      rotateRightBtn.classList.toggle("hidden", hidden);
+    }
+
+    function updateControlsVisibility() {
+      document.querySelector(".contrast").classList.toggle("hidden", isMergeMode());
+      document.querySelector(".size-control").classList.toggle("hidden", isMergeMode());
+    }
+
+    function updateContrastButtons() {
+      contrastButtons.forEach((button) => {
+        button.classList.toggle("active", Number(button.dataset.threshold) === blackThreshold);
+      });
+    }
+
+    function updateSizeButtons() {
+      sizeButtons.forEach((button) => {
+        button.classList.toggle("active", Number(button.dataset.scale) === sizeScale);
+      });
+    }
+
+    function rotateSelected(degrees) {
+      const type = selectedDocType();
+      rotations[type] = (rotations[type] + degrees + 360) % 360;
+      saveModeState(type);
+    }
+
+    function resetLoadedFiles() {
+      loadedCanvases = [];
+      sourceCanvases = [];
+      outputCanvases = [];
+      saveBtn.disabled = true;
+      showPlaceholder();
+      setStatus(modeStatusText());
+      saveModeState(currentDocType);
+    }
+
+    function emptyModeState() {
+      return {
+        loadedCanvases: [],
+        sourceCanvases: [],
+        outputCanvases: [],
+        blackThreshold: 172,
+        sizeScale: 1
+      };
+    }
+
+    function saveModeState(type) {
+      modeStates[type] = {
+        loadedCanvases: [...loadedCanvases],
+        sourceCanvases: [...sourceCanvases],
+        outputCanvases: [...outputCanvases],
+        blackThreshold,
+        sizeScale
+      };
+    }
+
+    function loadModeState(type) {
+      const state = modeStates[type] || emptyModeState();
+      loadedCanvases = [...state.loadedCanvases];
+      sourceCanvases = [...state.sourceCanvases];
+      outputCanvases = [...state.outputCanvases];
+      blackThreshold = state.blackThreshold;
+      sizeScale = state.sizeScale;
+      updateContrastButtons();
+      updateSizeButtons();
+      saveBtn.disabled = !outputCanvases.length;
+      if (outputCanvases.length) {
+        showPreview();
+        setStatus(isMergeMode()
+          ? `${outputCanvases.length}ページ分のPDF結合準備が完了しました。`
+          : `${outputCanvases.length}ページ分の切り抜きと白黒変換が完了しました。`);
+      } else {
+        showPlaceholder();
+        setStatus(modeStatusText());
+      }
+    }
+
+    function modeStatusText() {
+      if (isMergeMode()) return "複数のPDFをドラッグすると、1つのPDFに結合します。";
+      return "A4白背景の中央に配置します。出力は白黒PDFのみです。";
+    }
+
+    async function canWriteToDirectory(directory) {
+      const options = { mode: "readwrite" };
+      if ((await directory.queryPermission(options)) === "granted") return true;
+      return (await directory.requestPermission(options)) === "granted";
+    }
+
+    async function loadFiles(files) {
+      setStatus(`${files.length}件を読み込み中です。`);
+      showLoading();
+      saveBtn.disabled = true;
+      if (!isMergeMode()) {
+        loadedCanvases = [];
+        sourceCanvases = [];
+        outputCanvases = [];
+      }
+      try {
+        for (const file of files) {
+          if (isMergeMode() && !(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
+            throw new Error("merge mode accepts only PDF files");
+          }
+          const sources = file.type === "application/pdf" || /\.pdf$/i.test(file.name)
+            ? await renderPdfPages(file)
+            : [await renderImage(file)];
+          loadedCanvases.push(...sources);
+        }
+        rebuildForCurrentMode();
+        saveModeState(currentDocType);
+        showPreview();
+        saveBtn.disabled = false;
+        setStatus(isMergeMode()
+          ? `${outputCanvases.length}ページ分のPDF結合準備が完了しました。`
+          : `${outputCanvases.length}ページ分の切り抜きと白黒変換が完了しました。`);
+      } catch (error) {
+        console.error(error);
+        setStatus("読み込みに失敗しました。PDFの場合はインターネット接続が必要な場合があります。");
+        showPlaceholder();
+      }
+    }
+
+    function showLoading() {
+      drop.classList.remove("merge-preview");
+      drop.innerHTML = `
+        <div class="loading">
+          <div class="spinner" aria-hidden="true"></div>
+          <div class="loading-dots">読込中 しばらくお待ちください</div>
+        </div>
+      `;
+    }
+
+    function showPlaceholder() {
+      drop.classList.remove("merge-preview");
+      drop.innerHTML = `
+        <div id="placeholder" class="placeholder">
+          白黒の写真またはPDFを<br>ここにドラッグ
+        </div>
+      `;
+    }
+
+    async function renderImage(file) {
+      const bitmap = await createImageBitmap(file);
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      canvas.getContext("2d").drawImage(bitmap, 0, 0);
+      return canvas;
+    }
+
+    async function renderPdfPages(file) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+      const data = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+      const canvases = [];
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        const page = await pdf.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 3 });
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+        canvases.push(canvas);
+      }
+      return canvases;
+    }
+
+    function cropDocument(canvas) {
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const { width, height } = canvas;
+      const image = ctx.getImageData(0, 0, width, height);
+      const data = image.data;
+      const threshold = 244;
+      let minX = width, minY = height, maxX = 0, maxY = 0;
+      for (let y = 0; y < height; y += 2) {
+        for (let x = 0; x < width; x += 2) {
+          const i = (y * width + x) * 4;
+          const r = data[i], g = data[i + 1], b = data[i + 2];
+          if (r < threshold || g < threshold || b < threshold) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (minX >= maxX || minY >= maxY) return canvas;
+      const pad = Math.round(Math.min(width, height) * 0.01);
+      minX = Math.max(0, minX - pad);
+      minY = Math.max(0, minY - pad);
+      maxX = Math.min(width, maxX + pad);
+      maxY = Math.min(height, maxY + pad);
+      const out = document.createElement("canvas");
+      out.width = maxX - minX;
+      out.height = maxY - minY;
+      out.getContext("2d").drawImage(canvas, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+      return out;
+    }
+
+    function addOuterMargin(canvas) {
+      const size = originalSizes[selectedOrientation()];
+      const pxPerMm = Math.min(canvas.width / size.wMm, canvas.height / size.hMm);
+      const margin = Math.max(24, Math.round(pxPerMm * 10));
+      const out = document.createElement("canvas");
+      out.width = canvas.width + margin * 2;
+      out.height = canvas.height + margin * 2;
+      const ctx = out.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, out.width, out.height);
+      ctx.drawImage(canvas, margin, margin);
+      return out;
+    }
+
+    function normalizeOrientation(canvas) {
+      const orientation = selectedOrientation();
+      const shouldRotate = (orientation === "landscape" && canvas.height > canvas.width)
+        || (orientation === "portrait" && canvas.width > canvas.height);
+      if (!shouldRotate) return canvas;
+      const out = document.createElement("canvas");
+      out.width = canvas.height;
+      out.height = canvas.width;
+      const ctx = out.getContext("2d");
+      ctx.translate(out.width / 2, out.height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+      return out;
+    }
+
+    function refreshOutputCanvases() {
+      outputCanvases = sourceCanvases.map((canvas) => toBlackWhite(canvas));
+    }
+
+    function rebuildForCurrentMode() {
+      sourceCanvases = [];
+      outputCanvases = [];
+      if (!loadedCanvases.length) return;
+      if (isMergeMode()) {
+        outputCanvases = [...loadedCanvases];
+        return;
+      }
+      for (const loaded of loadedCanvases) {
+        const cropped = cropDocument(loaded);
+        const oriented = normalizeOrientation(cropped);
+        sourceCanvases.push(addOuterMargin(oriented));
+      }
+      refreshOutputCanvases();
+    }
+
+    function toBlackWhite(canvas) {
+      const out = document.createElement("canvas");
+      out.width = canvas.width;
+      out.height = canvas.height;
+      const ctx = out.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(canvas, 0, 0);
+      const image = ctx.getImageData(0, 0, out.width, out.height);
+      const data = image.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        const value = gray < blackThreshold ? 0 : 255;
+        data[i] = value;
+        data[i + 1] = value;
+        data[i + 2] = value;
+        data[i + 3] = 255;
+      }
+      ctx.putImageData(image, 0, 0);
+      return out;
+    }
+
+    function showPreview(canvas = outputCanvases[0]) {
+      drop.innerHTML = "";
+      drop.classList.toggle("merge-preview", isMergeMode());
+      if (isMergeMode()) {
+        outputCanvases.forEach((pageCanvas, index) => {
+          const item = document.createElement("div");
+          item.className = "merge-page";
+          const number = document.createElement("div");
+          number.className = "merge-page-number";
+          number.textContent = `${index + 1}`;
+          item.appendChild(number);
+          item.appendChild(buildPreviewSheet(pageCanvas));
+          drop.appendChild(item);
+        });
+        return;
+      }
+      drop.appendChild(buildPreviewSheet(canvas));
+    }
+
+    function buildPreviewSheet(canvas) {
+      const sheet = document.createElement("div");
+      sheet.className = "sheet";
+      const previewLandscape = isMergeMode() ? canvas.width > canvas.height : selectedOrientation() === "landscape";
+      if (previewLandscape) sheet.classList.add("landscape");
+      const preview = document.createElement("canvas");
+      const displayCanvas = isMergeMode() ? canvas : applySelectedRotation(canvas);
+      const page = isMergeMode() ? pageSizeForCanvas(displayCanvas) : selectedPageSize();
+      const box = isMergeMode() ? { wMm: page.wMm - 10, hMm: page.hMm - 10 } : largePlacementBox(page);
+      preview.width = displayCanvas.width;
+      preview.height = displayCanvas.height;
+      preview.getContext("2d").drawImage(displayCanvas, 0, 0);
+      const fitted = fitWithin(displayCanvas.width, displayCanvas.height, box.wMm, box.hMm);
+      preview.style.width = `${(fitted.wMm / page.wMm) * 100}%`;
+      preview.style.height = `${(fitted.hMm / page.hMm) * 100}%`;
+      sheet.appendChild(preview);
+      return sheet;
+    }
+
+    function buildPdfBlob(canvas) {
+      const pageImages = [buildA4PageJpeg(canvas)];
+      return objectsToPdfBlobFromPageImages(pageImages);
+    }
+
+    function buildMergedPdfBlob(canvases) {
+      const pageImages = canvases.map((canvas) => buildMergedPageJpeg(canvas));
+      return objectsToPdfBlobFromPageImages(pageImages);
+    }
+
+    function objectsToPdfBlobFromPageImages(pageImages) {
+      const objects = [];
+      const pageObjectIds = [];
+      const pageCount = pageImages.length;
+
+      objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+      objects.push("");
+
+      for (let index = 0; index < pageCount; index++) {
+        const page = pageImages[index].page;
+        const pageId = objects.length + 1;
+        const imageId = pageId + 1;
+        const contentId = pageId + 2;
+        pageObjectIds.push(pageId);
+
+        objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${page.wPt} ${page.hPt}] /Resources << /XObject << /Im${index} ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+        objects.push(`<< /Type /XObject /Subtype /Image /Width ${pageImages[index].width} /Height ${pageImages[index].height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${pageImages[index].data.length} >>\nstream\n${pageImages[index].data}\nendstream`);
+        const content = `q\n${page.wPt} 0 0 ${page.hPt} 0 0 cm\n/Im${index} Do\nQ`;
+        objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+      }
+
+      objects[1] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageCount} >>`;
+      return objectsToPdfBlob(objects);
+    }
+
+    function buildA4PageJpeg(canvas) {
+      const page = selectedPageSize();
+      const displayCanvas = applySelectedRotation(canvas);
+      const doc = document.createElement("canvas");
+      doc.width = Math.round(page.wMm * MM_TO_PX);
+      doc.height = Math.round(page.hMm * MM_TO_PX);
+      const ctx = doc.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, doc.width, doc.height);
+      const box = largePlacementBox(page);
+      const fitted = fitWithin(displayCanvas.width, displayCanvas.height, box.wMm, box.hMm);
+      const targetW = Math.round(fitted.wMm * MM_TO_PX);
+      const targetH = Math.round(fitted.hMm * MM_TO_PX);
+      const x = Math.round((doc.width - targetW) / 2);
+      const y = Math.round((doc.height - targetH) / 2);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(displayCanvas, x, y, targetW, targetH);
+      const jpegData = atob(doc.toDataURL("image/jpeg", 0.92).split(",")[1]);
+      return { data: jpegData, width: doc.width, height: doc.height, page };
+    }
+
+    function buildMergedPageJpeg(canvas) {
+      const page = pageSizeForCanvas(canvas);
+      const doc = document.createElement("canvas");
+      doc.width = Math.round(page.wMm * MM_TO_PX);
+      doc.height = Math.round(page.hMm * MM_TO_PX);
+      const ctx = doc.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, doc.width, doc.height);
+      const box = { wMm: page.wMm - 10, hMm: page.hMm - 10 };
+      const fitted = fitWithin(canvas.width, canvas.height, box.wMm, box.hMm);
+      const targetW = Math.round(fitted.wMm * MM_TO_PX);
+      const targetH = Math.round(fitted.hMm * MM_TO_PX);
+      const x = Math.round((doc.width - targetW) / 2);
+      const y = Math.round((doc.height - targetH) / 2);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(canvas, x, y, targetW, targetH);
+      const jpegData = atob(doc.toDataURL("image/jpeg", 0.92).split(",")[1]);
+      return { data: jpegData, width: doc.width, height: doc.height, page };
+    }
+
+    function applySelectedRotation(canvas) {
+      const rotation = rotations[selectedDocType()];
+      if (rotation === 0) return canvas;
+      const out = document.createElement("canvas");
+      const quarterTurn = rotation === 90 || rotation === 270;
+      out.width = quarterTurn ? canvas.height : canvas.width;
+      out.height = quarterTurn ? canvas.width : canvas.height;
+      const ctx = out.getContext("2d");
+      ctx.translate(out.width / 2, out.height / 2);
+      ctx.rotate(rotation * Math.PI / 180);
+      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+      return out;
+    }
+
+    function fitWithin(sourceW, sourceH, maxWMm, maxHMm) {
+      const sourceRatio = sourceW / sourceH;
+      const boxRatio = maxWMm / maxHMm;
+      if (sourceRatio > boxRatio) {
+        return { wMm: maxWMm, hMm: maxWMm / sourceRatio };
+      }
+      return { wMm: maxHMm * sourceRatio, hMm: maxHMm };
+    }
+
+    function selectedPageSize() {
+      if (selectedOrientation() === "landscape") {
+        return { wMm: A4.hMm, hMm: A4.wMm, wPt: A4.hPt, hPt: A4.wPt };
+      }
+      return A4;
+    }
+
+    function pageSizeForCanvas(canvas) {
+      if (canvas.width > canvas.height) {
+        return { wMm: A4.hMm, hMm: A4.wMm, wPt: A4.hPt, hPt: A4.wPt };
+      }
+      return A4;
+    }
+
+    function largePlacementBox(page) {
+      const scaleBox = (box) => ({
+        wMm: Math.min(page.wMm - 2, box.wMm * sizeScale),
+        hMm: Math.min(page.hMm - 2, box.hMm * sizeScale)
+      });
+      if (selectedOrientation() === "portrait") {
+        return scaleBox({ wMm: 120, hMm: 170 });
+      }
+      const margin = 10;
+      return scaleBox({ wMm: page.wMm - margin * 2, hMm: page.hMm - margin * 2 });
+    }
+
+    function objectsToPdfBlob(objects) {
+      let pdf = "%PDF-1.4\n";
+      const offsets = [0];
+      objects.forEach((obj, index) => {
+        offsets.push(pdf.length);
+        pdf += `${index + 1} 0 obj\n${obj}\nendobj\n`;
+      });
+      const xref = pdf.length;
+      pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+      for (let i = 1; i < offsets.length; i++) {
+        pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+      }
+      pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+      const bytes = new Uint8Array(pdf.length);
+      for (let i = 0; i < pdf.length; i++) bytes[i] = pdf.charCodeAt(i) & 0xff;
+      return new Blob([bytes], { type: "application/pdf" });
+    }
+  </script>
+</body>
+</html>

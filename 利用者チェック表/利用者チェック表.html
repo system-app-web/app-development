@@ -1,0 +1,4125 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="theme-color" content="#4a9e2f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="利用者チェック表">
+<title>利用者チェック表</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./app-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./app-icon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: #f2f8f0;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input, textarea, select, option {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+.modal-input, .modal-textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.topbar {
+  background: linear-gradient(135deg, #4a9e2f 0%, #65b842 55%, #84cc50 100%);
+  padding: 14px 16px 8px;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex: 0 0 auto;
+  gap: 10px;
+  overflow: hidden;
+}
+.topbar-divider {
+  width: calc(100% + 32px);
+  margin: -2px -16px 0;
+  height: 1px;
+  background: rgba(255,255,255,0.28);
+}
+.app-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  line-height: 1.1;
+  padding-left: 0;
+}
+.topbar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.topbar-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.topbar-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+}
+.topbar-main::-webkit-scrollbar { height: 6px; }
+.topbar-main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.28); border-radius: 999px; }
+.month-nav { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+.mbtn {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 7px;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  color: white;
+  cursor: pointer;
+}
+.mlabel { font-size: 13px; font-weight: 700; color: white; min-width: 80px; text-align: center; }
+.stats {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex: 0 0 auto;
+  margin: 0;
+  flex-wrap: nowrap;
+  min-width: max-content;
+  overflow: visible;
+}
+.stats.header-stats {
+  min-width: 0;
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(20, 58, 20, 0.18);
+}
+.stat-num { font-size: 12px; font-weight: 800; color: white; }
+.stat-num.g { color: #6ee7b7; }
+.stat-num.r { color: #fca5a5; }
+.stat-num.y { color: #fcd34d; }
+.stat-label { font-size: 11px; color: #f8fff4; font-weight: 800; }
+.top-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+.reorder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 64vh;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  padding-right: 1px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.reorder-item {
+  display: block;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid #b3e89a;
+  border-radius: 8px;
+  background: #f9fef5;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+}
+.reorder-item.is-selected {
+  background: #dcfce7;
+  border-color: #65b842;
+  box-shadow: inset 0 0 0 1px #65b842;
+}
+.reorder-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a4d0e;
+  text-align: left;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reorder-hint {
+  font-size: 10px;
+  color: #f8fff4;
+  line-height: 1.2;
+  margin-bottom: 3px;
+  min-height: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.editor-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin-bottom: 3px;
+  width: 100%;
+}
+.editor-list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: stretch;
+  padding-bottom: 2px;
+}
+.editor-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  width: 72px;
+  min-height: 54px;
+  padding: 6px 4px;
+  border: 1px solid #b3e89a;
+  border-radius: 8px;
+  background: #f9fef5;
+  text-align: center;
+}
+.editor-row.is-selected {
+  background: #dcfce7;
+  border-color: #65b842;
+  box-shadow: inset 0 0 0 1px #65b842;
+}
+.editor-row-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #1a4d0e;
+  line-height: 1.1;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+  word-break: break-word;
+}
+.editor-row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.editor-chip {
+  min-width: 34px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid #b3e89a;
+  background: #edf9e7;
+  color: #2d7a1a;
+  font-size: 8px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.office-check-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 8px 0 14px;
+}
+.office-check-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1.5px solid #b3e89a;
+  border-radius: 10px;
+  background: #f9fef5;
+  width: min(100%, 228px);
+  box-sizing: border-box;
+}
+.office-check-name {
+  flex: 1;
+  min-width: 0;
+  color: #1a4d0e;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.office-check-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.6px solid #65b842;
+  background: white;
+  color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: none;
+}
+.office-check-mark.is-on {
+  background: #3a9e20;
+  color: white;
+  box-shadow: 0 2px 8px rgba(58,158,32,0.25);
+}
+.office-check-actions {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.office-mini-btn {
+  height: 22px;
+  min-width: 34px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid #b3e89a;
+  background: #edf9e7;
+  color: #2d7a1a;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.office-mini-btn.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+.office-empty-note {
+  padding: 9px 10px;
+  border: 1.5px dashed #b3e89a;
+  border-radius: 10px;
+  background: #f9fef5;
+  color: #64748b;
+  font-size: 11px;
+  text-align: center;
+  width: min(100%, 228px);
+  box-sizing: border-box;
+}
+.office-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.office-modal-actions .mact {
+  width: 100%;
+  margin: 0 !important;
+}
+.editor-action-btn {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #65b842;
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+.editor-action-btn.subtle {
+  background: #edf9e7;
+  color: #2d7a1a;
+  border: 1px solid #b3e89a;
+}
+.editor-action-btn.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+.editor-action-btn.is-active {
+  background: #dcfce7;
+  color: #1f6f12;
+  border: 1px solid #65b842;
+}
+.editor-action-btn.danger.is-active {
+  background: #fecaca;
+  color: #991b1b;
+  border: 1px solid #ef4444;
+}
+.top-add-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.55);
+  background: #d4f0c4;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.top-add-btn.primary {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(20, 58, 20, 0.18);
+  color: #f8fff4;
+}
+.top-add-btn.primary .top-add-btn-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.top-add-btn.primary .top-add-btn-label::before {
+  content: "+";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #f4fbef;
+  color: #2d7a1a;
+  font-size: 12px;
+  font-weight: 700;
+}
+.top-add-btn.alt {
+  background: rgba(255,255,255,0.18);
+  color: white;
+}
+.top-add-btn.alt.is-active {
+  background: #f4fbef;
+  color: #2d7a1a;
+  border-color: rgba(255,255,255,0.7);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.utility-btn {
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.34);
+  background: rgba(255,255,255,0.10);
+  color: #f7fff3;
+  font-size: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.utility-btn.backup {
+  background: rgba(255,255,255,0.16);
+}
+.utility-btn.import {
+  background: rgba(212,240,196,0.18);
+  color: #eefce6;
+}
+.month-side-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: 4px;
+}
+.top-toggle-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.18);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.date-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.28);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.date-toggle-btn {
+  height: 24px;
+  min-width: 38px;
+  padding: 0 5px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.88);
+  font-size: clamp(7px, 0.9vw, 9px);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+.date-toggle-btn.is-active {
+  background: #f4fbef;
+  color: #2d7a1a;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.date-toggle-btn.order-custom {
+  min-width: 42px;
+  font-size: clamp(6px, 0.8vw, 8px);
+  letter-spacing: 0;
+}
+.tbl-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  background: white;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+table, thead, tbody, tr, th, td, button, span, div {
+  -webkit-touch-callout: none;
+}
+table { border-collapse: collapse; table-layout: fixed; min-width: 820px; width: 100%; }
+thead th {
+  background: #f2fded;
+  border-bottom: 2px solid #b3e89a;
+  border-right: 0.5px solid #b3e89a;
+  vertical-align: bottom;
+  text-align: center;
+  padding: 4px 2px 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+th.h-no {
+  width: 32px;
+  font-size: 10px;
+  color: #2d7a1a;
+  font-weight: 700;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0;
+}
+th.h-name {
+  width: 76px;
+  font-size: 10px;
+  color: #2d7a1a;
+  font-weight: 700;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0;
+}
+th.h-kosin { width: 44px; font-size: 8px; color: #2d7a1a; font-weight: 700; text-align: center; border-right: 2px solid #86d46a; vertical-align: middle; padding-top: 0; padding-bottom: 0; }
+th.h-rot { width: 28px; }
+th[data-col-key="level"] { width: 32px; vertical-align: middle; padding: 0; }
+th.h-rot-date { width: 60px; vertical-align: middle; padding: 0; }
+th.h-visit { width: 44px; }
+th.h-seho { width: 44px; }
+th[data-custom-col="1"] { width: 44px; }
+th[data-col-key="monita"],
+th[data-col-key="sikien"],
+th[data-col-key="drive"],
+th[data-col-key="hand"],
+th[data-col-key="fax"],
+th[data-col-key="meeting"] { width: 44px; }
+th.h-biko { width: 168px; font-size: 8px; color: #2d7a1a; font-weight: 700; text-align: center; vertical-align: middle; padding-left: 0; padding-right: 0; border-left: 2px solid #86d46a; min-width: 168px; }
+th.col-movable { cursor: pointer; }
+th[data-col-key], td[data-col-key] { transition: background-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease; }
+th.col-selected {
+  background: #dff5d2 !important;
+  box-shadow: inset 0 0 0 2px #65b842;
+}
+th.col-dragging {
+  background: #eefce6 !important;
+  box-shadow: 0 8px 20px rgba(58,158,32,0.22), inset 0 0 0 2px #65b842;
+  transform: scale(1.04);
+  z-index: 25;
+}
+th.col-drop-target {
+  background: #fff7d6 !important;
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+th .inner {
+  writing-mode: horizontal-tb;
+  font-size: 8px;
+  font-weight: 700;
+  color: #2d7a1a;
+  white-space: normal;
+  line-height: 1.05;
+  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  text-align: center;
+  padding: 0 2px;
+}
+th .inner.long {
+  font-size: 6.8px;
+  letter-spacing: -0.05em;
+}
+th .inner.split {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 34px;
+  font-size: 6.8px;
+  line-height: 1.05;
+  letter-spacing: 0;
+  transform: translateY(1px);
+}
+th .inner.split span {
+  display: block;
+}
+th .inner.split .sub-label {
+  font-size: 0.84em;
+}
+th.h-visit .inner {
+  font-size: 7px;
+}
+th.h-kosin .label-small {
+  font-size: 0.82em;
+}
+tbody tr:nth-child(even) { background: #f8fcff; }
+tbody tr:nth-child(odd) { background: white; }
+tbody tr { transition: background-color 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease, opacity 0.12s ease; }
+tbody tr.done-row { background: #f0fdf4 !important; }
+tbody tr.row-selected {
+  background: #dcfce7 !important;
+  box-shadow: inset 0 0 0 2px #65b842;
+}
+tbody tr.row-dragging {
+  position: relative;
+  z-index: 8;
+  box-shadow: 0 14px 32px rgba(45, 122, 26, 0.22), inset 0 0 0 2px #65b842;
+  opacity: 0.96;
+  will-change: transform;
+}
+tbody tr.row-drop-target {
+  box-shadow: inset 0 3px 0 #65b842;
+}
+tbody tr.row-drop-target.drop-before {
+  box-shadow: inset 0 3px 0 #65b842;
+}
+tbody tr.row-drop-target.drop-after {
+  box-shadow: inset 0 -3px 0 #65b842;
+}
+tbody tr.blank-insert-target {
+  background: #fff7d6 !important;
+  box-shadow: inset 0 3px 0 #f59e0b;
+}
+td {
+  border-bottom: 1px solid #d4f0c4;
+  border-right: 0.5px solid #d4f0c4;
+  height: 46px;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 12px;
+  color: #92400e;
+}
+td.td-no { font-size: 10px; color: #86d46a; font-weight: 700; width: 32px; text-align: center; vertical-align: middle; padding: 0; -webkit-user-select: none; user-select: none; }
+td.td-lv { min-width: 32px; }
+td.td-name {
+  text-align: center;
+  padding: 0;
+  color: #1a4d0e;
+  width: 76px;
+  cursor: pointer;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.name-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1px;
+  min-height: 40px;
+  width: 100%;
+  overflow: hidden;
+}
+.name-kana {
+  font-size: 8px;
+  line-height: 1.1;
+  color: #64748b;
+  text-align: center;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.name-main {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #1a4d0e;
+  text-align: center;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+td.td-kosin {
+  width: 44px;
+  padding: 0 2px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #92400e;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  border-right: 2px solid #b3e89a;
+}
+td.td-date { font-size: 9px; font-weight: 600; color: #1a4d0e; padding: 0 1px; width: 60px; white-space: nowrap; }
+td.td-date.expiring { color: #dc2626; font-weight: 700; }
+td.td-date.expiring-done { color: #b8c0b3; font-weight: 600; }
+td.td-date.plan-long-current { color: #dc2626; font-weight: 700; }
+td.td-date.plan-current { color: #dc2626; font-weight: 700; }
+td.td-lv { font-size: 11px; font-weight: 700; color: #2d7a1a; width: 32px; white-space: nowrap; }
+td.td-lv.is-clickable { cursor: pointer; }
+td.td-visit {
+  width: 58px;
+  outline: none;
+  padding: 2px 1px 3px;
+  cursor: pointer;
+  text-align: center;
+  vertical-align: middle;
+}
+td.td-visit.is-empty { color: #cbd5e1; }
+td.td-visit.is-selected {
+  background: #dcfce7;
+  box-shadow: inset 0 0 0 2px #65b842;
+}
+.visit-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  min-height: 34px;
+  height: 100%;
+}
+.visit-cell.date-only {
+  justify-content: center;
+  gap: 0;
+}
+.visit-date-text {
+  font-size: 9px;
+  font-weight: 700;
+  color: #3a9e20;
+  line-height: 1.1;
+  min-height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.visit-cell.date-only .visit-date-text {
+  font-size: 10px;
+  line-height: 1.2;
+  min-height: 0;
+}
+.visit-tags {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: 18px;
+  width: 100%;
+}
+.visit-cell.date-only .visit-tags {
+  display: none;
+}
+.visit-tag {
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: #e2f7d8;
+  color: #2d7a1a;
+}
+td.td-cc { cursor: pointer; width: 58px; user-select: none; text-align: center; vertical-align: middle; }
+td.td-seho { width: 58px; cursor: pointer; padding: 2px 2px; text-align: center; vertical-align: middle; }
+td.td-custom-col { width: 58px; }
+td.td-biko {
+  text-align: left;
+  display: table-cell;
+  vertical-align: middle;
+  padding: 0 0 0 8px;
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  border-left: 2px solid #b3e89a;
+  min-width: 92px;
+}
+.chip-warn {
+  display: inline-block;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 20px;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 700;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+.circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.12s;
+  box-sizing: border-box;
+}
+.circle.on { background: #3a9e20; color: white; box-shadow: 0 2px 8px rgba(58,158,32,0.35); transform: scale(0.82); }
+.circle.pending { background: #d4f0c4; color: transparent; border: 1.5px solid #65b842; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.7); }
+.circle.off { background: transparent; color: transparent; border: 1.6px solid #65b842; box-shadow: none; transform: scale(0.82); }
+.seho-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #65b842;
+}
+.seho-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 40px;
+}
+.seho-label {
+  font-size: 8px;
+  line-height: 1.1;
+  color: #64748b;
+  white-space: nowrap;
+}
+.fac-header td {
+  background: #d4f0c4;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a4d0e;
+  padding: 4px 10px;
+  border-bottom: 1px solid #86d46a;
+  text-align: left;
+}
+.fac-add-btn {
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1.5px solid #86d46a;
+  background: white;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2d7a1a;
+  cursor: pointer;
+  font-family: inherit;
+}
+.modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(45,122,26,0.4);
+  z-index: 100;
+  justify-content: center;
+  align-items: flex-end;
+}
+.modal-bg.show { display: flex; }
+.modal-bg.add-client { align-items: center; padding: 16px; }
+.modal-bg.add-client .modal { border-radius: 16px; max-height: calc(100vh - 32px); }
+.modal-bg.compact-picker { align-items: center; padding: 16px; }
+.modal-bg.compact-picker .modal {
+  border-radius: 16px;
+  width: 260px;
+  max-width: 260px;
+  max-height: none;
+  padding: 16px;
+  box-sizing: border-box;
+}
+.modal-bg.compact-picker .modal-pill { margin-bottom: 10px; }
+.modal-bg.compact-picker .modal-name { font-size: 15px; margin-bottom: 10px; }
+.modal-bg.compact-picker .macts { justify-content: center; gap: 5px; }
+.modal-bg.compact-picker .mact {
+  flex: none;
+  min-width: 44px;
+  padding: 8px 8px;
+  font-size: 12px;
+}
+.modal-bg.compact-picker .modal-close {
+  margin-top: 8px;
+  padding: 10px;
+  font-size: 12px;
+}
+.modal-bg.column-editor-picker { align-items: center; padding: 12px 16px; }
+.modal-bg.column-editor-picker .modal {
+  border-radius: 16px;
+  max-width: 720px;
+  width: min(92vw, 720px);
+  max-height: none;
+  padding: 16px;
+}
+.modal-bg.column-editor-picker .modal-name {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+.modal-bg.column-editor-picker .modal-close {
+  margin-top: 10px;
+}
+.modal-bg.fax-office-picker { align-items: center; padding: 16px; }
+.modal-bg.fax-office-picker .modal {
+  border-radius: 16px;
+  width: min(92vw, 380px);
+  max-width: 380px;
+  max-height: none;
+  padding: 16px;
+  box-sizing: border-box;
+}
+.modal-bg.fax-office-picker .modal-name {
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+.modal-bg.fax-office-picker .macts {
+  display: block;
+  width: 100%;
+}
+.modal-bg.fax-office-picker .modal-close {
+  margin-top: 10px;
+}
+.modal-bg.fax-office-picker .office-modal-actions {
+  width: 100%;
+}
+.modal-bg.fax-office-picker .office-modal-actions .mact {
+  width: 100%;
+  display: block;
+  flex: none;
+}
+.modal-bg.calendar-picker { align-items: center; padding: 8px 12px; }
+.modal-bg.calendar-picker .modal {
+  border-radius: 16px;
+  max-width: 348px;
+  width: 100%;
+  max-height: none;
+  padding: 8px 12px;
+}
+.modal-bg.calendar-picker .macts {
+  display: block;
+  width: 100%;
+}
+.modal-bg.calendar-picker .modal-pill { margin-bottom: 6px; }
+.modal-bg.calendar-picker .modal-name { font-size: 14px; margin-bottom: 6px; }
+.calendar-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+}
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+}
+.calendar-nav {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid #b3e89a;
+  background: #f2fded;
+  color: #2d7a1a;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.calendar-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a4d0e;
+}
+.calendar-selects {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+}
+.calendar-select {
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid #b3e89a;
+  background: white;
+  color: #1a4d0e;
+  font-size: 10px;
+  font-family: inherit;
+  padding: 0 5px;
+}
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.calendar-weekdays span {
+  text-align: center;
+  font-size: 9px;
+  color: #94a3b8;
+  line-height: 1;
+}
+.calendar-day {
+  aspect-ratio: 1 / 1;
+  min-height: 24px;
+  border-radius: 7px;
+  border: 1px solid #d4f0c4;
+  background: white;
+  color: #1a4d0e;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.calendar-day.blank {
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+.calendar-day.sel {
+  background: #3a9e20;
+  border-color: #3a9e20;
+  color: white;
+}
+.visit-subactions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
+}
+.visit-subactions .mact {
+  flex: none;
+  min-width: 84px;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.visit-modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.visit-modal-actions .mact {
+  flex: 1;
+  min-width: 0;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.visit-free-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 5px;
+}
+.visit-free-inputs .modal-input {
+  margin-bottom: 0;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+.visit-calendar-box {
+  gap: 1px;
+}
+.visit-calendar-box .visit-subactions {
+  margin-top: 2px;
+}
+.visit-calendar-box .visit-subactions .mact {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+.visit-calendar-box .visit-free-inputs {
+  gap: 3px;
+  margin-top: 3px;
+}
+.visit-calendar-box .visit-free-inputs .modal-input {
+  font-size: 11px;
+  padding: 5px 8px;
+}
+.visit-calendar-box .visit-modal-actions {
+  margin-top: 3px;
+  gap: 6px;
+}
+.visit-calendar-box .visit-modal-actions .mact {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.visit-cancel-btn {
+  width: 100%;
+  margin-top: 3px;
+  padding: 7px;
+}
+.modal-bg.visit-calendar-open > .modal > .modal-close:not(.visit-cancel-btn) {
+  display: none;
+}
+@media (max-width: 820px) {
+  .modal-bg.calendar-picker { padding: 6px 8px; }
+  .modal-bg.calendar-picker .modal {
+    max-width: 332px;
+    padding: 7px 9px;
+  }
+  .modal-bg.calendar-picker .modal-pill { margin-bottom: 5px; }
+  .modal-bg.calendar-picker .modal-name { font-size: 13px; margin-bottom: 5px; }
+  .calendar-nav {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+  .calendar-select {
+    height: 24px;
+    font-size: 9px;
+    padding: 0 4px;
+  }
+  .calendar-weekdays span {
+    font-size: 8px;
+  }
+  .calendar-day {
+    min-height: 21px;
+    font-size: 9px;
+    border-radius: 6px;
+  }
+  .visit-subactions {
+    margin-top: 3px;
+  }
+  .visit-subactions .mact,
+  .visit-modal-actions .mact {
+    font-size: 10px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+  .visit-free-inputs {
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .visit-free-inputs .modal-input {
+    font-size: 11px;
+    padding: 7px 8px;
+  }
+  .visit-calendar-box .visit-subactions .mact {
+    font-size: 9px;
+    padding: 3px 7px;
+  }
+  .visit-calendar-box .visit-free-inputs .modal-input {
+    font-size: 10px;
+    padding: 4px 7px;
+  }
+  .visit-calendar-box .visit-modal-actions .mact {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+  .visit-cancel-btn {
+    margin-top: 2px;
+    padding: 6px;
+  }
+}
+@media (max-width: 1024px) {
+  table { min-width: 800px; }
+  th.h-no { width: 30px; }
+  th.h-name { width: 72px; padding-left: 0; }
+  th.h-kosin { width: 40px; }
+  th.h-rot { width: 26px; }
+  th.h-rot-date { width: 56px; }
+  th.h-visit { width: 42px; }
+  th.h-seho { width: 42px; }
+  th[data-custom-col="1"] { width: 42px; }
+  th[data-col-key="monita"],
+  th[data-col-key="sikien"],
+  th[data-col-key="drive"],
+  th[data-col-key="hand"],
+  th[data-col-key="fax"],
+  th[data-col-key="meeting"] { width: 42px; }
+  th[data-col-key="level"] { width: 30px; }
+  th.h-biko { min-width: 150px; width: 150px; padding-left: 0; }
+  td.td-no { width: 30px; }
+  td.td-name { width: 72px; padding: 0; }
+  td.td-kosin { width: 40px; font-size: 8px; }
+  td.td-date { width: 56px; }
+  td.td-lv { min-width: 30px; width: 30px; }
+  td.td-visit { width: 56px; }
+  td.td-cc { width: 56px; }
+  td.td-seho { width: 56px; }
+  td.td-custom-col { width: 56px; }
+  td.td-biko { min-width: 150px; padding: 0; font-size: 9px; }
+  .circle { width: 22px; height: 22px; font-size: 11px; }
+  .name-kana { font-size: 7px; }
+  .name-main { font-size: 10px; }
+}
+.modal {
+  background: white;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 -8px 40px rgba(58,158,32,0.18);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.modal-pill {
+  width: 36px;
+  height: 4px;
+  background: #b3e89a;
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+.modal-col { font-size: 11px; color: #2d7a1a; font-weight: 700; margin-bottom: 3px; }
+.modal-name { font-size: 17px; font-weight: 700; color: #1a4d0e; margin-bottom: 14px; }
+.macts { display: flex; gap: 6px; flex-wrap: wrap; }
+.mact {
+  padding: 11px 10px;
+  border-radius: 10px;
+  border: 1.5px solid #b3e89a;
+  background: #f2fded;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2d7a1a;
+  cursor: pointer;
+  flex: 1;
+  min-width: 55px;
+  text-align: center;
+  font-family: inherit;
+}
+.mact.green { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
+.mact.red { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+.mact.sel { background: #3a9e20; border-color: #3a9e20; color: white; }
+.modal-close {
+  margin-top: 10px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1.5px solid #b3e89a;
+  background: white;
+  font-size: 13px;
+  color: #94a3b8;
+  cursor: pointer;
+  font-family: inherit;
+}
+textarea.modal-textarea,
+input.modal-input,
+select.modal-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1.5px solid #b3e89a;
+  background: #f2fded;
+  color: #1a4d0e;
+  font-family: inherit;
+  outline: none;
+}
+textarea.modal-textarea { height: 84px; resize: none; }
+input.modal-input { margin-bottom: 8px; }
+select.modal-input {
+  margin-bottom: 8px;
+  height: 42px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.confirm-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(45,122,26,0.5);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.confirm-bg.show { display: flex; }
+.confirm-box {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+}
+.confirm-title { font-size: 16px; font-weight: 700; color: #1a4d0e; margin-bottom: 8px; }
+.confirm-msg { font-size: 13px; color: #64748b; margin-bottom: 20px; line-height: 1.6; }
+.confirm-btns { display: flex; gap: 8px; }
+.confirm-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.confirm-btn.ok { background: #3a9e20; color: white; }
+.confirm-btn.cancel { background: #f1f5f9; color: #64748b; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-head">
+    <div class="topbar-title-group">
+      <div class="app-name">利用者チェック表</div>
+      <div class="stats header-stats">
+        <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-label">総数</div></div>
+      </div>
+    </div>
+    <div class="month-nav">
+      <button class="mbtn" onclick="changeMonth(-1)">‹</button>
+      <span class="mlabel" id="month-label"></span>
+      <button class="mbtn" onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+  <div class="topbar-divider"></div>
+  <div class="topbar-main">
+  <div class="topbar-controls">
+    <button class="top-add-btn primary" onclick="openAddClient()"><span class="top-add-btn-label">利用者追加</span></button>
+    <div class="date-toggle-group" aria-label="日付表示切替">
+      <button class="date-toggle-btn" id="date-toggle-wareki" onclick="setDateDisplayMode(true)">和暦</button>
+      <button class="date-toggle-btn" id="date-toggle-seireki" onclick="setDateDisplayMode(false)">西暦</button>
+    </div>
+    <div class="date-toggle-group" aria-label="並び順切替">
+      <button class="date-toggle-btn" id="order-toggle-name" onclick="setOrderMode('name')">名前順</button>
+      <button class="date-toggle-btn order-custom" id="order-toggle-custom" onclick="setOrderMode('custom')">カスタム順</button>
+    </div>
+    <button class="top-add-btn alt" onclick="openRowReorderModal()">利用者編集</button>
+    <button class="top-add-btn alt" onclick="openColumnEditorModal()">項目編集</button>
+  </div>
+  <div class="month-side-actions">
+    <button class="utility-btn backup" onclick="exportLocalData()">バックアップ</button>
+    <button class="utility-btn import" onclick="triggerImportLocalData()">データ挿入</button>
+  </div>
+  </div>
+</div>
+
+<div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="h-no">No</th>
+        <th class="h-name">利用者名</th>
+        <th class="h-kosin"><span class="label-small">更新申請等</span><br>メモ</th>
+        <th class="h-rot h-rot-date col-movable" data-col-key="yuko"><span class="inner">有効期間</span></th>
+        <th class="h-rot col-movable" data-col-key="level"><span class="inner">介護度</span></th>
+        <th class="h-rot h-rot-date col-movable" data-col-key="planL"><span class="inner">長期目標</span></th>
+        <th class="h-rot h-rot-date col-movable" data-col-key="planS"><span class="inner">短期目標</span></th>
+        <th class="h-rot h-visit col-movable" data-col-key="visit"><span class="inner">訪問日</span></th>
+        <th class="h-rot col-movable" data-col-key="monita"><span class="inner">モニ記録</span></th>
+        <th class="h-rot col-movable" data-col-key="sikien"><span class="inner">支援経過</span></th>
+        <th class="h-rot col-movable" data-col-key="drive"><span class="inner split"><span>利用票</span><span class="sub-label">ドライブ</span></span></th>
+        <th class="h-rot col-movable" data-col-key="hand"><span class="inner split"><span>次月</span><span>利用票</span></span></th>
+        <th class="h-rot col-movable" data-col-key="fax"><span class="inner split"><span>次月</span><span>提供票</span></span></th>
+        <th class="h-rot"><span class="inner">プラン作成</span></th>
+        <th class="h-rot col-movable" data-col-key="meeting"><span class="inner">担会日</span></th>
+        <th class="h-rot"><span class="inner">照会</span></th>
+        <th class="h-rot"><span class="inner">アセス</span></th>
+        <th class="h-rot h-seho col-movable" data-col-key="seho"><span class="inner">生保</span></th>
+        <th class="h-biko">備考</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-pill"></div>
+    <div class="modal-col" id="mc"></div>
+    <div class="modal-name" id="mn"></div>
+    <div class="macts" id="ma"></div>
+    <button class="modal-close" onclick="closeModal()">キャンセル</button>
+  </div>
+</div>
+
+<div class="confirm-bg" id="confirm">
+  <div class="confirm-box">
+    <div class="confirm-title" id="cf-title"></div>
+    <div class="confirm-msg" id="cf-msg"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn cancel" onclick="closeConfirm()">キャンセル</button>
+      <button class="confirm-btn ok" id="cf-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="import-data-input" accept=".json,application/json" style="display:none">
+
+<script>
+function toReiwa(y, m) {
+  const rYear = y - 2018;
+  return `R${rYear}.${String(m).padStart(2, '0')}`;
+}
+
+function reiwaLabel(y, m) {
+  return 'R' + (y - 2018) + '年' + m + '月';
+}
+
+const now = new Date();
+let curYear = now.getFullYear();
+let curMonth = now.getMonth() + 1;
+
+function monthKey(y, m) { return `${y}-${String(m).padStart(2, '0')}`; }
+
+const DEFAULT_CLIENTS = [];
+
+function makeRowId(base) {
+  if (base.rowId) return String(base.rowId);
+  const baseName = String(base.baseName || '').trim();
+  const name = String(base.name || '').trim();
+  if (baseName) return `base:${baseName}`;
+  if (name) return `name:${name}`;
+  return `custom:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function newClientData(base) {
+  const visitState = parseVisitState(base);
+  return {
+    rowId: makeRowId(base),
+    name: base.name || '',
+    baseName: base.baseName !== undefined ? base.baseName : (base.name || ''),
+    customAdded: Boolean(base.customAdded),
+    noNumber: Boolean(base.noNumber),
+    deleted: Boolean(base.deleted),
+    manualOrder: Number.isFinite(base.manualOrder) ? base.manualOrder : null,
+    kana: base.kana || '',
+    facility: base.facility || '',
+    kosin: base.kosin || '',
+    yuko: base.yuko || '',
+    level: base.level || '',
+    planL: base.planL || '',
+    planS: base.planS || '',
+    seho: base.seho || '',
+    sehoCw: base.sehoCw || '',
+    kaigoken: base.kaigoken || '',
+    biko: base.biko || '',
+    visit: '',
+    visitDate: visitState.visitDate,
+    visitTag1: visitState.visitTag1,
+    visitTag2: visitState.visitTag2,
+    meetingDate: base.meetingDate || '',
+    meetingTag1: base.meetingTag1 || '',
+    meetingTag2: base.meetingTag2 || '',
+    monita: base.monita || 0,
+    sikien: base.sikien || 0,
+    drive: base.drive || 0,
+    hand: base.hand || 0,
+    fax: base.fax || 0,
+    faxOffices: normalizeFaxOffices(base.faxOffices),
+    plan: base.plan || 0,
+    meeting: base.meeting || 0,
+    shokai: base.shokai || 0,
+    assess: base.assess || 0,
+    customFields: normalizeCustomFieldValues(base.customFields)
+  };
+}
+
+function normalizeCustomFieldValues(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).map(([key, fieldValue]) => [key, fieldValue ?? '']));
+}
+
+function normalizeFaxOffices(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(item => ({
+      id: String(item.id || '').trim() || makeOfficeId(),
+      name: String(item.name || '').trim(),
+      checked: Number(item.checked) === 1 || item.checked === true
+    }))
+    .filter(item => item.name);
+}
+
+function makeOfficeId() {
+  return `office_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function syncFaxDone(item) {
+  item.faxOffices = normalizeFaxOffices(item.faxOffices);
+  item.fax = item.faxOffices.length > 0 && item.faxOffices.every(office => office.checked) ? 1 : 0;
+}
+
+function isFaxComplete(item) {
+  const offices = normalizeFaxOffices(item?.faxOffices);
+  return offices.length > 0 && offices.every(office => office.checked);
+}
+
+function isCheckComplete(item, key) {
+  if (key === 'fax') return isFaxComplete(item);
+  return item[key] === 1;
+}
+
+function parseVisitState(base) {
+  const raw = String(base.visit || '').trim();
+  return {
+    visitDate: base.visitDate || (/^\d{1,2}日$/.test(raw) ? raw : ''),
+    visitTag1: base.visitTag1 || (Boolean(base.visitTel) || raw === 'TEL' || raw === 'TEL' ? 'TEL' : Boolean(base.visitNyuin) || raw === '入院中' ? '入院中' : ''),
+    visitTag2: base.visitTag2 || ''
+  };
+}
+
+function normalizeSehoFields(item) {
+  if (item.sehoCw && !item.seho) item.seho = '○';
+  item.faxOffices = normalizeFaxOffices(item.faxOffices);
+  syncFaxDone(item);
+  return item;
+}
+
+function hasVisitValue(item) {
+  return Boolean(item.visitDate || item.visitTag1 || item.visitTag2);
+}
+
+function hasMeetingValue(item) {
+  return Boolean(item.meetingDate || item.meetingTag1 || item.meetingTag2);
+}
+
+const STORAGE_KEY = 'riyosha_check_v1';
+const FAC_KEY = 'riyosha_facilities_v1';
+const ORDER_MODE_KEY = 'riyosha_order_mode_v1';
+const COLUMN_ORDER_KEY = 'riyosha_column_order_v1';
+const CUSTOM_COLUMNS_KEY = 'riyosha_custom_columns_v1';
+const COLUMN_LABELS_KEY = 'riyosha_column_labels_v1';
+const CHK = ['monita', 'sikien', 'drive', 'hand', 'fax'];
+const BASE_MOVABLE_COLUMN_KEYS = ['yuko', 'level', 'planL', 'planS', 'visit', 'monita', 'sikien', 'drive', 'hand', 'fax', 'meeting', 'seho'];
+const DEFAULT_COLUMN_LABELS = {
+  yuko: '有効期間',
+  level: '介護度',
+  planL: '長期目標',
+  planS: '短期目標',
+  visit: '訪問日',
+  monita: 'モニ記録',
+  sikien: '支援経過',
+  drive: '利用票ドライブ',
+  hand: '次月利用票',
+  fax: '次月提供票',
+  meeting: '担会日',
+  seho: '生保'
+};
+const nameCollator = new Intl.Collator('ja', { sensitivity: 'base', numeric: true });
+const NAME_YOMI = {};
+const EXPORT_SCHEMA_VERSION = 1;
+let allDateReiwa = true;
+const visitChoices = ['TEL', '入院中'];
+const levelChoices = ['支1', '支2', '1', '2', '3', '4', '5'];
+
+let currentData = [];
+let modalIndex = -1;
+let visitPickerYear = 0;
+let visitPickerMonth = 0;
+let datePickerField = '';
+let pendingDateClick = null;
+let pendingVisitClick = null;
+let orderMode = 'name';
+let addClientDraft = null;
+let customColumns = [];
+let columnLabels = {};
+let columnOrder = [...BASE_MOVABLE_COLUMN_KEYS];
+let selectedColumnKey = '';
+let columnDragPointerId = null;
+let columnDragHoldTimer = null;
+let columnDragActive = false;
+let columnDragKey = '';
+let columnDragHeaderEl = null;
+let columnDragTargetKey = '';
+let columnDragTargetAfter = false;
+let columnDragStartX = 0;
+let columnDragPointerOffsetX = 0;
+let selectedRowId = '';
+let rowDragPointerId = null;
+let rowDragHoldTimer = null;
+let rowDragActive = false;
+let rowDragRowId = '';
+let rowDragRowEl = null;
+let rowDragTargetRowId = '';
+let rowDragTargetAfter = false;
+let rowDragStartY = 0;
+let rowDragPointerOffsetY = 0;
+
+function removeUnusedTaskHeaders() {
+  const headerRow = document.querySelector('thead tr');
+  if (!headerRow || headerRow.dataset.removedPlanShokai === '1') return;
+  const cells = headerRow.querySelectorAll('th');
+  [16, 15, 13].forEach(index => {
+    if (cells[index]) cells[index].remove();
+  });
+  headerRow.dataset.removedPlanShokai = '1';
+}
+
+function loadAll() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function loadCustomColumns() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CUSTOM_COLUMNS_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(item => ({
+        key: String(item.key || '').trim(),
+        label: String(item.label || '').trim(),
+        type: item.type === 'date' ? 'date' : 'check'
+      }))
+      .filter(item => item.key && item.label);
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomColumns() {
+  localStorage.setItem(CUSTOM_COLUMNS_KEY, JSON.stringify(customColumns));
+}
+
+function loadColumnLabels() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(COLUMN_LABELS_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, value]) => [String(key), String(value || '').trim()])
+        .filter(([key, value]) => key && value)
+    );
+  } catch {
+    return {};
+  }
+}
+
+function saveColumnLabels() {
+  localStorage.setItem(COLUMN_LABELS_KEY, JSON.stringify(columnLabels));
+}
+
+function getColumnLabel(key) {
+  return columnLabels[key] || getCustomColumn(key)?.label || DEFAULT_COLUMN_LABELS[key] || key;
+}
+
+function getAllMovableColumnKeys() {
+  return [...BASE_MOVABLE_COLUMN_KEYS, ...customColumns.map(item => item.key)];
+}
+
+function getCustomColumn(key) {
+  return customColumns.find(item => item.key === key) || null;
+}
+
+function isCustomColumnKey(key) {
+  return Boolean(getCustomColumn(key));
+}
+
+function isCustomCheckColumn(key) {
+  return getCustomColumn(key)?.type === 'check';
+}
+
+function isCustomDateColumn(key) {
+  return getCustomColumn(key)?.type === 'date';
+}
+
+function makeCustomColumnKey() {
+  return `customcol_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function getFieldValue(item, field) {
+  if (isCustomColumnKey(field)) return item.customFields?.[field] || '';
+  return item[field];
+}
+
+function setFieldValue(item, field, value) {
+  if (isCustomColumnKey(field)) {
+    item.customFields = normalizeCustomFieldValues(item.customFields);
+    item.customFields[field] = value;
+    return;
+  }
+  item[field] = value;
+}
+
+function loadOrderMode() {
+  try {
+    const saved = localStorage.getItem(ORDER_MODE_KEY);
+    return saved === 'custom' ? 'custom' : 'name';
+  } catch {
+    return 'name';
+  }
+}
+
+function loadColumnOrder() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) || '[]');
+    const movableKeys = getAllMovableColumnKeys();
+    if (!Array.isArray(saved)) return [...movableKeys];
+    const valid = saved.filter(key => movableKeys.includes(key));
+    const missing = movableKeys.filter(key => !valid.includes(key));
+    return [...valid, ...missing];
+  } catch {
+    return [...getAllMovableColumnKeys()];
+  }
+}
+
+function saveColumnOrder() {
+  localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(columnOrder));
+}
+
+function saveOrderMode(mode) {
+  orderMode = mode === 'custom' ? 'custom' : 'name';
+  localStorage.setItem(ORDER_MODE_KEY, orderMode);
+}
+
+function clearRowSelection() {
+  selectedRowId = '';
+  document.querySelectorAll('#tbody tr.row-selected').forEach(tr => tr.classList.remove('row-selected'));
+}
+
+function applySelectedRowState() {
+  document.querySelectorAll('#tbody tr').forEach(tr => {
+    tr.classList.toggle('row-selected', !!selectedRowId && tr.dataset.rowId === selectedRowId);
+  });
+}
+
+function saveAll(all) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+}
+
+function sortClientsByName(data) {
+  return [...data].sort((a, b) => {
+    if (orderMode === 'custom') {
+      const aOrder = Number.isFinite(a.manualOrder) ? a.manualOrder : Number.MAX_SAFE_INTEGER;
+      const bOrder = Number.isFinite(b.manualOrder) ? b.manualOrder : Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+    }
+    if (a.noNumber !== b.noNumber) return a.noNumber ? 1 : -1;
+    const aName = String(a.name || '').trim();
+    const bName = String(b.name || '').trim();
+    const aYomi = String(a.kana || '').trim() || NAME_YOMI[aName] || aName;
+    const bYomi = String(b.kana || '').trim() || NAME_YOMI[bName] || bName;
+    return nameCollator.compare(aYomi, bYomi) || nameCollator.compare(aName, bName);
+  });
+}
+
+function mergeClientRecord(base, extra) {
+  const merged = { ...base };
+  Object.keys(extra).forEach(key => {
+    const value = extra[key];
+    if (value === undefined || value === null || value === '') return;
+    if (typeof value === 'number' && value === 0 && merged[key]) return;
+    merged[key] = value;
+  });
+  return normalizeSehoFields(merged);
+}
+
+function resolveKanaForName(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return '';
+  if (NAME_YOMI[trimmed]) return String(NAME_YOMI[trimmed]);
+  const normalized = trimmed.replace(/\s+/g, '');
+  const fromCurrent = currentData.find(item => {
+    const itemName = String(item.name || '').trim();
+    const itemBaseName = String(item.baseName || '').trim();
+    return itemName === trimmed || itemBaseName === trimmed || itemName.replace(/\s+/g, '') === normalized || itemBaseName.replace(/\s+/g, '') === normalized;
+  });
+  if (fromCurrent && String(fromCurrent.kana || '').trim()) return String(fromCurrent.kana).trim();
+  const fromDefaults = DEFAULT_CLIENTS.find(item => {
+    const itemName = String(item.name || '').trim();
+    const itemBaseName = String(item.baseName || '').trim();
+    return itemName === trimmed || itemBaseName === trimmed || itemName.replace(/\s+/g, '') === normalized || itemBaseName.replace(/\s+/g, '') === normalized;
+  });
+  if (fromDefaults && String(fromDefaults.kana || '').trim()) return String(fromDefaults.kana).trim();
+  return '';
+}
+
+function fillKanaIfKnown(nameInputId, kanaInputId) {
+  const nameInput = document.getElementById(nameInputId);
+  const kanaInput = document.getElementById(kanaInputId);
+  if (!nameInput || !kanaInput) return;
+  const autoKana = resolveKanaForName(nameInput.value);
+  if (autoKana) kanaInput.value = autoKana;
+}
+
+function defaultAddClientDraft() {
+  return {
+    name: '',
+    kana: '',
+    yuko: '',
+    level: '',
+    planL: '',
+    planS: '',
+    seho: '',
+    sehoCw: ''
+  };
+}
+
+function syncAddClientDraft() {
+  if (!addClientDraft) addClientDraft = defaultAddClientDraft();
+  const read = id => (document.getElementById(id)?.value || '').trim();
+  addClientDraft.name = read('add-name');
+  addClientDraft.kana = read('add-kana');
+}
+
+function renderAddClientModal() {
+  if (!addClientDraft) addClientDraft = defaultAddClientDraft();
+  modalIndex = -1;
+  showModal('利用者を追加', '新規',
+    `<input class="modal-input" id="add-name" placeholder="利用者名" value="${esc(addClientDraft.name || '')}" oninput="fillKanaIfKnown('add-name','add-kana')" onchange="fillKanaIfKnown('add-name','add-kana')" onblur="fillKanaIfKnown('add-name','add-kana')">
+     <input class="modal-input" id="add-kana" placeholder="かな" value="${esc(addClientDraft.kana || '')}">
+     <input class="modal-input" id="add-yuko" placeholder="有効期限 例: R9.10.31" value="${esc(shortDate(addClientDraft.yuko) || '')}" readonly ondblclick="syncAddClientDraft();openAddClientPeriodPicker('yuko')" onclick="this.blur()">
+     <input class="modal-input" id="add-level" placeholder="介護度" value="${esc(addClientDraft.level || '')}" readonly ondblclick="syncAddClientDraft();openAddClientLevelPicker()" onclick="this.blur()">
+     <input class="modal-input" id="add-planL" placeholder="長期 例: R9.10.31" value="${esc(shortDate(addClientDraft.planL) || '')}" readonly ondblclick="syncAddClientDraft();openAddClientPeriodPicker('planL')" onclick="this.blur()">
+     <input class="modal-input" id="add-planS" placeholder="短期 例: R9.4.30" value="${esc(shortDate(addClientDraft.planS) || '')}" readonly ondblclick="syncAddClientDraft();openAddClientPeriodPicker('planS')" onclick="this.blur()">
+     <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #b3e89a;border-radius:10px;background:#f9fef5;margin-top:2px;cursor:pointer">
+       <input type="checkbox" id="add-seho-mark" ${addClientDraft.seho ? 'checked' : ''} onchange="syncAddClientSehoDraft()" style="width:18px;height:18px;accent-color:#65b842">
+       <span style="font-size:13px;font-weight:700;color:#1a4d0e">生活保護あり</span>
+     </label>
+     <input class="modal-input" id="add-seho-cw" placeholder="保護 例: 山田CW" value="${esc(addClientDraft.sehoCw || '')}" oninput="syncAddClientSehoDraft()">
+     <button class="mact green" style="width:100%;margin-top:4px" onclick="addClient()">追加する</button>`
+  );
+  document.getElementById('modal').classList.add('add-client');
+  setTimeout(() => {
+    const input = document.getElementById('add-name');
+    if (input) input.focus();
+    wireKanaAutoTransfer('add-name', 'add-kana');
+  }, 100);
+}
+
+function syncAddClientSehoDraft() {
+  if (!addClientDraft) addClientDraft = defaultAddClientDraft();
+  addClientDraft.seho = document.getElementById('add-seho-mark')?.checked ? '○' : '';
+  addClientDraft.sehoCw = (document.getElementById('add-seho-cw')?.value || '').trim();
+}
+
+function wireKanaAutoTransfer(nameInputId, kanaInputId) {
+  const nameInput = document.getElementById(nameInputId);
+  const kanaInput = document.getElementById(kanaInputId);
+  if (!nameInput || !kanaInput || nameInput.dataset.kanaWired === '1') return;
+
+  let kanaTouched = false;
+  const toKanaCandidate = value => {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    return /^[ぁ-んァ-ヶー\s　]+$/.test(text) ? text : '';
+  };
+  const updateKana = value => {
+    if (kanaTouched) return;
+    const text = toKanaCandidate(value);
+    if (!text) return;
+    kanaInput.value = text;
+  };
+
+  kanaInput.addEventListener('input', () => {
+    kanaTouched = true;
+  });
+
+  nameInput.addEventListener('compositionupdate', event => {
+    updateKana(event.data || '');
+  });
+
+  nameInput.addEventListener('compositionend', event => {
+    const knownKana = resolveKanaForName(nameInput.value);
+    if (knownKana) {
+      updateKana(knownKana);
+      return;
+    }
+    updateKana(toKanaCandidate(event.data || ''));
+  });
+
+  nameInput.addEventListener('input', () => {
+    const knownKana = resolveKanaForName(nameInput.value);
+    if (knownKana) {
+      updateKana(knownKana);
+      return;
+    }
+    updateKana(toKanaCandidate(nameInput.value));
+  });
+
+  nameInput.dataset.kanaWired = '1';
+}
+
+function dedupeClients(data) {
+  const byName = new Map();
+  data.forEach(item => {
+    const name = String(item.name || '').trim();
+    const rowId = makeRowId(item);
+    const baseName = String(item.baseName || '').trim();
+    const key = rowId || baseName || name;
+    if (!key) return;
+    if (!byName.has(key)) {
+      byName.set(key, normalizeSehoFields({ ...item, rowId, name, baseName }));
+      return;
+    }
+    byName.set(key, mergeClientRecord(byName.get(key), { ...item, rowId, name, baseName }));
+  });
+  return Array.from(byName.values());
+}
+
+function syncClientList(data) {
+  const normalized = dedupeClients(data);
+  const byBaseName = new Map(normalized.map(item => [String(item.baseName || '').trim(), item]).filter(([key]) => key));
+  const byName = new Map(normalized.map(item => [item.name, item]));
+  const merged = [];
+  DEFAULT_CLIENTS.forEach(base => {
+    const existing = byBaseName.get(base.name) || byName.get(base.name);
+    if (!existing) {
+      merged.push(newClientData(base));
+      return;
+    }
+    if (existing.deleted) {
+      merged.push({
+        ...newClientData(base),
+        ...existing,
+        baseName: existing.baseName || base.name,
+        deleted: true
+      });
+      return;
+    }
+    const existingVisit = parseVisitState(existing);
+    merged.push({
+      ...newClientData(base),
+      ...existing,
+      baseName: existing.baseName || base.name,
+      customAdded: false,
+      deleted: false,
+      manualOrder: Number.isFinite(existing.manualOrder) ? existing.manualOrder : null,
+      kana: existing.kana !== undefined ? existing.kana : (base.kana || ''),
+      kosin: existing.kosin !== undefined ? existing.kosin : (base.kosin || ''),
+      yuko: existing.yuko !== undefined ? existing.yuko : (base.yuko || ''),
+      level: existing.level !== undefined ? existing.level : (base.level || ''),
+      planL: existing.planL !== undefined ? existing.planL : (base.planL || ''),
+      planS: existing.planS !== undefined ? existing.planS : (base.planS || ''),
+      visitDate: existingVisit.visitDate,
+      visitTag1: existingVisit.visitTag1,
+      visitTag2: existingVisit.visitTag2,
+      meetingDate: existing.meetingDate !== undefined ? existing.meetingDate : (base.meetingDate || ''),
+      meetingTag1: existing.meetingTag1 !== undefined ? existing.meetingTag1 : (base.meetingTag1 || ''),
+      meetingTag2: existing.meetingTag2 !== undefined ? existing.meetingTag2 : (base.meetingTag2 || ''),
+      seho: existing.seho !== undefined ? existing.seho : (base.seho || ''),
+      sehoCw: existing.sehoCw !== undefined ? existing.sehoCw : (base.sehoCw || ''),
+      kaigoken: existing.kaigoken !== undefined ? existing.kaigoken : (base.kaigoken || ''),
+      biko: existing.biko !== undefined ? existing.biko : (base.biko || ''),
+      faxOffices: normalizeFaxOffices(existing.faxOffices),
+      customFields: normalizeCustomFieldValues(existing.customFields)
+    });
+  });
+  normalized.forEach(item => {
+    const isDefaultLinked = DEFAULT_CLIENTS.some(base => base.name === item.baseName || base.name === item.name);
+    if (!isDefaultLinked && item.customAdded && !item.deleted) merged.push(item);
+  });
+  return dedupeClients(merged);
+}
+
+function resetMonthlyWorkFields(item) {
+  const next = {
+    ...item,
+    visit: '',
+    visitDate: '',
+    visitTag1: '',
+    visitTag2: '',
+    meetingDate: '',
+    meetingTag1: '',
+    meetingTag2: '',
+    monita: 0,
+    sikien: 0,
+    drive: 0,
+    hand: 0,
+    fax: 0,
+    faxOffices: normalizeFaxOffices(item.faxOffices).map(office => ({ ...office, checked: false })),
+    plan: 0,
+    meeting: 0,
+    shokai: 0,
+    assess: 0
+  };
+  return next;
+}
+
+function clientMatchKeys(item) {
+  const keys = [item?.rowId, item?.baseName, item?.name]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  return [...new Set(keys)];
+}
+
+function syncBasicFieldsFromPreviousMonth(currentList, previousList) {
+  if (!Array.isArray(previousList) || previousList.length === 0) return currentList;
+  const previousNormalized = dedupeClients(previousList);
+  const currentNormalized = dedupeClients(currentList);
+  const currentByKey = new Map();
+  currentNormalized.forEach(item => {
+    clientMatchKeys(item).forEach(key => currentByKey.set(key, item));
+  });
+  const used = new Set();
+  const merged = previousNormalized.map(prev => {
+    const current = clientMatchKeys(prev).map(key => currentByKey.get(key)).find(Boolean);
+    if (current) used.add(current);
+    const source = current || resetMonthlyWorkFields(prev);
+    return {
+      ...source,
+      rowId: prev.rowId || source.rowId,
+      name: prev.name || '',
+      baseName: prev.baseName !== undefined ? prev.baseName : (prev.name || ''),
+      customAdded: Boolean(prev.customAdded),
+      noNumber: Boolean(prev.noNumber),
+      deleted: Boolean(prev.deleted),
+      kana: prev.kana || '',
+      kosin: prev.kosin || '',
+      yuko: prev.yuko || '',
+      level: prev.level || '',
+      planL: prev.planL || '',
+      planS: prev.planS || '',
+      seho: prev.seho || '',
+      sehoCw: prev.sehoCw || '',
+      biko: prev.biko || '',
+      faxOffices: normalizeFaxOffices(prev.faxOffices).map((office, index) => {
+        const currentOffice = normalizeFaxOffices(source.faxOffices)[index];
+        return { ...office, checked: Boolean(currentOffice?.checked) };
+      }),
+      customFields: normalizeCustomFieldValues(prev.customFields)
+    };
+  });
+  currentNormalized.forEach(item => {
+    if (!used.has(item)) merged.push(item);
+  });
+  return dedupeClients(merged);
+}
+
+function getMonthData(y, m) {
+  const all = loadAll();
+  const key = monthKey(y, m);
+  let pm = m - 1;
+  let py = y;
+  if (pm < 1) {
+    pm = 12;
+    py -= 1;
+  }
+  const prevKey = monthKey(py, pm);
+
+  if (all[key]) {
+    const synced = all[prevKey] && all[prevKey].length > 0
+      ? syncBasicFieldsFromPreviousMonth(all[key], all[prevKey])
+      : all[key];
+    all[key] = sortClientsByName(syncClientList(synced));
+    saveAll(all);
+    return all[key];
+  }
+
+  if (all[prevKey] && all[prevKey].length > 0) {
+    all[key] = all[prevKey].map(resetMonthlyWorkFields);
+  } else {
+    all[key] = DEFAULT_CLIENTS.map(newClientData);
+  }
+
+  all[key] = sortClientsByName(syncClientList(all[key]));
+
+  saveAll(all);
+  return all[key];
+}
+
+function saveMonthData(y, m, data) {
+  const all = loadAll();
+  all[monthKey(y, m)] = sortClientsByName(dedupeClients(data));
+  saveAll(all);
+}
+
+function loadFacilities() {
+  try {
+    return JSON.parse(localStorage.getItem(FAC_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFacilities(list) {
+  localStorage.setItem(FAC_KEY, JSON.stringify(list));
+}
+
+function buildExportPayload() {
+  return {
+    schemaVersion: EXPORT_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    appTitle: document.querySelector('.app-name')?.textContent || '',
+    data: loadAll(),
+    facilities: loadFacilities(),
+    orderMode: loadOrderMode(),
+    customColumns: loadCustomColumns(),
+    columnLabels: loadColumnLabels()
+  };
+}
+
+async function exportLocalData() {
+  const payload = buildExportPayload();
+  const text = JSON.stringify(payload, null, 2);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  const filename = `利用者チェック表_個人データ_${stamp}.json`;
+
+  if (typeof window.showSaveFilePicker === 'function') {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        startIn: 'desktop',
+        types: [{
+          description: 'JSON files',
+          accept: { 'application/json': ['.json'] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      return;
+    } catch (error) {
+      if (error && error.name === 'AbortError') return;
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function triggerImportLocalData() {
+  const input = document.getElementById('import-data-input');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function importLocalDataFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || '{}'));
+      const data = parsed && typeof parsed === 'object' ? parsed.data : null;
+      const facilities = parsed && typeof parsed === 'object' ? parsed.facilities : null;
+      const importedOrderMode = parsed && typeof parsed === 'object' ? parsed.orderMode : null;
+      const importedCustomColumns = parsed && typeof parsed === 'object' ? parsed.customColumns : null;
+      const importedColumnLabels = parsed && typeof parsed === 'object' ? parsed.columnLabels : null;
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('invalid');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(FAC_KEY, JSON.stringify(Array.isArray(facilities) ? facilities : []));
+      localStorage.setItem(ORDER_MODE_KEY, importedOrderMode === 'custom' ? 'custom' : 'name');
+      localStorage.setItem(CUSTOM_COLUMNS_KEY, JSON.stringify(Array.isArray(importedCustomColumns) ? importedCustomColumns : []));
+      localStorage.setItem(COLUMN_LABELS_KEY, JSON.stringify(importedColumnLabels && typeof importedColumnLabels === 'object' && !Array.isArray(importedColumnLabels) ? importedColumnLabels : {}));
+      customColumns = loadCustomColumns();
+      columnLabels = loadColumnLabels();
+      columnOrder = loadColumnOrder();
+      orderMode = loadOrderMode();
+      currentData = getMonthData(curYear, curMonth);
+      render();
+      alert('個人データを読み込みました');
+    } catch {
+      alert('読み込みに失敗しました。バックアップJSONを選択してください。');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function esc(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function getPeriodFieldLabel(field) {
+  if (field === 'yuko') return '有効期間';
+  if (field === 'planL') return getColumnLabel('planL');
+  if (field === 'planS') return getColumnLabel('planS');
+  return getCustomColumn(field)?.label || '短期';
+}
+
+function shortDate(value) {
+  if (!value) return '';
+  const parsed = parseAnyDate(value);
+  if (!parsed) return String(value).replace(/\./g, '/');
+  if (allDateReiwa) return formatWareki(parsed.year, parsed.month, parsed.day);
+  const year = String(parsed.year);
+  const month = String(parsed.month).padStart(2, '0');
+  const day = String(parsed.day).padStart(2, '0');
+  return `${year}/${month}/${day}`;
+}
+
+function getYukoStatus(value, displayYear = curYear, displayMonth = curMonth) {
+  const parsed = parseAnyDate(value);
+  if (!parsed) return '';
+  const currentMonthStart = new Date(displayYear, displayMonth - 1, 1);
+  const redStart = new Date(parsed.year, parsed.month - 3, 1);
+  const grayStart = new Date(parsed.year, parsed.month - 2, 1);
+  const nextCertStart = new Date(parsed.year, parsed.month, 1);
+  if (currentMonthStart >= nextCertStart) return 'blank';
+  if (currentMonthStart >= grayStart) return 'done';
+  if (currentMonthStart >= redStart) return 'soon';
+  return '';
+}
+
+function isExpiringSoon(value) {
+  return getYukoStatus(value) === 'soon';
+}
+
+function isExpiringProcedureDone(value) {
+  return getYukoStatus(value) === 'done';
+}
+
+function isNewCertificationStarted(value) {
+  return getYukoStatus(value) === 'blank';
+}
+
+function isCurrentShortPlan(value, displayYear = curYear, displayMonth = curMonth) {
+  if (!value) return false;
+  const match = value.match(/R(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return false;
+  const y = parseInt(match[1], 10) + 2018;
+  const m = parseInt(match[2], 10);
+  const start = new Date(y, m - 1, 1);
+  return new Date(displayYear, displayMonth - 1, 1) >= start;
+}
+
+function isCurrentLongPlan(value, displayYear = curYear, displayMonth = curMonth) {
+  if (!value) return false;
+  const match = value.match(/R(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return false;
+  const y = parseInt(match[1], 10) + 2018;
+  const m = parseInt(match[2], 10);
+  const start = new Date(y, m - 1, 1);
+  return new Date(displayYear, displayMonth - 1, 1) >= start;
+}
+
+function parseWareki(value) {
+  if (!value) return null;
+  const match = String(value).trim().match(/^R(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+  return {
+    year: parseInt(match[1], 10) + 2018,
+    month: parseInt(match[2], 10),
+    day: parseInt(match[3], 10)
+  };
+}
+
+function formatWareki(year, month, day) {
+  return `R${year - 2018}.${month}.${day}`;
+}
+
+function parseAnyDate(value) {
+  if (!value) return null;
+  const wareki = parseWareki(value);
+  if (wareki) return wareki;
+  const match = String(value).trim().match(/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})$/);
+  if (!match) return null;
+  return {
+    year: parseInt(match[1], 10),
+    month: parseInt(match[2], 10),
+    day: parseInt(match[3], 10)
+  };
+}
+
+function changeMonth(dir) {
+  curMonth += dir;
+  if (curMonth > 12) {
+    curMonth = 1;
+    curYear += 1;
+  }
+  if (curMonth < 1) {
+    curMonth = 12;
+    curYear -= 1;
+  }
+  render();
+}
+
+function setDateDisplayMode(useWareki) {
+  allDateReiwa = !!useWareki;
+  render();
+}
+
+function setOrderMode(mode) {
+  saveOrderMode(mode === 'custom' ? 'custom' : 'name');
+  render();
+}
+
+function tog(i, key) {
+  if (key === 'fax') {
+    openFaxOfficeChecklist(i);
+    return;
+  }
+  const current = getFieldValue(currentData[i], key);
+  setFieldValue(currentData[i], key, current === 1 ? 0 : 1);
+  saveMonthData(curYear, curMonth, currentData);
+  render();
+}
+
+function openFaxOfficeChecklist(i) {
+  modalIndex = i;
+  const item = currentData[i];
+  item.faxOffices = normalizeFaxOffices(item.faxOffices);
+  syncFaxDone(item);
+  const rows = item.faxOffices.length
+    ? item.faxOffices.map(office => `
+      <div class="office-check-row">
+        <div class="office-check-name">${esc(office.name)}</div>
+        <button class="office-check-mark${office.checked ? ' is-on' : ''}" ondblclick="toggleFaxOffice('${esc(office.id)}')">${office.checked ? '✓' : '○'}</button>
+        <div class="office-check-actions">
+          <button class="office-mini-btn" onclick="openFaxOfficeEdit('${esc(office.id)}')">編集</button>
+          <button class="office-mini-btn danger" onclick="deleteFaxOffice('${esc(office.id)}')">削除</button>
+        </div>
+      </div>`).join('')
+    : '<div class="office-empty-note">事業所を追加してください</div>';
+  showModal('次月提供票', item.name,
+    `<div class="office-check-list">${rows}</div>
+     <div class="office-modal-actions">
+       <button class="mact green" onclick="openFaxOfficeAdd()">追加</button>
+       <button class="mact green" onclick="closeModal();render();">OK</button>
+     </div>`
+  );
+  document.getElementById('modal').classList.add('fax-office-picker');
+}
+
+function saveFaxOfficeState() {
+  const item = currentData[modalIndex];
+  if (!item) return;
+  item.faxOffices = normalizeFaxOffices(item.faxOffices);
+  syncFaxDone(item);
+  saveMonthData(curYear, curMonth, currentData);
+}
+
+function toggleFaxOffice(id) {
+  const item = currentData[modalIndex];
+  if (!item) return;
+  item.faxOffices = normalizeFaxOffices(item.faxOffices).map(office =>
+    office.id === id ? { ...office, checked: !office.checked } : office
+  );
+  saveFaxOfficeState();
+  render();
+  openFaxOfficeChecklist(modalIndex);
+}
+
+function openFaxOfficeAdd() {
+  showModal('事業所追加', currentData[modalIndex]?.name || '',
+    `<input class="modal-input" id="fax-office-name" placeholder="事業所名">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveFaxOfficeAdd()">追加する</button>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+  setTimeout(() => document.getElementById('fax-office-name')?.focus(), 100);
+}
+
+function saveFaxOfficeAdd() {
+  const name = (document.getElementById('fax-office-name')?.value || '').trim();
+  if (!name) {
+    alert('事業所名を入力してください');
+    return;
+  }
+  const item = currentData[modalIndex];
+  item.faxOffices = [...normalizeFaxOffices(item.faxOffices), { id: makeOfficeId(), name, checked: false }];
+  saveFaxOfficeState();
+  openFaxOfficeChecklist(modalIndex);
+}
+
+function openFaxOfficeEdit(id) {
+  const item = currentData[modalIndex];
+  const office = normalizeFaxOffices(item?.faxOffices).find(entry => entry.id === id);
+  if (!office) return;
+  showModal('事業所編集', currentData[modalIndex]?.name || '',
+    `<input class="modal-input" id="fax-office-name" placeholder="事業所名" value="${esc(office.name)}">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveFaxOfficeEdit('${esc(id)}')">保存する</button>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+  setTimeout(() => document.getElementById('fax-office-name')?.focus(), 100);
+}
+
+function saveFaxOfficeEdit(id) {
+  const name = (document.getElementById('fax-office-name')?.value || '').trim();
+  if (!name) {
+    alert('事業所名を入力してください');
+    return;
+  }
+  const item = currentData[modalIndex];
+  item.faxOffices = normalizeFaxOffices(item.faxOffices).map(office =>
+    office.id === id ? { ...office, name } : office
+  );
+  saveFaxOfficeState();
+  openFaxOfficeChecklist(modalIndex);
+}
+
+function deleteFaxOffice(id) {
+  const item = currentData[modalIndex];
+  if (!item) return;
+  item.faxOffices = normalizeFaxOffices(item.faxOffices).filter(office => office.id !== id);
+  saveFaxOfficeState();
+  render();
+  openFaxOfficeChecklist(modalIndex);
+}
+
+function openVisit(i) {
+  modalIndex = i;
+  const current = currentData[i];
+  const modal = document.getElementById('modal');
+  modal.classList.add('calendar-picker');
+  modal.classList.add('visit-calendar-open');
+  datePickerField = 'visitDate';
+  visitPickerYear = curYear;
+  visitPickerMonth = curMonth;
+  const parsed = parseAnyDate(current.visitDate);
+  if (parsed) {
+    visitPickerYear = parsed.year;
+    visitPickerMonth = parsed.month;
+  }
+  showModal('訪問日', currentData[i].name,
+    `<div class="calendar-box visit-calendar-box">
+      <div class="calendar-head">
+        <button class="calendar-nav" onclick="changeVisitMonth(-1)">‹</button>
+        <div class="calendar-selects">
+          <select class="calendar-select" id="visit-calendar-year" onchange="jumpVisitCalendar()"></select>
+          <select class="calendar-select" id="visit-calendar-month" onchange="jumpVisitCalendar()"></select>
+        </div>
+        <button class="calendar-nav" onclick="changeVisitMonth(1)">›</button>
+      </div>
+      <div class="calendar-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div class="calendar-grid" id="visit-calendar-grid"></div>
+      <div class="visit-subactions">
+        ${visitChoices.map(label => `<button class="mact${isVisitTagSelected(current, label) ? ' sel' : ''}" onclick="toggleVisitFlag('${label}')">${label}</button>`).join('')}
+      </div>
+      <div class="visit-free-inputs">
+        <input class="modal-input" id="visit-date-free" placeholder="日付" value="${esc(current.visitDate || '')}" oninput="updateVisitFreeField('visitDate', this.value)">
+        <input class="modal-input" id="visit-tag1-free" placeholder="下段1" value="${esc(current.visitTag1 || '')}" oninput="updateVisitFreeField('visitTag1', this.value)">
+        <input class="modal-input" id="visit-tag2-free" placeholder="下段2" value="${esc(current.visitTag2 || '')}" oninput="updateVisitFreeField('visitTag2', this.value)">
+      </div>
+      <div class="visit-modal-actions">
+        <button class="mact red" onclick="clearVisit(modalIndex, true)">クリア</button>
+        <button class="mact green" onclick="closeModal();render();">OK</button>
+      </div>
+      <button class="modal-close visit-cancel-btn" onclick="closeModal()">キャンセル</button>
+    </div>`
+  );
+  renderVisitCalendar();
+}
+
+function setVisitDate(value) {
+  currentData[modalIndex].visitDate = value;
+  currentData[modalIndex].visit = '';
+  saveMonthData(curYear, curMonth, currentData);
+  render();
+  openVisit(modalIndex);
+}
+
+function toggleVisitFlag(label) {
+  const item = currentData[modalIndex];
+  if (item.visitTag1 === label) item.visitTag1 = '';
+  else if (item.visitTag2 === label) item.visitTag2 = '';
+  else if (!item.visitTag1) item.visitTag1 = label;
+  else if (!item.visitTag2) item.visitTag2 = label;
+  else item.visitTag2 = label;
+  normalizeVisitTags(item);
+  currentData[modalIndex].visit = '';
+  saveMonthData(curYear, curMonth, currentData);
+  render();
+  openVisit(modalIndex);
+}
+
+function clearVisit(i, keepModalOpen) {
+  currentData[i].visit = '';
+  currentData[i].visitDate = '';
+  currentData[i].visitTag1 = '';
+  currentData[i].visitTag2 = '';
+  saveMonthData(curYear, curMonth, currentData);
+  render();
+  if (keepModalOpen) {
+    openVisit(i);
+    return;
+  }
+}
+
+function isVisitTagSelected(item, label) {
+  return item.visitTag1 === label || item.visitTag2 === label;
+}
+
+function normalizeVisitTags(item) {
+  const tags = [item.visitTag1, item.visitTag2].filter(Boolean);
+  item.visitTag1 = tags[0] || '';
+  item.visitTag2 = tags[1] || '';
+}
+
+function updateVisitFreeField(field, value) {
+  currentData[modalIndex][field] = value.trim();
+  currentData[modalIndex].visit = '';
+  if (field === 'visitTag1' || field === 'visitTag2') normalizeVisitTags(currentData[modalIndex]);
+  saveMonthData(curYear, curMonth, currentData);
+  render();
+}
+
+function openMeeting(i) {
+  modalIndex = i;
+  const current = currentData[i];
+  const modal = document.getElementById('modal');
+  modal.classList.add('calendar-picker');
+  modal.classList.add('visit-calendar-open');
+  datePickerField = 'meetingDate';
+  visitPickerYear = curYear;
+  visitPickerMonth = curMonth;
+  const parsed = parseAnyDate(current.meetingDate);
+  if (parsed) {
+    visitPickerYear = parsed.year;
+    visitPickerMonth = parsed.month;
+  }
+  showModal('担当者会議', currentData[i].name,
+    `<div class="calendar-box visit-calendar-box">
+      <div class="calendar-head">
+        <button class="calendar-nav" onclick="changeVisitMonth(-1)">‹</button>
+        <div class="calendar-selects">
+          <select class="calendar-select" id="visit-calendar-year" onchange="jumpVisitCalendar()"></select>
+          <select class="calendar-select" id="visit-calendar-month" onchange="jumpVisitCalendar()"></select>
+        </div>
+        <button class="calendar-nav" onclick="changeVisitMonth(1)">›</button>
+      </div>
+      <div class="calendar-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div class="calendar-grid" id="visit-calendar-grid"></div>
+      <div class="visit-free-inputs">
+        <input class="modal-input" id="meeting-date-free" placeholder="日付" value="${esc(current.meetingDate || '')}" oninput="updateMeetingFreeField('meetingDate', this.value)">
+        <input class="modal-input" id="meeting-tag1-free" placeholder="下段1" value="${esc(current.meetingTag1 || '')}" oninput="updateMeetingFreeField('meetingTag1', this.value)">
+        <input class="modal-input" id="meeting-tag2-free" placeholder="下段2" value="${esc(current.meetingTag2 || '')}" oninput="updateMeetingFreeField('meetingTag2', this.value)">
+      </div>
+      <div class="visit-modal-actions">
+        <button class="mact red" onclick="clearMeeting(modalIndex, true)">クリア</button>
+        <button class="mact green" onclick="closeModal();render();">OK</button>
+      </div>
+      <button class="modal-close visit-cancel-btn" onclick="closeModal()">キャンセル</button>
+    </div>`
+  );
+  renderVisitCalendar();
+}
+
+function updateMeetingFreeField(field, value) {
+  currentData[modalIndex][field] = value.trim();
+  saveMonthData(curYear, curMonth, currentData);
+  render();
+}
+
+function clearMeeting(i, keepModalOpen) {
+  currentData[i].meetingDate = '';
+  currentData[i].meetingTag1 = '';
+  currentData[i].meetingTag2 = '';
+  saveMonthData(curYear, curMonth, currentData);
+  render();
+  if (keepModalOpen) {
+    openMeeting(i);
+    return;
+  }
+}
+
+function changeVisitMonth(dir) {
+  visitPickerMonth += dir;
+  if (visitPickerMonth > 12) {
+    visitPickerMonth = 1;
+    visitPickerYear += 1;
+  }
+  if (visitPickerMonth < 1) {
+    visitPickerMonth = 12;
+    visitPickerYear -= 1;
+  }
+  if (addClientDraft && datePickerField && modalIndex < 0) {
+    renderAddClientCalendar();
+    return;
+  }
+  renderVisitCalendar();
+}
+
+function jumpVisitCalendar() {
+  const year = document.getElementById('visit-calendar-year');
+  const month = document.getElementById('visit-calendar-month');
+  if (!year || !month) return;
+  visitPickerYear = parseInt(year.value, 10);
+  visitPickerMonth = parseInt(month.value, 10);
+  if (addClientDraft && datePickerField && modalIndex < 0) {
+    renderAddClientCalendar();
+    return;
+  }
+  renderVisitCalendar();
+}
+
+function renderVisitCalendar() {
+  const yearSelect = document.getElementById('visit-calendar-year');
+  const monthSelect = document.getElementById('visit-calendar-month');
+  const grid = document.getElementById('visit-calendar-grid');
+  if (!yearSelect || !monthSelect || !grid) return;
+  renderCalendarSelects(yearSelect, monthSelect, visitPickerYear, visitPickerMonth);
+  grid.innerHTML = '';
+
+  const selectedRaw = String(getFieldValue(currentData[modalIndex], datePickerField) || '');
+  let selectedDay = null;
+  if (datePickerField === 'visitDate' || datePickerField === 'meetingDate') {
+    const match = selectedRaw.match(/^(\d{1,2})日$/);
+    selectedDay = match ? parseInt(match[1], 10) : null;
+  } else {
+    const parsed = parseAnyDate(selectedRaw);
+    selectedDay = parsed && parsed.year === visitPickerYear && parsed.month === visitPickerMonth ? parsed.day : null;
+  }
+  const firstWeekday = new Date(visitPickerYear, visitPickerMonth - 1, 1).getDay();
+  const daysInMonth = new Date(visitPickerYear, visitPickerMonth, 0).getDate();
+
+  for (let i = 0; i < firstWeekday; i += 1) {
+    const blank = document.createElement('button');
+    blank.className = 'calendar-day blank';
+    blank.disabled = true;
+    blank.textContent = '';
+    grid.appendChild(blank);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const btn = document.createElement('button');
+    btn.className = `calendar-day${selectedDay === day ? ' sel' : ''}`;
+    btn.textContent = String(day);
+    btn.onclick = () => {
+      if (datePickerField === 'visitDate') {
+        if (selectedDay === day) {
+          currentData[modalIndex].visitDate = '';
+          currentData[modalIndex].visit = '';
+          saveMonthData(curYear, curMonth, currentData);
+          render();
+          openVisit(modalIndex);
+          return;
+        }
+        setVisitDate(`${day}日`);
+        return;
+      }
+      if (datePickerField === 'meetingDate') {
+        if (selectedDay === day) {
+          currentData[modalIndex].meetingDate = '';
+          saveMonthData(curYear, curMonth, currentData);
+          render();
+          openMeeting(modalIndex);
+          return;
+        }
+        currentData[modalIndex].meetingDate = `${day}日`;
+        saveMonthData(curYear, curMonth, currentData);
+        render();
+        openMeeting(modalIndex);
+        return;
+      }
+      if (selectedDay === day) {
+        setFieldValue(currentData[modalIndex], datePickerField, '');
+        saveMonthData(curYear, curMonth, currentData);
+        openPeriodDatePicker(modalIndex, datePickerField, getPeriodFieldLabel(datePickerField));
+        return;
+      }
+      setFieldValue(currentData[modalIndex], datePickerField, formatWareki(visitPickerYear, visitPickerMonth, day));
+      saveMonthData(curYear, curMonth, currentData);
+      openPeriodDatePicker(modalIndex, datePickerField, getPeriodFieldLabel(datePickerField));
+    };
+    grid.appendChild(btn);
+  }
+}
+
+function renderCalendarSelects(yearSelect, monthSelect, year, month) {
+  const startYear = Math.max(2019, curYear - 8);
+  const endYear = curYear + 12;
+  yearSelect.innerHTML = '';
+  for (let y = startYear; y <= endYear; y += 1) {
+    const option = document.createElement('option');
+    option.value = String(y);
+    option.textContent = String(y) + '年（R' + String(y - 2018) + '）';
+    option.selected = y === year;
+    yearSelect.appendChild(option);
+  }
+  monthSelect.innerHTML = '';
+  for (let m = 1; m <= 12; m += 1) {
+    const option = document.createElement('option');
+    option.value = String(m);
+    option.textContent = String(m) + '月';
+    option.selected = m === month;
+    monthSelect.appendChild(option);
+  }
+}
+
+function openPeriodDatePicker(i, field, label) {
+  modalIndex = i;
+  datePickerField = field;
+  const modal = document.getElementById('modal');
+  modal.classList.add('calendar-picker');
+  const parsed = parseAnyDate(getFieldValue(currentData[i], field)) || { year: curYear, month: curMonth, day: null };
+  visitPickerYear = parsed.year;
+  visitPickerMonth = parsed.month;
+  showModal(label, currentData[i].name,
+    `<div class="calendar-box">
+      <div class="calendar-head">
+        <button class="calendar-nav" onclick="changeVisitMonth(-1)">‹</button>
+        <div class="calendar-selects">
+          <select class="calendar-select" id="visit-calendar-year" onchange="jumpVisitCalendar()"></select>
+          <select class="calendar-select" id="visit-calendar-month" onchange="jumpVisitCalendar()"></select>
+        </div>
+        <button class="calendar-nav" onclick="changeVisitMonth(1)">›</button>
+      </div>
+      <div class="calendar-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div class="calendar-grid" id="visit-calendar-grid"></div>
+      <div class="visit-modal-actions">
+        <button class="mact red" onclick="clearDateField(modalIndex, '${field}', true)">クリア</button>
+        <button class="mact green" onclick="closeModal();render();">OK</button>
+      </div>
+    </div>`
+  );
+  renderVisitCalendar();
+}
+
+function clearDateField(i, field, keepModalOpen) {
+  setFieldValue(currentData[i], field, '');
+  saveMonthData(curYear, curMonth, currentData);
+  if (keepModalOpen) {
+    openPeriodDatePicker(i, field, getPeriodFieldLabel(field));
+    return;
+  }
+  render();
+}
+
+function bindDateCell(td, onClick, onDoubleClick) {
+  td.addEventListener('dblclick', event => {
+    event.stopPropagation();
+    clearTimeout(pendingDateClick);
+    pendingDateClick = null;
+    (onDoubleClick || onClick)();
+  });
+}
+
+function openLevelPicker(i) {
+  modalIndex = i;
+  const current = String(currentData[i].level || '');
+  const modal = document.getElementById('modal');
+  modal.classList.add('compact-picker');
+  showModal('介護度', currentData[i].name,
+    `<div style="display:flex;gap:6px;flex-wrap:wrap;">
+      ${levelChoices.map(level => `<button class="mact${current === level ? ' sel' : ''}" style="flex:none;min-width:40px;padding:8px 6px" onclick="setLevel('${level}')">${level}</button>`).join('')}
+    </div>`
+  );
+}
+
+function setLevel(value) {
+  currentData[modalIndex].level = value;
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function openBiko(i) {
+  modalIndex = i;
+  document.getElementById('modal').classList.add('compact-picker');
+  showModal('備考', currentData[i].name,
+    `<textarea class="modal-textarea" id="bi">${esc(currentData[i].biko || '')}</textarea>
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveBiko()">保存する</button>`
+  );
+  setTimeout(() => {
+    const textarea = document.getElementById('bi');
+    if (textarea) textarea.focus();
+  }, 100);
+}
+
+function openKosin(i) {
+  modalIndex = i;
+  document.getElementById('modal').classList.add('compact-picker');
+  showModal('更新申請等（メモ）', currentData[i].name,
+    `<input class="modal-input" id="kosin-input" placeholder="例: 7/1更新" value="${esc(currentData[i].kosin || '')}">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveKosin()">保存する</button>`
+  );
+  setTimeout(() => {
+    const input = document.getElementById('kosin-input');
+    if (input) input.focus();
+  }, 100);
+}
+
+function saveKosin() {
+  const input = document.getElementById('kosin-input');
+  if (!input) return;
+  currentData[modalIndex].kosin = input.value.trim();
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function saveBiko() {
+  const textarea = document.getElementById('bi');
+  if (!textarea) return;
+  currentData[modalIndex].biko = textarea.value.trim();
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function openMarkerField(i, field, label, placeholder) {
+  modalIndex = i;
+  const current = currentData[i][field] || '';
+  showModal(label, currentData[i].name,
+    `<input class="modal-input" id="marker-input" placeholder="${esc(placeholder)}" value="${esc(current)}">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveMarkerField('${field}')">保存する</button>
+     <button class="mact red" style="width:100%;margin-top:8px" onclick="clearMarkerField('${field}')">クリア</button>`
+  );
+  setTimeout(() => {
+    const input = document.getElementById('marker-input');
+    if (input) input.focus();
+  }, 100);
+}
+
+function saveMarkerField(field) {
+  const input = document.getElementById('marker-input');
+  if (!input) return;
+  currentData[modalIndex][field] = input.value.trim();
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function clearMarkerField(field) {
+  currentData[modalIndex][field] = '';
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function openSehoEditor(i) {
+  modalIndex = i;
+  const item = currentData[i];
+  showModal('保護', item.name,
+    `<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #b3e89a;border-radius:10px;background:#f9fef5;margin-bottom:8px;cursor:pointer">
+       <input type="checkbox" id="seho-mark-input" ${item.seho ? 'checked' : ''} style="width:18px;height:18px;accent-color:#65b842">
+       <span style="font-size:13px;font-weight:700;color:#1a4d0e">生活保護あり</span>
+     </label>
+     <input class="modal-input" id="seho-cw-input" placeholder="下段 例: 山田CW" value="${esc(item.sehoCw || '')}">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveSehoEditor()">保存する</button>
+     <button class="mact red" style="width:100%;margin-top:8px" onclick="clearSehoEditor()">クリア</button>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+  setTimeout(() => {
+    const input = document.getElementById('seho-cw-input');
+    if (input) input.focus();
+  }, 100);
+}
+
+function saveSehoEditor() {
+  currentData[modalIndex].seho = document.getElementById('seho-mark-input')?.checked ? '○' : '';
+  currentData[modalIndex].sehoCw = (document.getElementById('seho-cw-input')?.value || '').trim();
+  normalizeSehoFields(currentData[modalIndex]);
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function clearSehoEditor() {
+  currentData[modalIndex].seho = '';
+  currentData[modalIndex].sehoCw = '';
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function openVisitTextEditor(i, focusFieldId) {
+  modalIndex = i;
+  const item = currentData[i];
+  showModal('訪問日を編集', item.name,
+    `<input class="modal-input" id="visit-date-input" placeholder="日付" value="${esc(item.visitDate || '')}">
+     <input class="modal-input" id="visit-tag1-input" placeholder="下段1" value="${esc(item.visitTag1 || '')}">
+     <input class="modal-input" id="visit-tag2-input" placeholder="下段2" value="${esc(item.visitTag2 || '')}">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveVisitTextEditor()">保存する</button>
+     <button class="mact red" style="width:100%;margin-top:8px" onclick="clearVisit(modalIndex);closeModal()">クリア</button>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+  setTimeout(() => {
+    const input = document.getElementById(focusFieldId || 'visit-date-input');
+    if (input) input.focus();
+  }, 100);
+}
+
+function saveVisitTextEditor() {
+  const item = currentData[modalIndex];
+  item.visitDate = (document.getElementById('visit-date-input')?.value || '').trim();
+  item.visitTag1 = (document.getElementById('visit-tag1-input')?.value || '').trim();
+  item.visitTag2 = (document.getElementById('visit-tag2-input')?.value || '').trim();
+  item.visit = '';
+  normalizeVisitTags(item);
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function openAddClient(fromRowEditor) {
+  returnToRowEditorAfterAdd = Boolean(fromRowEditor);
+  closeModal();
+  addClientDraft = defaultAddClientDraft();
+  renderAddClientModal();
+}
+
+function addClient() {
+  syncAddClientDraft();
+  syncAddClientSehoDraft();
+  const name = String(addClientDraft?.name || '').trim();
+  if (name && currentData.some(item => !item.deleted && String(item.name || '').trim() === name)) {
+    alert('同じ利用者名があります。追加せず既存データを確認してください');
+    return;
+  }
+  currentData.push(newClientData({
+    name,
+    kana: String(addClientDraft?.kana || '').trim() || resolveKanaForName(name),
+    customAdded: true,
+    noNumber: !name,
+    baseName: '',
+    yuko: addClientDraft?.yuko || '',
+    level: addClientDraft?.level || '',
+    planL: addClientDraft?.planL || '',
+    planS: addClientDraft?.planS || '',
+    seho: addClientDraft?.seho || '',
+    sehoCw: addClientDraft?.sehoCw || ''
+  }));
+  addClientDraft = null;
+  saveMonthData(curYear, curMonth, currentData);
+  if (returnToRowEditorAfterAdd) {
+    returnToRowEditorAfterAdd = false;
+    render();
+    renderRowReorderModal();
+    return;
+  }
+  closeModal();
+  render();
+}
+
+function openAddClientPeriodPicker(field) {
+  if (!addClientDraft) addClientDraft = defaultAddClientDraft();
+  modalIndex = -1;
+  const modal = document.getElementById('modal');
+  modal.classList.add('calendar-picker');
+  const parsed = parseAnyDate(addClientDraft[field]) || { year: curYear, month: curMonth, day: null };
+  visitPickerYear = parsed.year;
+  visitPickerMonth = parsed.month;
+  datePickerField = field;
+  showModal(getPeriodFieldLabel(field), '新規',
+    `<div class="calendar-box">
+      <div class="calendar-head">
+        <button class="calendar-nav" onclick="changeVisitMonth(-1)">‹</button>
+        <div class="calendar-selects">
+          <select class="calendar-select" id="visit-calendar-year" onchange="jumpVisitCalendar()"></select>
+          <select class="calendar-select" id="visit-calendar-month" onchange="jumpVisitCalendar()"></select>
+        </div>
+        <button class="calendar-nav" onclick="changeVisitMonth(1)">›</button>
+      </div>
+      <div class="calendar-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div class="calendar-grid" id="visit-calendar-grid"></div>
+      <div class="visit-modal-actions">
+        <button class="mact red" onclick="clearAddClientDateField('${field}')">クリア</button>
+        <button class="mact green" onclick="renderAddClientModal()">OK</button>
+      </div>
+    </div>`
+  );
+  renderAddClientCalendar();
+}
+
+function renderAddClientCalendar() {
+  const yearSelect = document.getElementById('visit-calendar-year');
+  const monthSelect = document.getElementById('visit-calendar-month');
+  const grid = document.getElementById('visit-calendar-grid');
+  if (!yearSelect || !monthSelect || !grid || !addClientDraft) return;
+  renderCalendarSelects(yearSelect, monthSelect, visitPickerYear, visitPickerMonth);
+  grid.innerHTML = '';
+  const parsed = parseAnyDate(addClientDraft[datePickerField]);
+  const selectedDay = parsed && parsed.year === visitPickerYear && parsed.month === visitPickerMonth ? parsed.day : null;
+  const firstWeekday = new Date(visitPickerYear, visitPickerMonth - 1, 1).getDay();
+  const daysInMonth = new Date(visitPickerYear, visitPickerMonth, 0).getDate();
+  for (let i = 0; i < firstWeekday; i += 1) {
+    const blank = document.createElement('button');
+    blank.className = 'calendar-day blank';
+    blank.disabled = true;
+    blank.textContent = '';
+    grid.appendChild(blank);
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const btn = document.createElement('button');
+    btn.className = `calendar-day${selectedDay === day ? ' sel' : ''}`;
+    btn.textContent = String(day);
+    btn.onclick = () => {
+      if (!addClientDraft) return;
+      addClientDraft[datePickerField] = selectedDay === day ? '' : formatWareki(visitPickerYear, visitPickerMonth, day);
+      openAddClientPeriodPicker(datePickerField);
+    };
+    grid.appendChild(btn);
+  }
+}
+
+function clearAddClientDateField(field) {
+  if (!addClientDraft) return;
+  addClientDraft[field] = '';
+  openAddClientPeriodPicker(field);
+}
+
+function openAddClientLevelPicker() {
+  if (!addClientDraft) addClientDraft = defaultAddClientDraft();
+  modalIndex = -1;
+  const current = String(addClientDraft.level || '');
+  const modal = document.getElementById('modal');
+  modal.classList.add('compact-picker');
+  showModal('介護度', '新規',
+    `<div style="display:flex;gap:6px;flex-wrap:wrap;">
+      ${levelChoices.map(level => `<button class="mact${current === level ? ' sel' : ''}" style="flex:none;min-width:40px;padding:8px 6px" onclick="setAddClientLevel('${level}')">${level}</button>`).join('')}
+    </div>`
+  );
+}
+
+function setAddClientLevel(value) {
+  if (!addClientDraft) addClientDraft = defaultAddClientDraft();
+  addClientDraft.level = value;
+  renderAddClientModal();
+}
+
+function openAddClientSehoEditor() {
+  if (!addClientDraft) addClientDraft = defaultAddClientDraft();
+  modalIndex = -1;
+  showModal('保護', '新規',
+    `<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #b3e89a;border-radius:10px;background:#f9fef5;margin-bottom:8px;cursor:pointer">
+       <input type="checkbox" id="seho-mark-input" ${addClientDraft.seho ? 'checked' : ''} style="width:18px;height:18px;accent-color:#65b842">
+       <span style="font-size:13px;font-weight:700;color:#1a4d0e">生活保護あり</span>
+     </label>
+     <input class="modal-input" id="seho-cw-input" placeholder="下段 例: 山田CW" value="${esc(addClientDraft.sehoCw || '')}">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveAddClientSehoEditor()">保存する</button>
+     <button class="mact red" style="width:100%;margin-top:8px" onclick="clearAddClientSehoEditor()">クリア</button>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+  setTimeout(() => {
+    const input = document.getElementById('seho-cw-input');
+    if (input) input.focus();
+  }, 100);
+}
+
+function saveAddClientSehoEditor() {
+  if (!addClientDraft) addClientDraft = defaultAddClientDraft();
+  addClientDraft.seho = document.getElementById('seho-mark-input')?.checked ? '○' : '';
+  addClientDraft.sehoCw = (document.getElementById('seho-cw-input')?.value || '').trim();
+  renderAddClientModal();
+}
+
+function clearAddClientSehoEditor() {
+  if (!addClientDraft) return;
+  addClientDraft.seho = '';
+  addClientDraft.sehoCw = '';
+  renderAddClientModal();
+}
+
+function openAddFacility() {
+  const options = currentData.map((c, i) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #e8f5e0;cursor:pointer">
+      <input type="checkbox" id="fac-chk-${i}" style="width:18px;height:18px;accent-color:#65b842">
+      <span style="font-size:13px;font-weight:700;color:#1a4d0e">${esc(c.name)}</span>
+      ${c.facility ? `<span style="font-size:11px;color:#94a3b8">(${esc(c.facility)})</span>` : ''}
+    </label>
+  `).join('');
+  showModal('施設を追加', '',
+    `<input class="modal-input" id="new-fac-name" placeholder="施設名を入力">
+     <div style="font-size:11px;color:#94a3b8;margin:8px 0 4px">対象の利用者を選択</div>
+     <div style="max-height:260px;overflow-y:auto;border:1.5px solid #b3e89a;border-radius:10px;padding:0 10px;background:#f9fef5">${options}</div>
+     <button class="mact green" style="width:100%;margin-top:10px" onclick="saveNewFacility()">保存する</button>`
+  );
+}
+
+function saveNewFacility() {
+  const name = (document.getElementById('new-fac-name')?.value || '').trim();
+  if (!name) {
+    alert('施設名を入力してください');
+    return;
+  }
+  const facilities = loadFacilities();
+  if (!facilities.includes(name)) {
+    facilities.push(name);
+    saveFacilities(facilities);
+  }
+  currentData.forEach((item, index) => {
+    const checked = document.getElementById(`fac-chk-${index}`);
+    if (checked?.checked) item.facility = name;
+  });
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function openNameEditor(i) {
+  modalIndex = i;
+  const item = currentData[i];
+  showModal('氏名', item.name,
+    `<input class="modal-input" id="edit-name-input" placeholder="氏名" value="${esc(item.name || '')}" oninput="fillKanaIfKnown('edit-name-input','edit-kana-input')" onchange="fillKanaIfKnown('edit-name-input','edit-kana-input')" onblur="fillKanaIfKnown('edit-name-input','edit-kana-input')">
+     <input class="modal-input" id="edit-kana-input" placeholder="かな" value="${esc(item.kana || '')}">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveNameEditor()">保存する</button>
+     <button class="mact red" style="width:100%;margin-top:8px" onclick="confirmDelete(modalIndex)">削除</button>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+  setTimeout(() => {
+    const input = document.getElementById('edit-name-input');
+    if (input) input.focus();
+    wireKanaAutoTransfer('edit-name-input', 'edit-kana-input');
+  }, 100);
+}
+
+function bindRowSelection(cell, i) {
+  const toggleRowSelection = event => {
+    if (event) event.stopPropagation();
+    const row = cell.parentElement;
+    if (!row) return;
+    const rowId = row.dataset.rowId || '';
+    const willSelect = selectedRowId !== rowId;
+    selectedRowId = willSelect ? rowId : '';
+    applySelectedRowState();
+  };
+  cell.addEventListener('dblclick', toggleRowSelection);
+  cell.addEventListener('pointerup', event => {
+    if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+    const now = Date.now();
+    const lastTap = Number(cell.dataset.lastTapAt || '0');
+    cell.dataset.lastTapAt = String(now);
+    if (now - lastTap > 320) return;
+    event.preventDefault();
+    toggleRowSelection(event);
+  });
+}
+
+function bindRowTapSelection(row) {
+  row.addEventListener('click', event => {
+    if (event.target.closest('button, input, textarea, select, option')) return;
+    const rowId = row.dataset.rowId || '';
+    if (!rowId) return;
+    selectedRowId = selectedRowId === rowId ? '' : rowId;
+    applySelectedRowState();
+  });
+}
+
+function startRowHold(event, row) {
+  clearTimeout(rowDragHoldTimer);
+  rowDragPointerId = event.pointerId;
+  rowDragRowEl = row;
+  rowDragRowId = row.dataset.rowId || '';
+  rowDragTargetRowId = '';
+  rowDragTargetAfter = false;
+  rowDragStartY = event.clientY;
+  const rect = row.getBoundingClientRect();
+  rowDragPointerOffsetY = event.clientY - rect.top;
+  rowDragHoldTimer = setTimeout(() => {
+    if (orderMode !== 'custom') saveOrderMode('custom');
+    rowDragActive = true;
+    if (rowDragRowEl) rowDragRowEl.classList.add('row-dragging');
+    document.querySelector('.tbl-wrap')?.classList.add('row-drag-lock');
+  }, 140);
+}
+
+function clearRowDropMarkers() {
+  document.querySelectorAll('#tbody tr.row-drop-target').forEach(tr => {
+    tr.classList.remove('row-drop-target', 'drop-before', 'drop-after');
+  });
+}
+
+function updateRowDropMarker(targetRowId, insertAfter) {
+  clearRowDropMarkers();
+  if (!targetRowId || targetRowId === rowDragRowId) return;
+  const row = document.querySelector(`#tbody tr[data-row-id="${CSS.escape(targetRowId)}"]`);
+  if (!row) return;
+  row.classList.add('row-drop-target', insertAfter ? 'drop-after' : 'drop-before');
+}
+
+function moveHeldRow(event) {
+  if (rowDragPointerId !== event.pointerId || !rowDragRowEl) return;
+  if (!rowDragActive) return;
+  event.preventDefault();
+  const rect = rowDragRowEl.getBoundingClientRect();
+  const deltaY = event.clientY - rect.top - rowDragPointerOffsetY;
+  rowDragRowEl.style.transform = `translateY(${Math.round(deltaY)}px) scale(1.01)`;
+  const rows = Array.from(document.querySelectorAll('#tbody tr')).filter(tr => tr.dataset.rowId && tr.dataset.rowId !== rowDragRowId);
+  let nextTargetId = '';
+  let nextAfter = false;
+  for (const row of rows) {
+    const rowRect = row.getBoundingClientRect();
+    const rowCenter = rowRect.top + (rowRect.height / 2);
+    if (event.clientY < rowCenter) {
+      nextTargetId = row.dataset.rowId || '';
+      nextAfter = false;
+      break;
+    }
+    nextTargetId = row.dataset.rowId || '';
+    nextAfter = true;
+  }
+  rowDragTargetRowId = nextTargetId;
+  rowDragTargetAfter = nextAfter;
+  updateRowDropMarker(nextTargetId, nextAfter);
+}
+
+function commitRowReorder() {
+  if (!rowDragRowId || !rowDragTargetRowId || rowDragRowId === rowDragTargetRowId) return false;
+  const sourceIndex = currentData.findIndex(item => item.rowId === rowDragRowId);
+  const targetIndex = currentData.findIndex(item => item.rowId === rowDragTargetRowId);
+  if (sourceIndex < 0 || targetIndex < 0) return false;
+  const nextData = [...currentData];
+  const [moved] = nextData.splice(sourceIndex, 1);
+  let insertIndex = nextData.findIndex(item => item.rowId === rowDragTargetRowId);
+  if (insertIndex < 0) return false;
+  if (rowDragTargetAfter) insertIndex += 1;
+  nextData.splice(insertIndex, 0, moved);
+  nextData.forEach((item, index) => {
+    item.manualOrder = item.noNumber ? Number.MAX_SAFE_INTEGER + index : index;
+  });
+  currentData = nextData;
+  saveMonthData(curYear, curMonth, currentData);
+  return true;
+}
+
+function endRowHold(event) {
+  if (event && rowDragPointerId !== null && event.pointerId !== rowDragPointerId) return;
+  clearTimeout(rowDragHoldTimer);
+  const shouldCommit = rowDragActive;
+  document.querySelector('.tbl-wrap')?.classList.remove('row-drag-lock');
+  if (rowDragRowEl) {
+    rowDragRowEl.classList.remove('row-dragging');
+    rowDragRowEl.style.transform = '';
+  }
+  clearRowDropMarkers();
+  if (shouldCommit) {
+    commitRowReorder();
+    rowDragActive = false;
+    rowDragPointerId = null;
+    rowDragRowEl = null;
+    rowDragRowId = '';
+    rowDragTargetRowId = '';
+    rowDragTargetAfter = false;
+    render();
+    return;
+  }
+  rowDragActive = false;
+  rowDragPointerId = null;
+  rowDragRowEl = null;
+  rowDragRowId = '';
+  rowDragTargetRowId = '';
+  rowDragTargetAfter = false;
+}
+
+function saveNameEditor() {
+  const name = (document.getElementById('edit-name-input')?.value || '').trim();
+  if (!name) {
+    alert('氏名を入力してください');
+    return;
+  }
+  currentData[modalIndex].name = name;
+  currentData[modalIndex].kana = (document.getElementById('edit-kana-input')?.value || '').trim() || resolveKanaForName(name);
+  saveMonthData(curYear, curMonth, currentData);
+  closeModal();
+  render();
+}
+
+function openAddColumnModal() {
+  showModal('項目追加', '',
+    `<input class="modal-input" id="add-column-label" placeholder="項目名">
+     <select class="modal-input" id="add-column-type">
+       <option value="check">〇のチェック項目</option>
+       <option value="date">カレンダー項目</option>
+     </select>
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveAddedColumn()">追加する</button>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+}
+
+function getBaseColumnEditorItems() {
+  return [
+    { key: 'yuko', label: getColumnLabel('yuko'), type: 'date', custom: false },
+    { key: 'level', label: getColumnLabel('level'), type: 'fixed', custom: false },
+    { key: 'planL', label: getColumnLabel('planL'), type: 'date', custom: false },
+    { key: 'planS', label: getColumnLabel('planS'), type: 'date', custom: false },
+    { key: 'visit', label: getColumnLabel('visit'), type: 'fixed', custom: false },
+    { key: 'monita', label: getColumnLabel('monita'), type: 'check', custom: false },
+    { key: 'sikien', label: getColumnLabel('sikien'), type: 'check', custom: false },
+    { key: 'drive', label: getColumnLabel('drive'), type: 'check', custom: false },
+    { key: 'hand', label: getColumnLabel('hand'), type: 'check', custom: false },
+    { key: 'fax', label: getColumnLabel('fax'), type: 'check', custom: false },
+    { key: 'meeting', label: getColumnLabel('meeting'), type: 'fixed', custom: false },
+    { key: 'seho', label: getColumnLabel('seho'), type: 'fixed', custom: false }
+  ];
+}
+
+function getColumnEditorItems() {
+  const fixedMap = new Map(getBaseColumnEditorItems().map(item => [item.key, item]));
+  return columnOrder.map(key => {
+    const fixed = fixedMap.get(key);
+    if (fixed) return fixed;
+    const custom = getCustomColumn(key);
+    return {
+      key,
+      label: custom?.label || key,
+      type: custom?.type || 'check',
+      custom: true
+    };
+  });
+}
+
+function openColumnEditorModal() {
+  columnEditorReorderMode = false;
+  columnEditorTextMode = false;
+  selectedColumnReorderKey = '';
+  renderColumnEditorModal();
+}
+
+function renderColumnEditorModal() {
+  const items = getColumnEditorItems();
+  const rowClick = item => {
+    if (columnEditorReorderMode) return `tapColumnReorder('${esc(item.key)}')`;
+    if (columnEditorTextMode) return `openColumnLabelEditor('${esc(item.key)}')`;
+    return `selectColumnEditorItem('${esc(item.key)}')`;
+  };
+  showModal('項目編集', '',
+    `<div class="editor-actions">
+      <button class="editor-action-btn" onclick="openAddColumnModal()">追加</button>
+      <button class="editor-action-btn subtle${columnEditorReorderMode ? ' is-active' : ''}" onclick="toggleColumnEditorReorderMode()">並び替え</button>
+      <button class="editor-action-btn subtle${columnEditorTextMode ? ' is-active' : ''}" onclick="toggleColumnEditorTextMode()">文字編集</button>
+    </div>
+    <div class="reorder-hint">${columnEditorTextMode ? '名前を変えたい項目を押してください。' : (columnEditorReorderMode ? (selectedColumnReorderKey ? '緑の項目を移動中です。入れたい位置の項目を押してください。' : '移動したい項目を押してください。') : '横列の項目一覧です。追加項目のみ削除できます。')}</div>
+    <div class="editor-list">
+      ${items.map(item => `
+        <div class="editor-row${(columnEditorReorderMode ? selectedColumnReorderKey === item.key : selectedColumnKey === item.key) ? ' is-selected' : ''}" onclick="${rowClick(item)}">
+          <div class="editor-row-label">${esc(item.label)}</div>
+          <div class="editor-row-actions">
+            ${columnEditorReorderMode || columnEditorTextMode
+              ? ``
+              : `${item.custom ? `<button class="editor-chip" onclick="event.stopPropagation();confirmDeleteColumn('${esc(item.key)}')">削除</button>` : ''}`
+            }
+          </div>
+        </div>
+      `).join('')}
+    </div>`
+  );
+  document.getElementById('modal').classList.add('column-editor-picker');
+}
+
+function selectColumnEditorItem(key) {
+  selectedColumnKey = selectedColumnKey === key ? '' : key;
+  renderColumnEditorModal();
+}
+
+function toggleColumnEditorReorderMode() {
+  columnEditorReorderMode = !columnEditorReorderMode;
+  columnEditorTextMode = false;
+  selectedColumnReorderKey = '';
+  renderColumnEditorModal();
+}
+
+function toggleColumnEditorTextMode() {
+  columnEditorTextMode = !columnEditorTextMode;
+  columnEditorReorderMode = false;
+  selectedColumnReorderKey = '';
+  renderColumnEditorModal();
+}
+
+function openColumnLabelEditor(key) {
+  const currentLabel = getColumnLabel(key);
+  showModal('項目名編集', currentLabel,
+    `<input class="modal-input" id="column-label-input" value="${esc(currentLabel)}" placeholder="項目名">
+     <button class="mact green" style="width:100%;margin-top:8px" onclick="saveColumnLabelEdit('${esc(key)}')">OK</button>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+  setTimeout(() => {
+    const input = document.getElementById('column-label-input');
+    if (input) input.focus();
+  }, 100);
+}
+
+function saveColumnLabelEdit(key) {
+  const label = (document.getElementById('column-label-input')?.value || '').trim();
+  if (!label) {
+    alert('項目名を入力してください');
+    return;
+  }
+  const custom = getCustomColumn(key);
+  if (custom) {
+    customColumns = customColumns.map(item => item.key === key ? { ...item, label } : item);
+    saveCustomColumns();
+  } else {
+    const defaultLabel = DEFAULT_COLUMN_LABELS[key] || '';
+    columnLabels = { ...columnLabels };
+    if (label === defaultLabel) delete columnLabels[key];
+    else columnLabels[key] = label;
+    saveColumnLabels();
+  }
+  render();
+  renderColumnEditorModal();
+}
+
+function saveAddedColumn() {
+  const label = (document.getElementById('add-column-label')?.value || '').trim();
+  const type = document.getElementById('add-column-type')?.value === 'date' ? 'date' : 'check';
+  const target = 'seho';
+  if (!label) {
+    alert('項目名を入力してください');
+    return;
+  }
+  const key = makeCustomColumnKey();
+  customColumns = [...customColumns, { key, label, type }];
+  saveCustomColumns();
+  const nextOrder = columnOrder.filter(item => item !== key);
+  const targetIndex = nextOrder.indexOf(target);
+  if (targetIndex >= 0) nextOrder.splice(targetIndex + 1, 0, key);
+  else nextOrder.push(key);
+  columnOrder = nextOrder.filter((item, index, arr) => arr.indexOf(item) === index);
+  columnOrder.push(...getAllMovableColumnKeys().filter(item => !columnOrder.includes(item)));
+  saveColumnOrder();
+  currentData.forEach(item => {
+    item.customFields = normalizeCustomFieldValues(item.customFields);
+    item.customFields[key] = type === 'check' ? 0 : '';
+  });
+  saveMonthData(curYear, curMonth, currentData);
+  render();
+  renderColumnEditorModal();
+}
+
+function toggleDeleteColumnMode() {
+  if (!selectedColumnKey) {
+    alert('消したい項目を先にダブルクリックしてください');
+    return;
+  }
+  confirmDeleteColumn(selectedColumnKey);
+}
+
+function confirmDeleteColumn(key) {
+  const column = getCustomColumn(key);
+  if (!column) {
+    alert('追加した項目のみ削除できます');
+    return;
+  }
+  document.getElementById('cf-title').textContent = '項目を削除';
+  document.getElementById('cf-msg').textContent = `${column.label} を削除しますか？`;
+  document.getElementById('cf-ok').onclick = () => {
+    customColumns = customColumns.filter(item => item.key !== key);
+    saveCustomColumns();
+    columnOrder = columnOrder.filter(item => item !== key);
+    saveColumnOrder();
+    currentData.forEach(item => {
+      item.customFields = normalizeCustomFieldValues(item.customFields);
+      delete item.customFields[key];
+    });
+    saveMonthData(curYear, curMonth, currentData);
+    if (selectedColumnKey === key) selectedColumnKey = '';
+    closeConfirm();
+    render();
+    renderColumnEditorModal();
+  };
+  document.getElementById('confirm').classList.add('show');
+}
+
+function moveArrayItem(list, index, delta) {
+  const nextIndex = index + delta;
+  if (index < 0 || nextIndex < 0 || index >= list.length || nextIndex >= list.length) return list;
+  const next = [...list];
+  const [item] = next.splice(index, 1);
+  next.splice(nextIndex, 0, item);
+  return next;
+}
+
+function getVisibleRowItems() {
+  return currentData.filter(item => !item.deleted);
+}
+
+function updateManualOrderFromVisibleRows(visibleRows) {
+  const visibleIds = visibleRows.map(item => item.rowId);
+  const visibleMap = new Map(visibleRows.map((item, index) => [item.rowId, { ...item, manualOrder: item.noNumber ? Number.MAX_SAFE_INTEGER + index : index }]));
+  const reordered = [];
+  visibleIds.forEach(id => {
+    const item = visibleMap.get(id);
+    if (item) reordered.push(item);
+  });
+  currentData.forEach(item => {
+    if (item.deleted) reordered.push(item);
+  });
+  currentData = reordered;
+}
+
+let selectedRowReorderId = '';
+let selectedColumnReorderKey = '';
+let columnEditorReorderMode = false;
+let columnEditorTextMode = false;
+let rowEditorReorderMode = false;
+let rowEditorDeleteMode = false;
+let returnToRowEditorAfterAdd = false;
+
+function openRowReorderModal() {
+  if (loadOrderMode() !== 'custom') {
+    alert('カスタム順をクリックしてください');
+    return;
+  }
+  saveOrderMode('custom');
+  selectedRowReorderId = '';
+  rowEditorReorderMode = false;
+  rowEditorDeleteMode = false;
+  renderRowReorderModal();
+}
+
+function renderRowReorderModal(keepScroll) {
+  const previousScrollTop = keepScroll ? (document.querySelector('.reorder-list')?.scrollTop || 0) : 0;
+  const rows = getVisibleRowItems();
+  showModal('利用者編集', '',
+    `<div class="editor-actions">
+      <button class="editor-action-btn" onclick="openAddClient(true)">追加</button>
+      <button class="editor-action-btn subtle${rowEditorReorderMode ? ' is-active' : ''}" onclick="toggleRowEditorReorderMode()">並び替え</button>
+      <button class="editor-action-btn danger${rowEditorDeleteMode ? ' is-active' : ''}" onclick="toggleRowEditorDeleteMode()">削除</button>
+    </div>
+    <div class="reorder-list">
+      ${rows.map(item => {
+        const isSelected = item.rowId === selectedRowReorderId;
+        return `
+        <div class="reorder-item${isSelected ? ' is-selected' : ''}" onclick="tapRowReorder('${esc(item.rowId)}')">
+          <div class="reorder-label">${esc(item.name || '空欄')}</div>
+        </div>`;
+      }).join('')}
+    </div>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+  if (keepScroll) {
+    const list = document.querySelector('.reorder-list');
+    if (list) list.scrollTop = previousScrollTop;
+  }
+}
+
+function toggleRowEditorReorderMode() {
+  rowEditorReorderMode = !rowEditorReorderMode;
+  rowEditorDeleteMode = false;
+  selectedRowReorderId = '';
+  renderRowReorderModal();
+}
+
+function toggleRowEditorDeleteMode() {
+  rowEditorReorderMode = false;
+  rowEditorDeleteMode = !rowEditorDeleteMode;
+  selectedRowReorderId = '';
+  renderRowReorderModal();
+}
+
+function tapRowReorder(rowId) {
+  if (rowEditorDeleteMode) {
+    const index = currentData.findIndex(item => item.rowId === rowId);
+    if (index >= 0) confirmDelete(index);
+    return;
+  }
+  if (!rowEditorReorderMode) return;
+  if (!selectedRowReorderId) {
+    selectedRowReorderId = rowId;
+    renderRowReorderModal(true);
+    return;
+  }
+  if (selectedRowReorderId === rowId) {
+    selectedRowReorderId = '';
+    renderRowReorderModal(true);
+    return;
+  }
+  const rows = getVisibleRowItems();
+  const movingIndex = rows.findIndex(item => item.rowId === selectedRowReorderId);
+  const targetIndex = rows.findIndex(item => item.rowId === rowId);
+  if (movingIndex < 0 || targetIndex < 0) return;
+  const nextRows = [...rows];
+  const [moving] = nextRows.splice(movingIndex, 1);
+  const insertIndex = nextRows.findIndex(item => item.rowId === rowId);
+  if (insertIndex < 0) return;
+  nextRows.splice(insertIndex, 0, moving);
+  updateManualOrderFromVisibleRows(nextRows);
+  saveMonthData(curYear, curMonth, currentData);
+  selectedRowReorderId = '';
+  renderRowReorderModal(true);
+  render();
+}
+
+function getColumnLabelForReorder(key) {
+  return getColumnLabel(key);
+}
+
+function openColumnReorderModal(fromEditor) {
+  columnEditorReorderMode = true;
+  columnEditorTextMode = false;
+  selectedColumnReorderKey = '';
+  renderColumnEditorModal();
+}
+
+function renderColumnReorderModal(fromEditor) {
+  openColumnReorderModal(fromEditor);
+}
+
+function tapColumnReorder(key) {
+  if (!selectedColumnReorderKey) {
+    selectedColumnReorderKey = key;
+    renderColumnEditorModal();
+    return;
+  }
+  if (selectedColumnReorderKey === key) {
+    selectedColumnReorderKey = '';
+    renderColumnEditorModal();
+    return;
+  }
+  const nextOrder = [...columnOrder];
+  const movingIndex = nextOrder.indexOf(selectedColumnReorderKey);
+  const targetIndex = nextOrder.indexOf(key);
+  if (movingIndex < 0 || targetIndex < 0) return;
+  const [moving] = nextOrder.splice(movingIndex, 1);
+  const insertIndex = nextOrder.indexOf(key);
+  if (insertIndex < 0) return;
+  nextOrder.splice(insertIndex, 0, moving);
+  columnOrder = nextOrder;
+  saveColumnOrder();
+  selectedColumnReorderKey = '';
+  render();
+  renderColumnEditorModal();
+}
+
+function cellEdit(td, i, field, currentValue, multiline) {
+  if (td.querySelector('input,textarea')) return;
+  const original = td.innerHTML;
+  td.innerHTML = '';
+  const input = document.createElement(multiline ? 'textarea' : 'input');
+  input.value = currentValue || '';
+  input.style.cssText = `width:100%;font-size:11px;font-family:inherit;border:1.5px solid #65b842;border-radius:4px;padding:2px 4px;background:#f9fef5;color:#1a4d0e;box-sizing:border-box;${multiline ? 'height:60px;resize:none;' : ''}`;
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  function save() {
+    currentData[i][field] = input.value.trim();
+    if (field === 'visitDate') currentData[i].visit = '';
+    saveMonthData(curYear, curMonth, currentData);
+    render();
+  }
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !multiline) {
+      event.preventDefault();
+      save();
+    }
+    if (event.key === 'Escape') {
+      td.innerHTML = original;
+    }
+  });
+}
+
+function showModal(col, name, html) {
+  document.getElementById('mc').textContent = col;
+  document.getElementById('mn').textContent = name;
+  document.getElementById('ma').innerHTML = html;
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('show', 'add-client', 'compact-picker', 'calendar-picker', 'visit-calendar-open', 'column-editor-picker', 'fax-office-picker');
+  datePickerField = '';
+}
+
+function confirmDelete(i) {
+  closeModal();
+  const name = currentData[i].name;
+  document.getElementById('cf-title').textContent = '利用者を削除';
+  document.getElementById('cf-msg').textContent = `${name} を一覧から削除しますか？`;
+  document.getElementById('cf-ok').onclick = () => {
+    const item = currentData[i];
+    const isDefaultLinked = DEFAULT_CLIENTS.some(base => base.name === item.baseName);
+    if (isDefaultLinked) {
+      currentData[i] = { ...item, deleted: true };
+    } else {
+      currentData.splice(i, 1);
+    }
+    saveMonthData(curYear, curMonth, currentData);
+    closeConfirm();
+    render();
+  };
+  document.getElementById('confirm').classList.add('show');
+}
+
+function closeConfirm() {
+  document.getElementById('confirm').classList.remove('show');
+}
+
+function getColumnHeaderInnerHtml(key) {
+  const label = getColumnLabel(key);
+  if (key === 'drive' && label === DEFAULT_COLUMN_LABELS.drive) {
+    return '<span class="inner split"><span>利用票</span><span class="sub-label">ドライブ</span></span>';
+  }
+  if (key === 'hand' && label === DEFAULT_COLUMN_LABELS.hand) {
+    return '<span class="inner split"><span>次月</span><span>利用票</span></span>';
+  }
+  if (key === 'fax' && label === DEFAULT_COLUMN_LABELS.fax) {
+    return '<span class="inner split"><span>次月</span><span>提供票</span></span>';
+  }
+  return `<span class="inner">${esc(label)}</span>`;
+}
+
+function renderColumnHeaderOrder() {
+  const headerRow = document.querySelector('thead tr');
+  if (!headerRow) return;
+  Array.from(headerRow.querySelectorAll('th[data-custom-col="1"]')).forEach(th => th.remove());
+  Array.from(headerRow.querySelectorAll('th[data-col-key]')).forEach(th => {
+    const key = th.dataset.colKey || '';
+    th.innerHTML = getColumnHeaderInnerHtml(key);
+  });
+  const fixedStart = Array.from(headerRow.querySelectorAll('th')).slice(0, 3);
+  const fixedEnd = headerRow.querySelector('th.h-biko');
+  customColumns.forEach(item => {
+    const th = document.createElement('th');
+    th.className = `h-rot${item.type === 'date' ? ' h-rot-date' : ''} col-movable`;
+    th.dataset.colKey = item.key;
+    th.dataset.customCol = '1';
+    th.innerHTML = getColumnHeaderInnerHtml(item.key);
+    headerRow.insertBefore(th, fixedEnd);
+  });
+  const movableMap = new Map(
+    Array.from(headerRow.querySelectorAll('th[data-col-key]')).map(th => [th.dataset.colKey, th])
+  );
+  columnOrder.forEach(key => {
+    const th = movableMap.get(key);
+    if (th) headerRow.insertBefore(th, fixedEnd);
+  });
+  fixedStart.forEach((th, index) => {
+    const anchor = headerRow.children[index];
+    if (anchor !== th) headerRow.insertBefore(th, anchor || headerRow.firstChild);
+  });
+  Array.from(headerRow.querySelectorAll('th[data-col-key]')).forEach(th => {
+    th.classList.toggle('col-selected', th.dataset.colKey === selectedColumnKey);
+  });
+  bindMovableColumnHeaders();
+}
+
+function moveColumnKeyInOrder(sourceKey, targetKey, insertAfter) {
+  if (!sourceKey || !targetKey || sourceKey === targetKey) return false;
+  const nextOrder = columnOrder.filter(key => key !== sourceKey);
+  const baseIndex = nextOrder.indexOf(targetKey);
+  if (baseIndex < 0) return false;
+  const insertIndex = insertAfter ? baseIndex + 1 : baseIndex;
+  nextOrder.splice(insertIndex, 0, sourceKey);
+  if (nextOrder.join('|') === columnOrder.join('|')) return false;
+  columnOrder = nextOrder;
+  return true;
+}
+
+function reorderColumnDom(sourceKey, targetKey, insertAfter) {
+  if (!moveColumnKeyInOrder(sourceKey, targetKey, insertAfter)) return false;
+  const headerRow = document.querySelector('thead tr');
+  const bodyRows = Array.from(document.querySelectorAll('#tbody tr'));
+  const headerSource = headerRow?.querySelector(`th[data-col-key="${sourceKey}"]`);
+  const headerTarget = headerRow?.querySelector(`th[data-col-key="${targetKey}"]`);
+  if (headerRow && headerSource && headerTarget) {
+    headerRow.insertBefore(headerSource, insertAfter ? headerTarget.nextSibling : headerTarget);
+  }
+  bodyRows.forEach(row => {
+    const sourceCell = row.querySelector(`td[data-col-key="${sourceKey}"]`);
+    const targetCell = row.querySelector(`td[data-col-key="${targetKey}"]`);
+    if (!sourceCell || !targetCell) return;
+    row.insertBefore(sourceCell, insertAfter ? targetCell.nextSibling : targetCell);
+  });
+  renderColumnHeaderOrder();
+  return true;
+}
+
+function bindMovableColumnHeaders() {
+  document.querySelectorAll('th[data-col-key]').forEach(th => {
+    if (th.dataset.bound === '1') return;
+    th.dataset.bound = '1';
+    th.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      const key = th.dataset.colKey || '';
+      selectedColumnKey = selectedColumnKey === key ? '' : key;
+      renderColumnHeaderOrder();
+    });
+  });
+}
+
+function startColumnHold(event, key, th) {
+  clearTimeout(columnDragHoldTimer);
+  columnDragPointerId = event.pointerId;
+  columnDragKey = key;
+  columnDragHeaderEl = th;
+  columnDragTargetKey = '';
+  columnDragTargetAfter = false;
+  columnDragStartX = event.clientX;
+  const rect = th.getBoundingClientRect();
+  columnDragPointerOffsetX = event.clientX - rect.left;
+  const activateDrag = () => {
+    columnDragActive = true;
+    if (columnDragHeaderEl) columnDragHeaderEl.classList.add('col-dragging');
+  };
+  columnDragHoldTimer = setTimeout(activateDrag, 260);
+}
+
+function updateColumnDropMarker(targetKey, insertAfter) {
+  document.querySelectorAll('th[data-col-key]').forEach(th => th.classList.remove('col-drop-target'));
+  const markerKey = insertAfter
+    ? columnOrder[columnOrder.indexOf(targetKey) + 1] || ''
+    : targetKey;
+  if (!markerKey || markerKey === columnDragKey) return;
+  document.querySelector(`th[data-col-key="${markerKey}"]`)?.classList.add('col-drop-target');
+}
+
+function previewMoveSelectedColumn(targetKey, insertAfter) {
+  if (!reorderColumnDom(columnDragKey, targetKey, insertAfter)) return;
+  const activeHeader = document.querySelector(`th[data-col-key="${columnDragKey}"]`);
+  if (activeHeader) {
+    activeHeader.classList.add('col-dragging');
+    activeHeader.style.transform = `translateX(${Math.round((columnDragTargetAfter ? 8 : -8) + 0)}px) scale(1.04)`;
+    columnDragHeaderEl = activeHeader;
+  }
+}
+
+function moveHeldColumn(event) {
+  if (!columnDragActive || columnDragPointerId !== event.pointerId || !columnDragKey) return;
+  event.preventDefault();
+  let dragCenterX = event.clientX;
+  if (columnDragHeaderEl) {
+    const rect = columnDragHeaderEl.getBoundingClientRect();
+    const deltaX = event.clientX - rect.left - columnDragPointerOffsetX;
+    columnDragHeaderEl.style.transform = `translateX(${Math.round(deltaX)}px) scale(1.04)`;
+    dragCenterX = rect.left + columnDragPointerOffsetX + deltaX;
+  }
+
+  const orderedHeaders = columnOrder
+    .map(key => document.querySelector(`th[data-col-key="${key}"]`))
+    .filter(Boolean);
+  const dragIndex = columnOrder.indexOf(columnDragKey);
+  if (dragIndex < 0) {
+    document.querySelectorAll('th[data-col-key]').forEach(th => th.classList.remove('col-drop-target'));
+    return;
+  }
+
+  const prevKey = columnOrder[dragIndex - 1] || '';
+  const nextKey = columnOrder[dragIndex + 1] || '';
+  const prevHeader = prevKey ? document.querySelector(`th[data-col-key="${prevKey}"]`) : null;
+  const nextHeader = nextKey ? document.querySelector(`th[data-col-key="${nextKey}"]`) : null;
+
+  if (prevHeader) {
+    const prevRect = prevHeader.getBoundingClientRect();
+    const prevCenter = prevRect.left + (prevRect.width / 2);
+    if (dragCenterX < prevCenter) {
+      updateColumnDropMarker(prevKey, false);
+      if (columnDragTargetKey !== prevKey || columnDragTargetAfter !== false) {
+        columnDragTargetKey = prevKey;
+        columnDragTargetAfter = false;
+        previewMoveSelectedColumn(prevKey, false);
+      }
+      return;
+    }
+  }
+
+  if (nextHeader) {
+    const nextRect = nextHeader.getBoundingClientRect();
+    const nextCenter = nextRect.left + (nextRect.width / 2);
+    if (dragCenterX > nextCenter) {
+      updateColumnDropMarker(nextKey, true);
+      if (columnDragTargetKey !== nextKey || columnDragTargetAfter !== true) {
+        columnDragTargetKey = nextKey;
+        columnDragTargetAfter = true;
+        previewMoveSelectedColumn(nextKey, true);
+      }
+      return;
+    }
+  }
+
+  if (!orderedHeaders.length) {
+    document.querySelectorAll('th[data-col-key]').forEach(th => th.classList.remove('col-drop-target'));
+    return;
+  }
+
+  document.querySelectorAll('th[data-col-key]').forEach(th => th.classList.remove('col-drop-target'));
+  columnDragTargetKey = '';
+  columnDragTargetAfter = false;
+}
+
+function endColumnHold(event) {
+  clearTimeout(columnDragHoldTimer);
+  if (event && columnDragPointerId !== null && columnDragPointerId !== event.pointerId) return;
+  if (columnDragActive) {
+    saveColumnOrder();
+    render();
+  }
+  document.querySelectorAll('th[data-col-key]').forEach(th => {
+    th.classList.remove('col-dragging', 'col-drop-target');
+    th.style.transform = '';
+  });
+  columnDragPointerId = null;
+  columnDragHoldTimer = null;
+  columnDragActive = false;
+  columnDragKey = '';
+  columnDragHeaderEl = null;
+  columnDragTargetKey = '';
+  columnDragTargetAfter = false;
+  columnDragStartX = 0;
+  columnDragPointerOffsetX = 0;
+}
+
+function render() {
+  renderColumnHeaderOrder();
+  orderMode = loadOrderMode();
+  currentData = sortClientsByName(getMonthData(curYear, curMonth));
+  const visibleData = currentData.filter(item => !item.deleted);
+  document.getElementById('month-label').textContent = reiwaLabel(curYear, curMonth);
+  const warekiBtn = document.getElementById('date-toggle-wareki');
+  const seirekiBtn = document.getElementById('date-toggle-seireki');
+  if (warekiBtn) warekiBtn.classList.toggle('is-active', allDateReiwa);
+  if (seirekiBtn) seirekiBtn.classList.toggle('is-active', !allDateReiwa);
+  const orderNameBtn = document.getElementById('order-toggle-name');
+  const orderCustomBtn = document.getElementById('order-toggle-custom');
+  if (orderNameBtn) orderNameBtn.classList.toggle('is-active', orderMode !== 'custom');
+  if (orderCustomBtn) orderCustomBtn.classList.toggle('is-active', orderMode === 'custom');
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+
+  visibleData.forEach((item, displayIndex) => {
+    const originalIndex = currentData.indexOf(item);
+
+    const tr = document.createElement('tr');
+    tr.dataset.sourceIndex = String(originalIndex);
+    tr.dataset.rowId = item.rowId || '';
+    if (CHK.every(key => isCheckComplete(item, key))) tr.classList.add('done-row');
+    if (selectedRowId && selectedRowId === (item.rowId || '')) tr.classList.add('row-selected');
+    bindRowTapSelection(tr);
+
+    const tdNo = document.createElement('td');
+    tdNo.className = 'td-no';
+    tdNo.textContent = item.noNumber ? '' : displayIndex + 1;
+    bindRowSelection(tdNo, originalIndex);
+    tr.appendChild(tdNo);
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'td-name';
+    nameTd.innerHTML = `<div class="name-cell">${item.kana ? `<div class="name-kana">${esc(item.kana)}</div>` : ''}<div class="name-main">${esc(item.name)}</div></div>`;
+    nameTd.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      openNameEditor(originalIndex);
+    });
+    tr.appendChild(nameTd);
+
+    const kosinTd = document.createElement('td');
+    kosinTd.className = 'td-kosin';
+    kosinTd.textContent = item.kosin || '';
+    kosinTd.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      openKosin(originalIndex);
+    });
+    tr.appendChild(kosinTd);
+
+    const yukoStatus = getYukoStatus(item.yuko);
+    const columnCells = {};
+
+    const yukoTd = document.createElement('td');
+    yukoTd.dataset.colKey = 'yuko';
+    const yukoStatusClass = yukoStatus === 'done' ? ' expiring-done' : (yukoStatus === 'soon' ? ' expiring' : '');
+    yukoTd.className = `td-date${yukoStatusClass}`;
+    yukoTd.textContent = yukoStatus === 'blank' ? '' : shortDate(item.yuko);
+    bindDateCell(yukoTd, () => openPeriodDatePicker(originalIndex, 'yuko', getPeriodFieldLabel('yuko')));
+    columnCells.yuko = yukoTd;
+
+    const lvTd = document.createElement('td');
+    lvTd.dataset.colKey = 'level';
+    lvTd.className = 'td-lv is-clickable';
+    lvTd.textContent = item.level;
+    lvTd.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      openLevelPicker(originalIndex);
+    });
+    columnCells.level = lvTd;
+
+    const planLTd = document.createElement('td');
+    planLTd.dataset.colKey = 'planL';
+    planLTd.className = `td-date${yukoStatus === 'done' ? ' expiring-done' : (isCurrentLongPlan(item.planL) ? ' plan-long-current' : '')}`;
+    planLTd.textContent = yukoStatus === 'blank' ? '' : shortDate(item.planL);
+    bindDateCell(planLTd, () => openPeriodDatePicker(originalIndex, 'planL', getPeriodFieldLabel('planL')));
+    columnCells.planL = planLTd;
+
+    const planSTd = document.createElement('td');
+    planSTd.dataset.colKey = 'planS';
+    planSTd.className = `td-date${yukoStatus === 'done' ? ' expiring-done' : (isCurrentShortPlan(item.planS) ? ' plan-current' : '')}`;
+    planSTd.textContent = yukoStatus === 'blank' ? '' : shortDate(item.planS);
+    bindDateCell(planSTd, () => openPeriodDatePicker(originalIndex, 'planS', getPeriodFieldLabel('planS')));
+    columnCells.planS = planSTd;
+
+    const visitTd = document.createElement('td');
+    visitTd.dataset.colKey = 'visit';
+    visitTd.className = `td-visit${hasVisitValue(item) ? '' : ' is-empty'}`;
+    const tags = [item.visitTag1, item.visitTag2].filter(Boolean);
+    const visitCellClass = tags.length === 0 && item.visitDate ? 'visit-cell date-only' : 'visit-cell';
+    visitTd.innerHTML = `
+      <div class="${visitCellClass}">
+        <div class="visit-date-text" data-visit-edit="date">${esc(item.visitDate || '')}</div>
+        <div class="visit-tags" data-visit-edit="tags">${tags.map(tag => `<span class="visit-tag" data-visit-edit="tags">${esc(tag)}</span>`).join('')}</div>
+      </div>`;
+    visitTd.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      openVisit(originalIndex);
+    });
+    visitTd.addEventListener('keydown', event => {
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        event.preventDefault();
+        clearVisit(originalIndex);
+      }
+    });
+    columnCells.visit = visitTd;
+
+    CHK.forEach(key => {
+      const td = document.createElement('td');
+      td.dataset.colKey = key;
+      td.className = 'td-cc';
+      const done = isCheckComplete(item, key);
+      td.innerHTML = `<span class="circle ${done ? 'on' : 'off'}">${done ? '✓' : '○'}</span>`;
+      td.addEventListener('dblclick', event => {
+        event.stopPropagation();
+        if (key === 'fax') openFaxOfficeChecklist(originalIndex);
+        else tog(originalIndex, key);
+      });
+      columnCells[key] = td;
+    });
+
+    const meetingTd = document.createElement('td');
+    meetingTd.dataset.colKey = 'meeting';
+    meetingTd.className = `td-visit${hasMeetingValue(item) ? '' : ' is-empty'}`;
+    const meetingTags = [item.meetingTag1, item.meetingTag2].filter(Boolean);
+    const meetingCellClass = meetingTags.length === 0 && item.meetingDate ? 'visit-cell date-only' : 'visit-cell';
+    meetingTd.innerHTML = `
+      <div class="${meetingCellClass}">
+        <div class="visit-date-text">${esc(item.meetingDate || '')}</div>
+        <div class="visit-tags">${meetingTags.map(tag => `<span class="visit-tag">${esc(tag)}</span>`).join('')}</div>
+      </div>`;
+    meetingTd.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      openMeeting(originalIndex);
+    });
+    meetingTd.addEventListener('keydown', event => {
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        event.preventDefault();
+        clearMeeting(originalIndex);
+      }
+    });
+    columnCells.meeting = meetingTd;
+
+    const sehoTd = document.createElement('td');
+    sehoTd.dataset.colKey = 'seho';
+    sehoTd.className = 'td-seho';
+    sehoTd.innerHTML = item.seho || item.sehoCw ? `<div class="seho-cell">${item.seho ? `<span class="seho-dot" title="${esc(item.seho)}"></span>` : '<span style="height:10px"></span>'}${item.sehoCw ? `<span class="seho-label">(${esc(item.sehoCw)})</span>` : ''}</div>` : '';
+    sehoTd.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      openSehoEditor(originalIndex);
+    });
+    columnCells.seho = sehoTd;
+
+    customColumns.forEach(column => {
+      if (column.type === 'check') {
+        const td = document.createElement('td');
+        const value = Number(getFieldValue(item, column.key)) === 1 ? 1 : 0;
+        td.dataset.colKey = column.key;
+        td.className = 'td-cc td-custom-col';
+        td.innerHTML = `<span class="circle ${value === 1 ? 'on' : 'off'}">${value === 1 ? '✓' : '○'}</span>`;
+        td.addEventListener('dblclick', event => {
+          event.stopPropagation();
+          tog(originalIndex, column.key);
+        });
+        columnCells[column.key] = td;
+        return;
+      }
+      const td = document.createElement('td');
+      td.dataset.colKey = column.key;
+      td.className = 'td-date td-custom-col';
+      td.textContent = shortDate(getFieldValue(item, column.key) || '');
+      bindDateCell(td, () => openPeriodDatePicker(originalIndex, column.key, column.label));
+      columnCells[column.key] = td;
+    });
+
+    columnOrder.forEach(key => {
+      const td = columnCells[key];
+      if (td) tr.appendChild(td);
+    });
+
+    const bikoTd = document.createElement('td');
+    bikoTd.className = 'td-biko';
+    bikoTd.textContent = item.biko || '';
+    bikoTd.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      openBiko(originalIndex);
+    });
+    tr.appendChild(bikoTd);
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('s-total').textContent = visibleData.length;
+}
+
+document.getElementById('import-data-input')?.addEventListener('change', event => {
+  importLocalDataFromFile(event.target.files?.[0]);
+});
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+removeUnusedTaskHeaders();
+customColumns = loadCustomColumns();
+columnLabels = loadColumnLabels();
+columnOrder = loadColumnOrder();
+bindMovableColumnHeaders();
+render();
+</script>
+</body>
+</html>
+
+
+
+

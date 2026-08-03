@@ -133,6 +133,44 @@
   transform: rotate(45deg);
 }
 
+.app-icon.pdf {
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #0f766e 0%, #62d6c4 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(15, 118, 110, 0.2);
+}
+
+.app-icon.pdf .icon-mark {
+  width: 34px;
+  height: 40px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(11, 94, 88, 0.16);
+}
+
+.app-icon.pdf .icon-mark::before {
+  right: 0;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 0 7px 0 5px;
+  background: #d7fbf5;
+}
+
+.app-icon.pdf .icon-mark::after {
+  left: 6px;
+  bottom: 8px;
+  width: 22px;
+  height: 5px;
+  border-radius: 999px;
+  background: #0f766e;
+  box-shadow:
+    0 -9px 0 rgba(15, 118, 110, 0.62),
+    0 -18px 0 rgba(15, 118, 110, 0.34);
+}
+
 .app-icon.people {
   background:
     radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),

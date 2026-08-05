@@ -1,10 +1,10 @@
-const CACHE_NAME = 'riyosha-check-pwa-v2';
+const CACHE_NAME = 'riyosha-check-pwa-v3';
 const APP_SHELL = [
   './',
   './利用者チェック表.html',
   './利用者チェック表_スタッフ用.html',
   './manifest.webmanifest',
-  './app-icon.svg'
+  './app-icon-v2.png'
 ];
 
 self.addEventListener('install', event => {

@@ -1,6 +1,6 @@
 {
   "name": "利用者チェック表",
-  "short_name": "利用者表",
+  "short_name": "利用者チェック表",
   "start_url": "./利用者チェック表.html",
   "scope": "./",
   "display": "standalone",

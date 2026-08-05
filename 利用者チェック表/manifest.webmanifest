@@ -1,8 +1,8 @@
 {
   "name": "利用者チェック表",
   "short_name": "利用者チェック表",
-  "start_url": "./利用者チェック表.html",
-  "scope": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f2f8f0",
   "theme_color": "#4a9e2f",

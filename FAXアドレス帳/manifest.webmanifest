@@ -1,0 +1,17 @@
+{
+  "name": "FAXアドレス帳",
+  "short_name": "FAXアドレス帳",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f8fd",
+  "theme_color": "#1e3a5f",
+  "icons": [
+    {
+      "src": "./app-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

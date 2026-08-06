@@ -1,0 +1,17 @@
+{
+  "name": "かんたん見取り図",
+  "short_name": "かんたん見取り図",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eefaf8",
+  "theme_color": "#247a8a",
+  "icons": [
+    {
+      "src": "./app-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 {
   "name": "かんたんジェノグラム",
-  "short_name": "ジェノグラム",
+  "short_name": "かんたんジェノグラム",
   "display": "standalone",
-  "start_url": "./かんたんジェノグラム.html",
+  "start_url": "/",
+  "scope": "/",
   "background_color": "#f0f7ff",
   "theme_color": "#5BA4CF",
   "icons": [

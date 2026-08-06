@@ -2072,10 +2072,46 @@ function getMonthData(y, m) {
   return all[key];
 }
 
-function saveMonthData(y, m, data) {
+function saveMonthData(y, m, data, options = {}) {
   const all = loadAll();
   all[monthKey(y, m)] = sortClientsByName(dedupeClients(data));
+  if (options.syncFutureClients) {
+    syncFutureClientStructure(all, monthKey(y, m), all[monthKey(y, m)]);
+  }
   saveAll(all);
+}
+
+function matchingClientInList(list, source) {
+  const sourceKeys = new Set(clientMatchKeys(source));
+  return list.find(item => clientMatchKeys(item).some(key => sourceKeys.has(key))) || null;
+}
+
+// Keep people and their custom order in later months, while preserving each month's work checks.
+function syncFutureClientStructure(all, sourceKey, sourceList) {
+  Object.keys(all)
+    .filter(key => key > sourceKey && Array.isArray(all[key]))
+    .sort()
+    .forEach(key => {
+      const futureList = dedupeClients(all[key]);
+      const used = new Set();
+      const synced = sourceList.map(source => {
+        const existing = matchingClientInList(futureList, source);
+        if (existing) {
+          used.add(existing);
+          return {
+            ...existing,
+            manualOrder: source.manualOrder
+          };
+        }
+        const added = resetMonthlyWorkFields(newClientData(source));
+        added.manualOrder = source.manualOrder;
+        return added;
+      });
+      futureList.forEach(item => {
+        if (!used.has(item)) synced.push(item);
+      });
+      all[key] = sortClientsByName(dedupeClients(synced));
+    });
 }
 
 function loadFacilities() {
@@ -2932,7 +2968,7 @@ function addClient() {
     sehoCw: addClientDraft?.sehoCw || ''
   }));
   addClientDraft = null;
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureClients: true });
   if (returnToRowEditorAfterAdd) {
     returnToRowEditorAfterAdd = false;
     render();
@@ -3578,7 +3614,7 @@ function tapRowReorder(rowId) {
   if (insertIndex < 0) return;
   nextRows.splice(insertIndex, 0, moving);
   updateManualOrderFromVisibleRows(nextRows);
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureClients: true });
   selectedRowReorderId = '';
   renderRowReorderModal(true);
   render();

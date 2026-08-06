@@ -15,7 +15,7 @@ export const appData: PortalApp[] = [
   {
     id: 'user-checklist',
     name: '利用者チェック表',
-    url: '',
+    url: 'https://riyosha-check-app.vercel.app',
     manualUrl: '',
     icon: 'check',
     description: '利用者状況を確認・記録',
@@ -25,7 +25,7 @@ export const appData: PortalApp[] = [
   {
     id: 'fax-address-book',
     name: 'FAXアドレス帳',
-    url: '',
+    url: 'https://fax-address-book-git-main-system-app-webs-projects.vercel.app',
     manualUrl: '',
     icon: 'fax',
     description: 'FAX送信先管理',

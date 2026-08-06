@@ -25,7 +25,7 @@ export const appData: PortalApp[] = [
   {
     id: 'fax-address-book',
     name: 'FAXアドレス帳',
-    url: 'https://fax-address-book-git-main-system-app-webs-projects.vercel.app',
+    url: 'https://fax-address-book.vercel.app',
     manualUrl: '',
     icon: 'fax',
     description: 'FAX送信先管理',

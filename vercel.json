@@ -1,8 +1,8 @@
 {
   "framework": "vite",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "installCommand": "cd PDF変換アプリ && npm install",
+  "buildCommand": "cd PDF変換アプリ && npm run build",
+  "outputDirectory": "PDF変換アプリ/dist",
   "rewrites": [
     {
       "source": "/(.*)",

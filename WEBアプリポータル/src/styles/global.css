@@ -62,10 +62,6 @@ a {
   display: block;
   width: 240px;
   height: 152px;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(31, 85, 137, 0.12);
   object-fit: cover;
   object-position: center;
 }
@@ -509,7 +505,6 @@ a {
   .brand-logo {
     width: 124px;
     height: 80px;
-    border-radius: 13px;
   }
 
   .hamburger {

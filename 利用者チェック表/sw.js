@@ -1,4 +1,4 @@
-const CACHE_NAME = 'riyosha-check-pwa-v3';
+const CACHE_NAME = 'riyosha-check-pwa-v4';
 const APP_SHELL = [
   './',
   './利用者チェック表.html',

@@ -45,7 +45,7 @@ export const appData: PortalApp[] = [
   {
     id: 'pdf-converter',
     name: 'PDF変換アプリ',
-    url: '/apps/pdf-converter/',
+    url: 'https://riyosha-pdf-converter.vercel.app/',
     manualUrl: '',
     icon: 'pdf',
     description: '証書PDFの変換・結合',

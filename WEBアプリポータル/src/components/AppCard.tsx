@@ -11,9 +11,13 @@ export function AppCard({ app }: AppCardProps) {
   return (
     <article className="app-card">
       <div className="app-card-top">
-        <div className={`app-icon ${app.icon}`} aria-hidden="true">
-          <span className="icon-mark" />
-        </div>
+        {app.iconImage ? (
+          <img className="app-icon-image" src={app.iconImage} alt={`${app.name}のアイコン`} loading="lazy" />
+        ) : (
+          <div className={`app-icon ${app.icon}`} aria-hidden="true">
+            <span className="icon-mark" />
+          </div>
+        )}
         <div>
           <h3>{app.name}</h3>
           <p className="version-line">

@@ -6,6 +6,7 @@ export type PortalApp = {
   url?: string;
   manualUrl?: string;
   icon: string;
+  iconImage?: string;
   description: string;
   version: string;
   status: AppStatus;
@@ -18,6 +19,7 @@ export const appData: PortalApp[] = [
     url: 'https://riyosha-check-app.vercel.app',
     manualUrl: '',
     icon: 'check',
+    iconImage: '/app-icons/user-checklist.png',
     description: '利用者状況を確認・記録',
     version: 'v1.2.0',
     status: 'stable',
@@ -28,6 +30,7 @@ export const appData: PortalApp[] = [
     url: 'https://fax-address-book.vercel.app',
     manualUrl: '',
     icon: 'fax',
+    iconImage: '/app-icons/fax-address-book.png',
     description: 'FAX送信先管理',
     version: 'v1.1.3',
     status: 'stable',
@@ -38,6 +41,7 @@ export const appData: PortalApp[] = [
     url: 'https://template-memo-system-app-webs-projects.vercel.app',
     manualUrl: '',
     icon: 'memo',
+    iconImage: '/app-icons/template-notes.png',
     description: '文例管理',
     version: 'v0.8.0',
     status: 'preview',
@@ -48,6 +52,7 @@ export const appData: PortalApp[] = [
     url: 'https://riyosha-pdf-converter.vercel.app/',
     manualUrl: '',
     icon: 'pdf',
+    iconImage: '/app-icons/pdf-converter.png',
     description: '証書PDFの変換・結合',
     version: 'v1.0.0',
     status: 'stable',
@@ -68,6 +73,7 @@ export const appData: PortalApp[] = [
     url: '',
     manualUrl: '',
     icon: 'shortcut',
+    iconImage: '/app-icons/shortcut-memo.svg',
     description: 'よく使うキーボード操作を管理',
     version: 'v1.0.0',
     status: 'stable',
@@ -78,6 +84,7 @@ export const appData: PortalApp[] = [
     url: '',
     manualUrl: '',
     icon: 'floorplan',
+    iconImage: '/app-icons/floor-plan.png',
     description: '施設・住居の見取り図を作成',
     version: 'v1.0.0',
     status: 'stable',
@@ -88,6 +95,7 @@ export const appData: PortalApp[] = [
     url: '',
     manualUrl: '',
     icon: 'genogram',
+    iconImage: '/app-icons/genogram.png',
     description: '家族関係を図で整理',
     version: 'v1.0.0',
     status: 'stable',
@@ -98,6 +106,7 @@ export const appData: PortalApp[] = [
     url: '',
     manualUrl: '',
     icon: 'assessment',
+    iconImage: '/app-icons/assessment.svg',
     description: '利用者支援のアセスメントを整理',
     version: 'v0.1.0',
     status: 'preview',

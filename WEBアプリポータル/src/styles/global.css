@@ -305,6 +305,15 @@ a {
   box-shadow: 0 12px 24px rgba(17, 118, 216, 0.2);
 }
 
+.app-icon-image {
+  display: block;
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  object-fit: cover;
+}
+
 .app-icon.fax {
   background: linear-gradient(135deg, #0f8aa5, #51c7dc);
 }

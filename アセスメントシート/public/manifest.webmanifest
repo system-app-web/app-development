@@ -1,0 +1,9 @@
+{
+  "name": "アセスメントシート",
+  "short_name": "アセスメント",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#edf4f2",
+  "theme_color": "#3f8d79",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

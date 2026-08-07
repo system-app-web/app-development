@@ -90,7 +90,7 @@
       { id: crypto.randomUUID(), name: "開く", keys: "⌘ + O", favorite: false },
       { id: crypto.randomUUID(), name: "印刷", keys: "⌘ + P", favorite: false },
       { id: crypto.randomUUID(), name: "閉じる", keys: "⌘ + W", favorite: false },
-      { id: crypto.randomUUID(), name: "アプリを終了", keys: "⌘ + Q", favorite: false },
+      { id: crypto.randomUUID(), name: "サイト終了", keys: "⌘ + Q", favorite: false },
       { id: crypto.randomUUID(), name: "アプリ切り替え", keys: "⌘ + Tab", favorite: false },
       { id: crypto.randomUUID(), name: "ウィンドウを隠す", keys: "⌘ + H", favorite: false },
       { id: crypto.randomUUID(), name: "強制終了", keys: "⌘ + Option + Esc", favorite: false },
@@ -148,9 +148,18 @@
         }
       }
       const saved = JSON.parse(localStorage.getItem(platformKeys[platform]) || "null");
-      const merged = mergeDefaults(saved || [], defaultsByPlatform[platform]);
+      const normalized = platform === "mac" ? renameQuitShortcut(saved || []) : saved || [];
+      const merged = mergeDefaults(normalized, defaultsByPlatform[platform]);
       localStorage.setItem(platformKeys[platform], JSON.stringify(merged));
       return merged;
+    }
+
+    function renameQuitShortcut(shortcutList) {
+      return shortcutList.map(item =>
+        item.name === "アプリを終了" && item.keys === "⌘ + Q"
+          ? { ...item, name: "サイト終了" }
+          : item
+      );
     }
 
     function mergeDefaults(saved, defaults) {

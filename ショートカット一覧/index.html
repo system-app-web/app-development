@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ショートカットメモ</title>
+  <style>
+    :root { --bg: #f7f7f4; --paper: #fffef8; --ink: #202124; --muted: #686b70; --line: #ddd8c8; --accent: #2f6f73; --accent-soft: #d9eeee; --custom: #f4b860; --danger: #a83d3d; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; line-height: 1.5; }
+    main { width: min(940px, calc(100% - 24px)); margin: 24px auto; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+    .title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+    .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: #fff; }
+    .tab { min-height: 34px; border: 0; border-radius: 0; background: #fff; color: var(--ink); padding: 6px 14px; cursor: pointer; font: inherit; }
+    .tab + .tab { border-left: 1px solid var(--line); }
+    .tab.active { background: var(--accent); color: #fff; }
+    .count { color: var(--muted); font-size: 13px; white-space: nowrap; }
+    .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06); overflow: hidden; }
+    form { display: grid; grid-template-columns: 1.1fr 1fr auto; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); }
+    input, button { min-height: 40px; border-radius: 6px; font: inherit; }
+    input { width: 100%; border: 1px solid var(--line); background: #fff; padding: 8px 10px; color: var(--ink); }
+    input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+    button { border: 1px solid var(--accent); background: var(--accent); color: #fff; padding: 8px 13px; cursor: pointer; }
+    button.secondary { border-color: var(--line); background: #fff; color: var(--ink); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 12px; text-align: left; vertical-align: middle; }
+    th { color: var(--muted); font-size: 12px; font-weight: 700; background: #faf7ea; }
+    tr.favorite { background: var(--accent-soft); }
+    tr.custom-row td { border-bottom-color: #e8d1aa; }
+    .badge { display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 999px; background: var(--custom); color: #332100; font-size: 11px; font-weight: 700; vertical-align: middle; }
+    .shortcut { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; white-space: nowrap; }
+    .actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .icon { width: 38px; min-height: 34px; padding: 0; border-color: var(--line); background: #fff; color: var(--ink); }
+    .delete { color: var(--danger); }
+    .fav { accent-color: var(--accent); width: 18px; height: 18px; }
+    .hint { margin: 10px 2px 0; color: var(--muted); font-size: 13px; }
+    @media (max-width: 720px) { header { align-items: flex-start; flex-direction: column; } form { grid-template-columns: 1fr; } th:nth-child(4), td:nth-child(4) { display: none; } h1 { font-size: 23px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="title-row">
+        <h1>ショートカットメモ</h1>
+        <div class="tabs" aria-label="OS切り替え">
+          <button class="tab active" type="button" data-platform="windows">Windows</button>
+          <button class="tab" type="button" data-platform="mac">Mac</button>
+        </div>
+      </div>
+      <div class="count" id="count"></div>
+    </header>
+    <section class="panel">
+      <form id="form">
+        <input id="name" placeholder="内容 例: 左に分割" autocomplete="off" required>
+        <input id="keys" placeholder="ショートカット欄を選んでキーを押す" autocomplete="off" required>
+        <button type="submit" id="submit">追加</button>
+      </form>
+      <table>
+        <thead><tr><th>お気に入り</th><th>内容</th><th>キー</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+    <p class="hint">ショートカット欄をクリックしてから実際にキーを押すと入力されます。MacとWindowsは別々に保存されます。</p>
+  </main>
+  <script>
+    const legacyStorageKey = "shortcut-memo-v1";
+    const platformKeys = {
+      mac: "shortcut-memo-v2-mac",
+      windows: "shortcut-memo-v2-windows"
+    };
+    const platformLabels = {
+      mac: "Mac",
+      windows: "Windows"
+    };
+    const macDefaults = [
+      { id: crypto.randomUUID(), name: "コピー", keys: "⌘ + C", favorite: false },
+      { id: crypto.randomUUID(), name: "貼り付け", keys: "⌘ + V", favorite: false },
+      { id: crypto.randomUUID(), name: "切り取り", keys: "⌘ + X", favorite: false },
+      { id: crypto.randomUUID(), name: "取り消し", keys: "⌘ + Z", favorite: false },
+      { id: crypto.randomUUID(), name: "やり直し", keys: "⌘ + Shift + Z", favorite: false },
+      { id: crypto.randomUUID(), name: "すべて選択", keys: "⌘ + A", favorite: false },
+      { id: crypto.randomUUID(), name: "保存", keys: "⌘ + S", favorite: false },
+      { id: crypto.randomUUID(), name: "検索", keys: "⌘ + F", favorite: false },
+      { id: crypto.randomUUID(), name: "新規作成", keys: "⌘ + N", favorite: false },
+      { id: crypto.randomUUID(), name: "開く", keys: "⌘ + O", favorite: false },
+      { id: crypto.randomUUID(), name: "印刷", keys: "⌘ + P", favorite: false },
+      { id: crypto.randomUUID(), name: "閉じる", keys: "⌘ + W", favorite: false },
+      { id: crypto.randomUUID(), name: "アプリを終了", keys: "⌘ + Q", favorite: false },
+      { id: crypto.randomUUID(), name: "アプリ切り替え", keys: "⌘ + Tab", favorite: false },
+      { id: crypto.randomUUID(), name: "ウィンドウを隠す", keys: "⌘ + H", favorite: false },
+      { id: crypto.randomUUID(), name: "強制終了", keys: "⌘ + Option + Esc", favorite: false },
+      { id: crypto.randomUUID(), name: "Spotlight検索", keys: "⌘ + Space", favorite: false },
+      { id: crypto.randomUUID(), name: "画面をロック", keys: "Ctrl + ⌘ + Q", favorite: false },
+      { id: crypto.randomUUID(), name: "ファイル名を変更", keys: "Return", favorite: false },
+      { id: crypto.randomUUID(), name: "ゴミ箱へ移動", keys: "⌘ + Delete", favorite: false }
+    ];
+    const windowsDefaults = [
+      { id: crypto.randomUUID(), name: "コピー", keys: "Ctrl + C", favorite: false },
+      { id: crypto.randomUUID(), name: "貼り付け", keys: "Ctrl + V", favorite: false },
+      { id: crypto.randomUUID(), name: "切り取り", keys: "Ctrl + X", favorite: false },
+      { id: crypto.randomUUID(), name: "取り消し", keys: "Ctrl + Z", favorite: false },
+      { id: crypto.randomUUID(), name: "やり直し", keys: "Ctrl + Y", favorite: false },
+      { id: crypto.randomUUID(), name: "すべて選択", keys: "Ctrl + A", favorite: false },
+      { id: crypto.randomUUID(), name: "保存", keys: "Ctrl + S", favorite: false },
+      { id: crypto.randomUUID(), name: "検索", keys: "Ctrl + F", favorite: false },
+      { id: crypto.randomUUID(), name: "新規作成", keys: "Ctrl + N", favorite: false },
+      { id: crypto.randomUUID(), name: "開く", keys: "Ctrl + O", favorite: false },
+      { id: crypto.randomUUID(), name: "印刷", keys: "Ctrl + P", favorite: false },
+      { id: crypto.randomUUID(), name: "閉じる", keys: "Ctrl + W", favorite: false },
+      { id: crypto.randomUUID(), name: "アプリ切り替え", keys: "Alt + Tab", favorite: false },
+      { id: crypto.randomUUID(), name: "画面をロック", keys: "Windows + L", favorite: false },
+      { id: crypto.randomUUID(), name: "エクスプローラーを開く", keys: "Windows + E", favorite: false },
+      { id: crypto.randomUUID(), name: "設定を開く", keys: "Windows + I", favorite: false },
+      { id: crypto.randomUUID(), name: "スクリーンショット", keys: "Windows + Shift + S", favorite: false },
+      { id: crypto.randomUUID(), name: "ファイル名を変更", keys: "F2", favorite: false },
+      { id: crypto.randomUUID(), name: "削除", keys: "Delete", favorite: false },
+      { id: crypto.randomUUID(), name: "完全に削除", keys: "Shift + Delete", favorite: false }
+    ];
+    const defaultsByPlatform = {
+      mac: macDefaults,
+      windows: windowsDefaults
+    };
+
+    let activePlatform = "windows";
+    let shortcuts = load(activePlatform);
+    let editingId = null;
+    const form = document.querySelector("#form");
+    const nameInput = document.querySelector("#name");
+    const keysInput = document.querySelector("#keys");
+    const submitButton = document.querySelector("#submit");
+    const rows = document.querySelector("#rows");
+    const count = document.querySelector("#count");
+    const tabs = document.querySelectorAll(".tab");
+
+    function load(platform) {
+      if (platform === "mac" && localStorage.getItem(legacyStorageKey) && !localStorage.getItem(platformKeys.mac)) {
+        const legacy = JSON.parse(localStorage.getItem(legacyStorageKey) || "null");
+        if (legacy) {
+          legacy.forEach(item => {
+            if (["左に分割", "右に分割", "スクリーンショット"].includes(item.name)) item.custom = true;
+          });
+          localStorage.setItem(platformKeys.mac, JSON.stringify(mergeDefaults(legacy, macDefaults)));
+        }
+      }
+      const saved = JSON.parse(localStorage.getItem(platformKeys[platform]) || "null");
+      const merged = mergeDefaults(saved || [], defaultsByPlatform[platform]);
+      localStorage.setItem(platformKeys[platform], JSON.stringify(merged));
+      return merged;
+    }
+
+    function mergeDefaults(saved, defaults) {
+      const merged = [...saved];
+      defaults.forEach(defaultItem => {
+        const exists = merged.some(item => item.name === defaultItem.name && item.keys === defaultItem.keys);
+        if (!exists) merged.push(defaultItem);
+      });
+      return merged;
+    }
+
+    function save() {
+      localStorage.setItem(platformKeys[activePlatform], JSON.stringify(shortcuts));
+    }
+
+    function formatKey(event) {
+      event.preventDefault();
+      const parts = [];
+      if (event.metaKey) parts.push(activePlatform === "windows" ? "Windows" : "⌘");
+      if (event.ctrlKey) parts.push("Ctrl");
+      if (event.altKey) parts.push(activePlatform === "mac" ? "Option" : "Alt");
+      if (event.shiftKey) parts.push("Shift");
+      const ignore = ["Meta", "Control", "Alt", "Shift"];
+      if (!ignore.includes(event.key)) {
+        const names = {
+          ArrowLeft: "←",
+          ArrowRight: "→",
+          ArrowUp: "↑",
+          ArrowDown: "↓",
+          Escape: "Esc",
+          " ": "Space"
+        };
+        parts.push(names[event.key] || event.key.toUpperCase());
+      }
+      keysInput.value = parts.join(" + ");
+    }
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function render() {
+      tabs.forEach(tab => tab.classList.toggle("active", tab.dataset.platform === activePlatform));
+      const sorted = [...shortcuts].sort((a, b) => Number(b.favorite) - Number(a.favorite));
+      rows.innerHTML = sorted.map(item => `
+        <tr class="${item.favorite ? "favorite" : ""} ${item.custom ? "custom-row" : ""}">
+          <td><input class="fav" type="checkbox" ${item.favorite ? "checked" : ""} data-action="favorite" data-id="${item.id}" aria-label="お気に入り"></td>
+          <td>${escapeHtml(item.name)}${item.custom ? '<span class="badge">カスタム</span>' : ""}</td>
+          <td class="shortcut">${escapeHtml(item.keys)}</td>
+          <td>
+            <div class="actions">
+              <button class="icon secondary" type="button" data-action="edit" data-id="${item.id}" title="編集">✎</button>
+              <button class="icon secondary delete" type="button" data-action="delete" data-id="${item.id}" title="削除">×</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+      const favCount = shortcuts.filter(item => item.favorite).length;
+      count.textContent = `${platformLabels[activePlatform]} ${shortcuts.length}件 / お気に入り ${favCount}件`;
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        activePlatform = tab.dataset.platform;
+        shortcuts = load(activePlatform);
+        editingId = null;
+        submitButton.textContent = "追加";
+        form.reset();
+        render();
+      });
+    });
+
+    keysInput.addEventListener("keydown", formatKey);
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const name = nameInput.value.trim();
+      const keys = keysInput.value.trim();
+      if (!name || !keys) return;
+      if (editingId) {
+        shortcuts = shortcuts.map(item => item.id === editingId ? { ...item, name, keys } : item);
+      } else {
+        shortcuts.push({ id: crypto.randomUUID(), name, keys, favorite: false, custom: true });
+      }
+      editingId = null;
+      submitButton.textContent = "追加";
+      form.reset();
+      save();
+      render();
+    });
+    rows.addEventListener("click", event => {
+      const target = event.target;
+      const id = target.dataset.id;
+      const action = target.dataset.action;
+      if (!id || !action) return;
+      const item = shortcuts.find(shortcut => shortcut.id === id);
+      if (!item) return;
+      if (action === "favorite") item.favorite = target.checked;
+      if (action === "edit") {
+        editingId = id;
+        nameInput.value = item.name;
+        keysInput.value = item.keys;
+        submitButton.textContent = "更新";
+        nameInput.focus();
+      }
+      if (action === "delete") {
+        shortcuts = shortcuts.filter(shortcut => shortcut.id !== id);
+        if (editingId === id) {
+          editingId = null;
+          submitButton.textContent = "追加";
+          form.reset();
+        }
+      }
+      save();
+      render();
+    });
+    render();
+
+  </script>
+</body>
+</html>

@@ -6,7 +6,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: 'index.html',
-        app: 'PDF変換アプリ.html'
+        app: 'app.html'
       }
     }
   }

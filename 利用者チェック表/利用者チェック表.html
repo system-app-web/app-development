@@ -2018,7 +2018,8 @@ function syncBasicFieldsFromPreviousMonth(currentList, previousList) {
       baseName: prev.baseName !== undefined ? prev.baseName : (prev.name || ''),
       customAdded: Boolean(prev.customAdded),
       noNumber: Boolean(prev.noNumber),
-      deleted: Boolean(prev.deleted),
+      // A deletion made in this month must not be restored from the previous month.
+      deleted: Boolean(prev.deleted || current?.deleted),
       kana: prev.kana || '',
       kosin: prev.kosin || '',
       yuko: prev.yuko || '',

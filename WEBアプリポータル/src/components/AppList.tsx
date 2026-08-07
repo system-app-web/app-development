@@ -8,9 +8,7 @@ export function AppList() {
   return (
     <section className="app-section" id="apps">
       <div className="section-heading">
-        <p className="eyebrow">Applications</p>
-        <h2>アプリ一覧</h2>
-        <p>各アプリをクリックしてご利用ください。</p>
+        <h1>アプリ一覧</h1>
       </div>
 
       <div className="app-grid">

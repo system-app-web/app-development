@@ -116,6 +116,21 @@ input, textarea, select, option {
 .stats.header-stats {
   min-width: 0;
 }
+.header-refresh-btn {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,0.32);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.16);
+  color: white;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.header-refresh-btn:active { background: rgba(255,255,255,0.28); }
+.header-refresh-btn:disabled { opacity: 0.72; cursor: wait; }
 .stat {
   display: flex;
   align-items: center;
@@ -1326,6 +1341,7 @@ select.modal-input {
       <div class="stats header-stats">
         <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-label">総数</div></div>
       </div>
+      <button class="header-refresh-btn" id="app-refresh-btn" type="button" onclick="refreshApp()">更新</button>
     </div>
     <div class="month-nav">
       <button class="mbtn" onclick="changeMonth(-1)">‹</button>
@@ -3724,6 +3740,27 @@ function confirmDelete(i) {
 
 function closeConfirm() {
   document.getElementById('confirm').classList.remove('show');
+}
+
+function refreshApp() {
+  const button = document.getElementById('app-refresh-btn');
+  if (button) {
+    button.disabled = true;
+    button.textContent = '更新中';
+  }
+  const reload = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('updated', String(Date.now()));
+    window.location.replace(url.toString());
+  };
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistration()
+      .then(registration => registration?.update())
+      .catch(() => {})
+      .finally(reload);
+    return;
+  }
+  reload();
 }
 
 function getColumnHeaderInnerHtml(key) {

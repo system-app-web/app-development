@@ -105,8 +105,10 @@ export const appData: PortalApp[] = [
 ];
 
 export const siteInfo = {
-  companyName: '株式会社サンプルケア',
-  catchCopy: '社内WEBアプリを、ひとつの場所から。',
+  companyName: '株式会社K.T.M',
+  officeName: 'リーフケアプランニング',
+  catchCopy: 'リーフケアプランニング 社内WEBアプリポータル',
+  websiteUrl: 'https://leaf.ktm-care.com',
   version: 'v1.0.0',
   lastUpdated: '2026-08-07',
 };

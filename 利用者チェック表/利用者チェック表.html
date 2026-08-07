@@ -1961,7 +1961,8 @@ function syncClientList(data) {
   });
   normalized.forEach(item => {
     const isDefaultLinked = DEFAULT_CLIENTS.some(base => base.name === item.baseName || base.name === item.name);
-    if (!isDefaultLinked && item.customAdded && !item.deleted) merged.push(item);
+    // Keep deleted custom clients as hidden records so they stay deleted in later months.
+    if (!isDefaultLinked && item.customAdded) merged.push(item);
   });
   return dedupeClients(merged);
 }
@@ -2100,11 +2101,13 @@ function syncFutureClientStructure(all, sourceKey, sourceList) {
           used.add(existing);
           return {
             ...existing,
-            manualOrder: source.manualOrder
+            manualOrder: source.manualOrder,
+            deleted: Boolean(source.deleted)
           };
         }
         const added = resetMonthlyWorkFields(newClientData(source));
         added.manualOrder = source.manualOrder;
+        added.deleted = Boolean(source.deleted);
         return added;
       });
       futureList.forEach(item => {
@@ -3710,13 +3713,8 @@ function confirmDelete(i) {
   document.getElementById('cf-msg').textContent = `${name} を一覧から削除しますか？`;
   document.getElementById('cf-ok').onclick = () => {
     const item = currentData[i];
-    const isDefaultLinked = DEFAULT_CLIENTS.some(base => base.name === item.baseName);
-    if (isDefaultLinked) {
-      currentData[i] = { ...item, deleted: true };
-    } else {
-      currentData.splice(i, 1);
-    }
-    saveMonthData(curYear, curMonth, currentData);
+    currentData[i] = { ...item, deleted: true };
+    saveMonthData(curYear, curMonth, currentData, { syncFutureClients: true });
     closeConfirm();
     render();
   };

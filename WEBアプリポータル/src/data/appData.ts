@@ -35,7 +35,7 @@ export const appData: PortalApp[] = [
   {
     id: 'template-notes',
     name: 'テンプレートメモ帳',
-    url: '',
+    url: 'https://riyosha-template-memo.vercel.app',
     manualUrl: '',
     icon: 'memo',
     description: '文例管理',

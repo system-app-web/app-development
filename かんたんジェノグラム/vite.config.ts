@@ -6,9 +6,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: 'index.html',
-        app: 'かんたんジェノグラム.html',
-        demo: 'かんたんジェノグラム_デモ版.html',
-        save1: 'かんたんジェノグラム_save1.html'
+        app: 'app.html',
+        demo: 'demo.html',
+        backup: 'backup.html'
       }
     }
   }

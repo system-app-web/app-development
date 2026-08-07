@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">ショートカットメモ</title>
+  <rect width="512" height="512" rx="112" fill="#2f6f73"/>
+  <rect x="84" y="132" width="344" height="248" rx="42" fill="#fffef8"/>
+  <g fill="#2f6f73">
+    <rect x="124" y="172" width="58" height="52" rx="12"/>
+    <rect x="198" y="172" width="58" height="52" rx="12"/>
+    <rect x="272" y="172" width="58" height="52" rx="12"/>
+    <rect x="346" y="172" width="42" height="52" rx="12"/>
+    <rect x="124" y="240" width="78" height="52" rx="12"/>
+    <rect x="218" y="240" width="58" height="52" rx="12"/>
+    <rect x="292" y="240" width="96" height="52" rx="12"/>
+    <rect x="124" y="308" width="132" height="32" rx="12"/>
+    <rect x="272" y="308" width="116" height="32" rx="12"/>
+  </g>
+  <path d="M364 103v56m-28-28h56" stroke="#f4b860" stroke-width="20" stroke-linecap="round"/>
+</svg>

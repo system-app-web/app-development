@@ -209,3 +209,161 @@
   background: rgba(255, 255, 255, 0.68);
   box-shadow: 37px 0 0 rgba(255, 255, 255, 0.68);
 }
+
+.app-icon.shortcut {
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #7c4bd6 0%, #b49af2 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(111, 73, 191, 0.2);
+}
+
+.app-icon.shortcut .icon-mark {
+  width: 38px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(71, 43, 129, 0.16);
+}
+
+.app-icon.shortcut .icon-mark::before {
+  top: 7px;
+  left: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 2px;
+  background: #8154d7;
+  box-shadow:
+    9px 0 0 #8154d7,
+    18px 0 0 #8154d7,
+    0 9px 0 #8154d7,
+    9px 9px 0 #8154d7,
+    18px 9px 0 #8154d7;
+}
+
+.app-icon.shortcut .icon-mark::after {
+  right: 7px;
+  bottom: 5px;
+  width: 14px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(129, 84, 215, 0.38);
+}
+
+.app-icon.floorplan {
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #e1782a 0%, #f4bd61 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(194, 106, 34, 0.2);
+}
+
+.app-icon.floorplan .icon-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, transparent 45%, #d9792d 45% 53%, transparent 53%),
+    linear-gradient(transparent 46%, #d9792d 46% 54%, transparent 54%),
+    rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(141, 74, 23, 0.16);
+}
+
+.app-icon.floorplan .icon-mark::before {
+  top: 6px;
+  left: 6px;
+  width: 11px;
+  height: 11px;
+  border: 3px solid #d9792d;
+  border-radius: 3px;
+}
+
+.app-icon.floorplan .icon-mark::after {
+  right: 6px;
+  bottom: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d9792d;
+}
+
+.app-icon.genogram {
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #bc4671 0%, #f090a5 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(172, 55, 99, 0.2);
+}
+
+.app-icon.genogram .icon-mark {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    -13px 19px 0 rgba(255, 255, 255, 0.96),
+    13px 19px 0 rgba(255, 255, 255, 0.96);
+}
+
+.app-icon.genogram .icon-mark::before {
+  top: 13px;
+  left: 5px;
+  width: 3px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: -13px 12px 0 rgba(255, 255, 255, 0.88);
+  transform: rotate(45deg);
+}
+
+.app-icon.genogram .icon-mark::after {
+  top: 13px;
+  right: 5px;
+  width: 3px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 13px 12px 0 rgba(255, 255, 255, 0.88);
+  transform: rotate(-45deg);
+}
+
+.app-icon.assessment {
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.9), transparent 0 18%, transparent 32%),
+    linear-gradient(145deg, #326fbe 0%, #75a8ea 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 26px rgba(43, 93, 165, 0.2);
+}
+
+.app-icon.assessment .icon-mark {
+  width: 31px;
+  height: 39px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(28, 70, 130, 0.16);
+}
+
+.app-icon.assessment .icon-mark::before {
+  top: -5px;
+  left: 8px;
+  width: 15px;
+  height: 8px;
+  border-radius: 4px;
+  background: #dcecff;
+}
+
+.app-icon.assessment .icon-mark::after {
+  top: 13px;
+  left: 7px;
+  width: 17px;
+  height: 3px;
+  border-radius: 999px;
+  background: #3b75c2;
+  box-shadow:
+    0 8px 0 rgba(59, 117, 194, 0.62),
+    0 16px 0 rgba(59, 117, 194, 0.34);
+}

@@ -56,35 +56,18 @@ a {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
 }
 
 .brand-logo {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 15px;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--blue), var(--sky));
-  font-weight: 800;
-  box-shadow: 0 10px 22px rgba(17, 118, 216, 0.22);
-}
-
-.brand-name,
-.brand-copy {
   display: block;
-}
-
-.brand-name {
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
-.brand-copy {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.86rem;
+  width: 240px;
+  height: 152px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(31, 85, 137, 0.12);
+  object-fit: cover;
+  object-position: center;
 }
 
 .global-nav {
@@ -523,8 +506,10 @@ a {
     border-radius: 20px;
   }
 
-  .brand-copy {
-    display: none;
+  .brand-logo {
+    width: 124px;
+    height: 80px;
+    border-radius: 13px;
   }
 
   .hamburger {

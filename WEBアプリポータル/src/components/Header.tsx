@@ -1,16 +1,10 @@
-import { siteInfo } from '../data/appData';
-
 const navItems = ['ホーム', 'アプリ', 'マニュアル', 'お知らせ', 'サポート'];
 
 export function Header() {
   return (
     <header className="site-header">
       <a className="brand" href="#home" aria-label="ホームへ移動">
-        <span className="brand-logo" aria-hidden="true">SC</span>
-        <span>
-          <span className="brand-name">{siteInfo.companyName}</span>
-          <span className="brand-copy">{siteInfo.catchCopy}</span>
-        </span>
+        <img className="brand-logo" src="/2207.jpg" alt="KTM Keep Trust Meaning ロゴ" />
       </a>
 
       <input className="nav-toggle" id="nav-toggle" type="checkbox" aria-label="メニューを開閉" />

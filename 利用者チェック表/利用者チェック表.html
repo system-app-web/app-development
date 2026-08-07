@@ -118,13 +118,14 @@ input, textarea, select, option {
 }
 .header-refresh-btn {
   height: 32px;
-  padding: 0 10px;
+  width: 32px;
+  padding: 0;
   border: 1px solid rgba(255,255,255,0.32);
   border-radius: 8px;
   background: rgba(255,255,255,0.16);
   color: white;
   font: inherit;
-  font-size: 11px;
+  font-size: 19px;
   font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
@@ -1341,7 +1342,7 @@ select.modal-input {
       <div class="stats header-stats">
         <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-label">総数</div></div>
       </div>
-      <button class="header-refresh-btn" id="app-refresh-btn" type="button" onclick="refreshApp()">更新</button>
+      <button class="header-refresh-btn" id="app-refresh-btn" type="button" onclick="refreshApp()" aria-label="最新の内容に更新" title="更新">&#x21bb;</button>
     </div>
     <div class="month-nav">
       <button class="mbtn" onclick="changeMonth(-1)">‹</button>
@@ -3746,7 +3747,7 @@ function refreshApp() {
   const button = document.getElementById('app-refresh-btn');
   if (button) {
     button.disabled = true;
-    button.textContent = '更新中';
+    button.textContent = '...';
   }
   const reload = () => {
     const url = new URL(window.location.href);

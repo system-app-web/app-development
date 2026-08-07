@@ -6,8 +6,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: 'index.html',
-        app: '文言テンプレート.html',
-        staff: '文言テンプレート_スタッフ用.html'
+        app: 'app.html',
+        staff: 'staff.html'
       }
     }
   }

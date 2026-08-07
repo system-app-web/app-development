@@ -1,6 +1,6 @@
 {
-  "name": "文言テンプレート",
-  "short_name": "文言テンプレート",
+  "name": "テンプレートメモ帳",
+  "short_name": "テンプレートメモ帳",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

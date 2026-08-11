@@ -38,7 +38,7 @@ export const appData: PortalApp[] = [
   {
     id: 'template-notes',
     name: 'テンプレートメモ帳',
-    url: 'https://template-memo-system-app-webs-projects.vercel.app',
+    url: 'https://template-memo.vercel.app',
     manualUrl: '',
     icon: 'memo',
     iconImage: '/app-icons/template-notes.png',
@@ -49,7 +49,7 @@ export const appData: PortalApp[] = [
   {
     id: 'pdf-converter',
     name: 'PDF変換アプリ',
-    url: 'https://riyosha-pdf-converter.vercel.app/',
+    url: 'https://pdf-converter-app-six.vercel.app',
     manualUrl: '',
     icon: 'pdf',
     iconImage: '/app-icons/pdf-converter.png',
@@ -58,19 +58,9 @@ export const appData: PortalApp[] = [
     status: 'stable',
   },
   {
-    id: 'staff-shared-notes',
-    name: 'スタッフ共有メモ',
-    url: '',
-    manualUrl: '',
-    icon: 'people',
-    description: 'スタッフ間メモ',
-    version: 'v0.5.0',
-    status: 'preview',
-  },
-  {
     id: 'shortcut-memo',
     name: 'ショートカットメモ',
-    url: '',
+    url: 'https://shortcut-list.vercel.app',
     manualUrl: '',
     icon: 'shortcut',
     iconImage: '/app-icons/shortcut-memo.svg',
@@ -81,7 +71,7 @@ export const appData: PortalApp[] = [
   {
     id: 'simple-floor-plan',
     name: 'かんたん見取り図',
-    url: '',
+    url: 'https://easy-floor-plan.vercel.app',
     manualUrl: '',
     icon: 'floorplan',
     iconImage: '/app-icons/floor-plan.png',
@@ -92,7 +82,7 @@ export const appData: PortalApp[] = [
   {
     id: 'simple-genogram',
     name: 'かんたんジェノグラム',
-    url: '',
+    url: 'https://easy-genogram-app.vercel.app',
     manualUrl: '',
     icon: 'genogram',
     iconImage: '/app-icons/genogram.png',
@@ -111,6 +101,16 @@ export const appData: PortalApp[] = [
     version: 'v0.1.0',
     status: 'preview',
   },
+  {
+    id: 'service-slip-sorter',
+    name: '提供票自動振り分け',
+    url: 'https://service-slip-sorter.vercel.app',
+    manualUrl: '',
+    icon: 'pdf',
+    description: '提供票PDFを事業所別に振り分け',
+    version: 'v1.0.0',
+    status: 'stable',
+  },
 ];
 
 export const siteInfo = {
@@ -119,5 +119,5 @@ export const siteInfo = {
   catchCopy: 'リーフケアプランニング 社内WEBアプリポータル',
   websiteUrl: 'https://leaf.ktm-care.com',
   version: 'v1.0.0',
-  lastUpdated: '2026-08-07',
+  lastUpdated: '2026-08-12',
 };

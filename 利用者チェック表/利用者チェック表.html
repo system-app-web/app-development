@@ -2028,6 +2028,9 @@ function syncBasicFieldsFromPreviousMonth(currentList, previousList) {
     const current = clientMatchKeys(prev).map(key => currentByKey.get(key)).find(Boolean);
     if (current) used.add(current);
     const source = current || resetMonthlyWorkFields(prev);
+    // Keep this month's basic details when they have been edited. Only a newly
+    // created month without its own record should inherit the previous month.
+    const currentValue = field => current ? (current[field] ?? '') : (prev[field] ?? '');
     return {
       ...source,
       rowId: prev.rowId || source.rowId,
@@ -2037,15 +2040,15 @@ function syncBasicFieldsFromPreviousMonth(currentList, previousList) {
       noNumber: Boolean(prev.noNumber),
       // A deletion made in this month must not be restored from the previous month.
       deleted: Boolean(prev.deleted || current?.deleted),
-      kana: prev.kana || '',
-      kosin: prev.kosin || '',
-      yuko: prev.yuko || '',
-      level: prev.level || '',
-      planL: prev.planL || '',
-      planS: prev.planS || '',
-      seho: prev.seho || '',
-      sehoCw: prev.sehoCw || '',
-      biko: prev.biko || '',
+      kana: currentValue('kana'),
+      kosin: currentValue('kosin'),
+      yuko: currentValue('yuko'),
+      level: currentValue('level'),
+      planL: currentValue('planL'),
+      planS: currentValue('planS'),
+      seho: currentValue('seho'),
+      sehoCw: currentValue('sehoCw'),
+      biko: currentValue('biko'),
       faxOffices: normalizeFaxOffices(prev.faxOffices).map((office, index) => {
         const currentOffice = normalizeFaxOffices(source.faxOffices)[index];
         return { ...office, checked: Boolean(currentOffice?.checked) };

@@ -2108,6 +2108,9 @@ function saveMonthData(y, m, data, options = {}) {
   if (options.syncFutureClients) {
     syncFutureClientStructure(all, monthKey(y, m), all[monthKey(y, m)]);
   }
+  if (options.syncFutureProfileFields) {
+    syncFutureProfileFields(all, monthKey(y, m), all[monthKey(y, m)]);
+  }
   saveAll(all);
 }
 
@@ -2143,6 +2146,25 @@ function syncFutureClientStructure(all, sourceKey, sourceList) {
         if (!used.has(item)) synced.push(item);
       });
       all[key] = sortClientsByName(dedupeClients(synced));
+    });
+}
+
+// Keep profile information current in later months, without changing monthly work records.
+function syncFutureProfileFields(all, sourceKey, sourceList) {
+  const profileFields = ['kana', 'kosin', 'yuko', 'level', 'planL', 'planS', 'seho', 'sehoCw', 'biko'];
+  Object.keys(all)
+    .filter(key => key > sourceKey && Array.isArray(all[key]))
+    .sort()
+    .forEach(key => {
+      all[key] = dedupeClients(all[key]).map(future => {
+        const source = matchingClientInList(sourceList, future);
+        if (!source) return future;
+        const updated = { ...future };
+        profileFields.forEach(field => {
+          updated[field] = source[field] ?? '';
+        });
+        return updated;
+      });
     });
 }
 
@@ -2730,12 +2752,12 @@ function renderVisitCalendar() {
       }
       if (selectedDay === day) {
         setFieldValue(currentData[modalIndex], datePickerField, '');
-        saveMonthData(curYear, curMonth, currentData);
+        savePeriodData(datePickerField);
         openPeriodDatePicker(modalIndex, datePickerField, getPeriodFieldLabel(datePickerField));
         return;
       }
       setFieldValue(currentData[modalIndex], datePickerField, formatWareki(visitPickerYear, visitPickerMonth, day));
-      saveMonthData(curYear, curMonth, currentData);
+      savePeriodData(datePickerField);
       openPeriodDatePicker(modalIndex, datePickerField, getPeriodFieldLabel(datePickerField));
     };
     grid.appendChild(btn);
@@ -2796,12 +2818,17 @@ function openPeriodDatePicker(i, field, label) {
 
 function clearDateField(i, field, keepModalOpen) {
   setFieldValue(currentData[i], field, '');
-  saveMonthData(curYear, curMonth, currentData);
+  savePeriodData(field);
   if (keepModalOpen) {
     openPeriodDatePicker(i, field, getPeriodFieldLabel(field));
     return;
   }
   render();
+}
+
+function savePeriodData(field) {
+  const options = isCustomColumnKey(field) ? {} : { syncFutureProfileFields: true };
+  saveMonthData(curYear, curMonth, currentData, options);
 }
 
 function bindDateCell(td, onClick, onDoubleClick) {
@@ -2827,7 +2854,7 @@ function openLevelPicker(i) {
 
 function setLevel(value) {
   currentData[modalIndex].level = value;
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
   closeModal();
   render();
 }
@@ -2862,7 +2889,7 @@ function saveKosin() {
   const input = document.getElementById('kosin-input');
   if (!input) return;
   currentData[modalIndex].kosin = input.value.trim();
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
   closeModal();
   render();
 }
@@ -2871,7 +2898,7 @@ function saveBiko() {
   const textarea = document.getElementById('bi');
   if (!textarea) return;
   currentData[modalIndex].biko = textarea.value.trim();
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
   closeModal();
   render();
 }
@@ -2894,14 +2921,14 @@ function saveMarkerField(field) {
   const input = document.getElementById('marker-input');
   if (!input) return;
   currentData[modalIndex][field] = input.value.trim();
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
   closeModal();
   render();
 }
 
 function clearMarkerField(field) {
   currentData[modalIndex][field] = '';
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
   closeModal();
   render();
 }
@@ -2929,7 +2956,7 @@ function saveSehoEditor() {
   currentData[modalIndex].seho = document.getElementById('seho-mark-input')?.checked ? '○' : '';
   currentData[modalIndex].sehoCw = (document.getElementById('seho-cw-input')?.value || '').trim();
   normalizeSehoFields(currentData[modalIndex]);
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
   closeModal();
   render();
 }
@@ -2937,7 +2964,7 @@ function saveSehoEditor() {
 function clearSehoEditor() {
   currentData[modalIndex].seho = '';
   currentData[modalIndex].sehoCw = '';
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
   closeModal();
   render();
 }

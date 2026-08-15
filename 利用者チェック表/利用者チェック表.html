@@ -140,6 +140,20 @@ input, textarea, select, option {
 }
 .header-refresh-btn:active { background: rgba(255,255,255,0.28); }
 .header-refresh-btn:disabled { opacity: 0.72; cursor: wait; }
+.header-pdf-btn {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,0.32);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.16);
+  color: white;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.header-pdf-btn:active { background: rgba(255,255,255,0.28); }
 .stat {
   display: flex;
   align-items: center;
@@ -1340,6 +1354,30 @@ select.modal-input {
 }
 .confirm-btn.ok { background: #3a9e20; color: white; }
 .confirm-btn.cancel { background: #f1f5f9; color: #64748b; }
+.print-header { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 7mm; }
+  html, body { width: auto; height: auto; min-height: 0; overflow: visible; background: white; display: block; }
+  .topbar, .modal-bg, .confirm-bg { display: none !important; }
+  .print-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 0 0 4mm;
+    color: #163b0e;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .tbl-wrap {
+    display: block;
+    width: calc(100% / var(--print-scale, 1));
+    min-height: 0;
+    overflow: visible;
+    zoom: var(--print-scale, 1);
+  }
+  table { min-width: 820px; }
+  thead th { position: static; }
+}
 </style>
 </head>
 <body>
@@ -1351,6 +1389,8 @@ select.modal-input {
         <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-label">総数</div></div>
       </div>
       <button class="header-refresh-btn" id="app-refresh-btn" type="button" onclick="refreshApp()" aria-label="最新の内容に更新" title="更新"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 0-15.4-6.4L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 15.4 6.4L21 16"></path><path d="M21 21v-5h-5"></path></svg></button>
+      <button class="header-refresh-btn" id="app-undo-btn" type="button" onclick="undoLastChange()" aria-label="直前の修正を元に戻す" title="直前の修正を元に戻す" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 14-5-5 5-5"></path><path d="M4 9h10a6 6 0 0 1 0 12h-1"></path></svg></button>
+      <button class="header-pdf-btn" type="button" onclick="saveChecklistPdf()">PDF保存</button>
     </div>
     <div class="month-nav">
       <button class="mbtn" onclick="changeMonth(-1)">‹</button>
@@ -1380,6 +1420,7 @@ select.modal-input {
   </div>
 </div>
 
+<div class="print-header"><span>利用者チェック表</span><span id="print-month"></span></div>
 <div class="tbl-wrap">
   <table>
     <thead>
@@ -1561,6 +1602,7 @@ function hasMeetingValue(item) {
 }
 
 const STORAGE_KEY = 'riyosha_check_v1';
+const UNDO_KEY = 'riyosha_check_undo_v1';
 const FAC_KEY = 'riyosha_facilities_v1';
 const ORDER_MODE_KEY = 'riyosha_order_mode_v1';
 const COLUMN_ORDER_KEY = 'riyosha_column_order_v1';
@@ -1764,6 +1806,37 @@ function applySelectedRowState() {
 
 function saveAll(all) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+}
+
+function loadUndoSnapshot() {
+  try {
+    const snapshot = JSON.parse(localStorage.getItem(UNDO_KEY) || 'null');
+    return snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) ? snapshot : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveUndoSnapshot(all) {
+  localStorage.setItem(UNDO_KEY, JSON.stringify(all));
+}
+
+function updateUndoButton() {
+  const button = document.getElementById('app-undo-btn');
+  if (button) button.disabled = !loadUndoSnapshot();
+}
+
+function undoLastChange() {
+  const snapshot = loadUndoSnapshot();
+  if (!snapshot) {
+    alert('元に戻せる直前の修正がありません。');
+    return;
+  }
+  if (!confirm('直前の修正を元に戻しますか？')) return;
+  saveAll(snapshot);
+  localStorage.removeItem(UNDO_KEY);
+  closeModal();
+  render();
 }
 
 function sortClientsByName(data) {
@@ -2104,6 +2177,7 @@ function getMonthData(y, m) {
 
 function saveMonthData(y, m, data, options = {}) {
   const all = loadAll();
+  saveUndoSnapshot(all);
   all[monthKey(y, m)] = sortClientsByName(dedupeClients(data));
   if (options.syncFutureClients) {
     syncFutureClientStructure(all, monthKey(y, m), all[monthKey(y, m)]);
@@ -2112,6 +2186,7 @@ function saveMonthData(y, m, data, options = {}) {
     syncFutureProfileFields(all, monthKey(y, m), all[monthKey(y, m)]);
   }
   saveAll(all);
+  updateUndoButton();
 }
 
 function matchingClientInList(list, source) {
@@ -3781,6 +3856,35 @@ function closeConfirm() {
   document.getElementById('confirm').classList.remove('show');
 }
 
+function saveChecklistPdf() {
+  const visibleCount = currentData.filter(item => !item.deleted).length;
+  const estimatedTableHeight = 96 + visibleCount * 46;
+  const scale = Math.max(0.42, Math.min(1, 650 / estimatedTableHeight));
+  const monthLabel = document.getElementById('month-label')?.textContent || '';
+  const printMonth = document.getElementById('print-month');
+  const originalTitle = document.title;
+  let cleanedUp = false;
+
+  if (printMonth) printMonth.textContent = monthLabel;
+  document.title = `利用者チェック表_${monthLabel}`;
+  document.body.style.setProperty('--print-scale', String(scale));
+  document.body.classList.add('printing');
+
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    document.body.classList.remove('printing');
+    document.body.style.removeProperty('--print-scale');
+    document.title = originalTitle;
+  };
+
+  window.addEventListener('afterprint', cleanup, { once: true });
+  setTimeout(() => {
+    window.print();
+    setTimeout(cleanup, 0);
+  }, 60);
+}
+
 function refreshApp() {
   const button = document.getElementById('app-refresh-btn');
   if (button) {
@@ -4209,6 +4313,7 @@ function render() {
   });
 
   document.getElementById('s-total').textContent = visibleData.length;
+  updateUndoButton();
 }
 
 document.getElementById('import-data-input')?.addEventListener('change', event => {

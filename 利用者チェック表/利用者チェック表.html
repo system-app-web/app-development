@@ -1354,30 +1354,6 @@ select.modal-input {
 }
 .confirm-btn.ok { background: #3a9e20; color: white; }
 .confirm-btn.cancel { background: #f1f5f9; color: #64748b; }
-.print-header { display: none; }
-@media print {
-  @page { size: A4 landscape; margin: 7mm; }
-  html, body { width: auto; height: auto; min-height: 0; overflow: visible; background: white; display: block; }
-  .topbar, .modal-bg, .confirm-bg { display: none !important; }
-  .print-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin: 0 0 4mm;
-    color: #163b0e;
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .tbl-wrap {
-    display: block;
-    width: calc(100% / var(--print-scale, 1));
-    min-height: 0;
-    overflow: visible;
-    zoom: var(--print-scale, 1);
-  }
-  table { min-width: 820px; }
-  thead th { position: static; }
-}
 </style>
 </head>
 <body>
@@ -1420,7 +1396,6 @@ select.modal-input {
   </div>
 </div>
 
-<div class="print-header"><span>利用者チェック表</span><span id="print-month"></span></div>
 <div class="tbl-wrap">
   <table>
     <thead>
@@ -1473,6 +1448,8 @@ select.modal-input {
 
 <input type="file" id="import-data-input" accept=".json,application/json" style="display:none">
 
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 function toReiwa(y, m) {
   const rYear = y - 2018;
@@ -3856,33 +3833,85 @@ function closeConfirm() {
   document.getElementById('confirm').classList.remove('show');
 }
 
-function saveChecklistPdf() {
-  const visibleCount = currentData.filter(item => !item.deleted).length;
-  const estimatedTableHeight = 96 + visibleCount * 46;
-  const scale = Math.max(0.42, Math.min(1, 650 / estimatedTableHeight));
-  const monthLabel = document.getElementById('month-label')?.textContent || '';
-  const printMonth = document.getElementById('print-month');
-  const originalTitle = document.title;
-  let cleanedUp = false;
+function makePdfFileName() {
+  const monthLabel = document.getElementById('month-label')?.textContent || '利用者チェック表';
+  const safeMonthLabel = monthLabel.replace(/[\\/:*?"<>|]/g, '-');
+  return `利用者チェック表_${safeMonthLabel}.pdf`;
+}
 
-  if (printMonth) printMonth.textContent = monthLabel;
-  document.title = `利用者チェック表_${monthLabel}`;
-  document.body.style.setProperty('--print-scale', String(scale));
-  document.body.classList.add('printing');
+function downloadPdf(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-  const cleanup = () => {
-    if (cleanedUp) return;
-    cleanedUp = true;
-    document.body.classList.remove('printing');
-    document.body.style.removeProperty('--print-scale');
-    document.title = originalTitle;
-  };
+async function saveChecklistPdf() {
+  const button = document.querySelector('.header-pdf-btn');
+  const table = document.querySelector('.tbl-wrap table');
+  const PdfDocument = window.jspdf?.jsPDF;
+  if (!table || !PdfDocument || !window.html2canvas) {
+    alert('PDF保存の準備ができていません。インターネット接続を確認してから、もう一度お試しください。');
+    return;
+  }
 
-  window.addEventListener('afterprint', cleanup, { once: true });
-  setTimeout(() => {
-    window.print();
-    setTimeout(cleanup, 0);
-  }, 60);
+  if (button) {
+    button.disabled = true;
+    button.textContent = '作成中';
+  }
+
+  try {
+    const fileName = makePdfFileName();
+    let fileHandle = null;
+    if ('showSaveFilePicker' in window) {
+      try {
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: fileName,
+          startIn: 'desktop',
+          types: [{ description: 'PDF ファイル', accept: { 'application/pdf': ['.pdf'] } }]
+        });
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    const canvas = await window.html2canvas(table, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      logging: false,
+      useCORS: true
+    });
+    const pdf = new PdfDocument({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+    const margin = 6;
+    const pageWidth = 297 - margin * 2;
+    const pageHeight = 210 - margin * 2;
+    const imageWidth = canvas.width;
+    const imageHeight = canvas.height;
+    const ratio = Math.min(pageWidth / imageWidth, pageHeight / imageHeight);
+    const width = imageWidth * ratio;
+    const height = imageHeight * ratio;
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin + (pageWidth - width) / 2, margin + (pageHeight - height) / 2, width, height, undefined, 'FAST');
+
+    const blob = pdf.output('blob');
+    if (fileHandle) {
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    }
+    downloadPdf(blob, fileName);
+  } catch (error) {
+    console.error(error);
+    alert('PDFを作成できませんでした。もう一度お試しください。');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'PDF保存';
+    }
+  }
 }
 
 function refreshApp() {

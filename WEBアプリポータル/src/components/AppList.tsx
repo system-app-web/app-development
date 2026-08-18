@@ -12,12 +12,10 @@ export function AppList() {
       </div>
 
       <div className="app-grid">
-        {appData.map((app) => (
+        {appData.filter((app) => app.url).map((app) => (
           <MemoizedAppCard key={app.id} app={app} />
         ))}
       </div>
-
-      <p className="preview-note">previewは開発中です。内容は予告なく変更される場合があります。</p>
     </section>
   );
 }

@@ -278,7 +278,7 @@ a {
 .app-card {
   display: flex;
   flex-direction: column;
-  min-height: 370px;
+  min-height: 246px;
   padding: 22px;
   border: 1px solid rgba(217, 230, 242, 0.95);
   border-radius: 16px;
@@ -332,48 +332,12 @@ a {
   line-height: 1.35;
 }
 
-.version-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 0.92rem;
-  font-weight: 800;
-}
-
-.version-line strong {
-  color: #d92d20;
-}
-
-.stable {
-  color: #18845e;
-}
-
-.card-preview {
-  display: grid;
-  place-items: center;
-  height: 92px;
-  margin: 18px 0;
-  border-radius: 12px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(226, 244, 255, 0.82)),
-    repeating-linear-gradient(90deg, rgba(17, 118, 216, 0.08) 0 1px, transparent 1px 18px);
-  color: #276da9;
-  font-weight: 900;
-}
-
 .app-description {
   flex: 1;
-  margin: 0 0 20px;
+  margin: 18px 0 20px;
   color: #40516a;
   font-size: 1rem;
   line-height: 1.7;
-}
-
-.card-actions {
-  display: grid;
-  gap: 10px;
 }
 
 .button {
@@ -407,13 +371,6 @@ a {
   border-color: #e0e8ef;
   box-shadow: none;
   cursor: not-allowed;
-}
-
-.preview-note {
-  margin: 24px 0 0;
-  color: #7a3b36;
-  font-size: 0.98rem;
-  font-weight: 700;
 }
 
 .site-footer {

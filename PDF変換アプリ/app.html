@@ -50,9 +50,15 @@
 
     .header {
       display: flex;
-      gap: 14px;
+      gap: 12px;
       align-items: flex-start;
-      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+
+    .header-content {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
     }
 
     .lead {
@@ -133,13 +139,24 @@
     }
 
     .reset-btn {
-      width: auto;
-      min-height: 32px;
-      min-width: 72px;
-      padding: 6px 10px;
-      font-size: 12px;
-      line-height: 1.2;
-      background: #b45309;
+      flex: 0 0 36px;
+      width: 36px;
+      height: 36px;
+      min-height: 36px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #475569;
+      font-size: 21px;
+      font-weight: 700;
+    }
+
+    .reset-btn:hover {
+      border-color: #0f766e;
+      background: #f0fdfa;
+      color: #0f766e;
     }
 
     .control-row {
@@ -331,8 +348,11 @@
 <body>
   <div class="app">
     <div class="header">
-      <h1>PDF変換アプリ</h1>
-      <div class="lead">介護保険証、負担割合証などをちょうどいいサイズに変換し、中央に揃えてくれるアプリです。<br>複数のPDF書類を一つにまとめる結合機能付き。</div>
+      <div class="header-content">
+        <h1>PDF変換アプリ</h1>
+        <div class="lead">介護保険証、負担割合証などをちょうどいいサイズに変換し、中央に揃えてくれるアプリです。<br>複数のPDF書類を一つにまとめる結合機能付き。</div>
+      </div>
+      <button id="resetBtn" class="reset-btn" type="button" title="読み込み内容をリセット" aria-label="読み込み内容をリセット">↺</button>
     </div>
 
     <div class="doc-type-heading">処理を選ぶ</div>
@@ -343,8 +363,6 @@
     </div>
 
     <div class="notice"><strong>変換機能は白黒のみ対応です</strong><br>カラー・濃いグレースケールの書類は黒くなったり、影が出たりする場合があります。PDF結合は元のPDFをそのまま結合します。</div>
-
-    <button id="resetBtn" class="reset-btn" type="button">リセット</button>
 
     <div class="control-row contrast">
       <span>黒の濃さ</span>

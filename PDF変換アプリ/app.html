@@ -370,7 +370,7 @@
       <label><input type="radio" name="docType" value="burden"><span>負担割合証（縦印刷）</span></label>
     </div>
 
-    <div class="notice">白黒のみ対応。カラーやグレースケールは黒くなったり、影になったりします。</div>
+    <div class="notice">PDF結合は元のPDFをそのまま結合します。変換機能は白黒のみ対応です。</div>
 
     <div class="tools">
       <button id="rotateLeftBtn" class="rotate-btn" type="button" title="左に90度回転">↺ 反転</button>
@@ -405,11 +405,12 @@
       </div>
     </div>
 
-    <div id="status" class="status">A4白背景の中央に原寸大で配置します。出力は白黒PDFのみです。</div>
+    <div id="status" class="status">複数のPDFをドラッグすると、元のページをそのまま1つのPDFに結合します。</div>
   </div>
 
   <script type="module">
     import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+    import { PDFDocument } from "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm";
 
     const A4 = { wMm: 210, hMm: 297, wPt: 595.28, hPt: 841.89 };
     const DPI = 300;
@@ -431,6 +432,8 @@
     let loadedCanvases = [];
     let sourceCanvases = [];
     let outputCanvases = [];
+    let mergeFiles = [];
+    let mergePageCount = 0;
     let outputDirectory = null;
     let blackThreshold = 172;
     let sizeScale = 1;
@@ -527,11 +530,11 @@
     });
 
     saveBtn.addEventListener("click", async () => {
-      if (!outputCanvases.length) return;
+      if (isMergeMode() ? !mergeFiles.length : !outputCanvases.length) return;
       saveBtn.disabled = true;
       try {
         if (isMergeMode()) {
-          await saveSingleBlob(buildMergedPdfBlob(outputCanvases), "PDF結合.pdf");
+          await saveSingleBlob(await buildMergedPdfBlob(mergeFiles), "PDF結合.pdf");
           setStatus("PDFを結合して保存しました。");
           return;
         }
@@ -632,6 +635,8 @@
       loadedCanvases = [];
       sourceCanvases = [];
       outputCanvases = [];
+      mergeFiles = [];
+      mergePageCount = 0;
       saveBtn.disabled = true;
       showPlaceholder();
       setStatus(modeStatusText());
@@ -643,6 +648,8 @@
         loadedCanvases: [],
         sourceCanvases: [],
         outputCanvases: [],
+        mergeFiles: [],
+        mergePageCount: 0,
         blackThreshold: 172,
         sizeScale: 1
       };
@@ -653,6 +660,8 @@
         loadedCanvases: [...loadedCanvases],
         sourceCanvases: [...sourceCanvases],
         outputCanvases: [...outputCanvases],
+        mergeFiles: [...mergeFiles],
+        mergePageCount,
         blackThreshold,
         sizeScale
       };
@@ -663,15 +672,19 @@
       loadedCanvases = [...state.loadedCanvases];
       sourceCanvases = [...state.sourceCanvases];
       outputCanvases = [...state.outputCanvases];
+      mergeFiles = [...state.mergeFiles];
+      mergePageCount = state.mergePageCount;
       blackThreshold = state.blackThreshold;
       sizeScale = state.sizeScale;
       updateContrastButtons();
       updateSizeButtons();
-      saveBtn.disabled = !outputCanvases.length;
-      if (outputCanvases.length) {
-        showPreview();
+      const hasOutput = isMergeMode() ? mergeFiles.length : outputCanvases.length;
+      saveBtn.disabled = !hasOutput;
+      if (hasOutput) {
+        if (isMergeMode()) showMergeSummary();
+        else showPreview();
         setStatus(isMergeMode()
-          ? `${outputCanvases.length}ページ分のPDF結合準備が完了しました。`
+          ? `${mergeFiles.length}件・${mergePageCount}ページ分のPDF結合準備が完了しました。`
           : `${outputCanvases.length}ページ分の切り抜きと白黒変換が完了しました。`);
       } else {
         showPlaceholder();
@@ -700,10 +713,24 @@
         outputCanvases = [];
       }
       try {
-        for (const file of files) {
-          if (isMergeMode() && !(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
-            throw new Error("merge mode accepts only PDF files");
+        if (isMergeMode()) {
+          for (const file of files) {
+            if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
+              throw new Error("merge mode accepts only PDF files");
+            }
+            const sourcePdf = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+            mergeFiles.push(file);
+            mergePageCount += sourcePdf.getPageCount();
+            setStatus(`${mergeFiles.length}件・${mergePageCount}ページ分を確認中です。`);
+            await nextFrame();
           }
+          saveModeState(currentDocType);
+          showMergeSummary();
+          saveBtn.disabled = false;
+          setStatus(`${mergeFiles.length}件・${mergePageCount}ページ分のPDF結合準備が完了しました。`);
+          return;
+        }
+        for (const file of files) {
           const sources = file.type === "application/pdf" || /\.pdf$/i.test(file.name)
             ? await renderPdfPages(file)
             : [await renderImage(file)];
@@ -713,9 +740,7 @@
         saveModeState(currentDocType);
         showPreview();
         saveBtn.disabled = false;
-        setStatus(isMergeMode()
-          ? `${outputCanvases.length}ページ分のPDF結合準備が完了しました。`
-          : `${outputCanvases.length}ページ分の切り抜きと白黒変換が完了しました。`);
+        setStatus(`${outputCanvases.length}ページ分の切り抜きと白黒変換が完了しました。`);
       } catch (error) {
         console.error(error);
         setStatus("読み込みに失敗しました。PDFの場合はインターネット接続が必要な場合があります。");
@@ -872,20 +897,17 @@
     function showPreview(canvas = outputCanvases[0]) {
       drop.innerHTML = "";
       drop.classList.toggle("merge-preview", isMergeMode());
-      if (isMergeMode()) {
-        outputCanvases.forEach((pageCanvas, index) => {
-          const item = document.createElement("div");
-          item.className = "merge-page";
-          const number = document.createElement("div");
-          number.className = "merge-page-number";
-          number.textContent = `${index + 1}`;
-          item.appendChild(number);
-          item.appendChild(buildPreviewSheet(pageCanvas));
-          drop.appendChild(item);
-        });
-        return;
-      }
       drop.appendChild(buildPreviewSheet(canvas));
+    }
+
+    function showMergeSummary() {
+      drop.classList.remove("merge-preview");
+      drop.innerHTML = `
+        <div class="placeholder">
+          ${mergeFiles.length}件・${mergePageCount}ページを結合します<br>
+          元のPDFをそのまま結合するため、大量ページでも軽く処理できます
+        </div>
+      `;
     }
 
     function buildPreviewSheet(canvas) {
@@ -912,9 +934,16 @@
       return objectsToPdfBlobFromPageImages(pageImages);
     }
 
-    function buildMergedPdfBlob(canvases) {
-      const pageImages = canvases.map((canvas) => buildMergedPageJpeg(canvas));
-      return objectsToPdfBlobFromPageImages(pageImages);
+    async function buildMergedPdfBlob(files) {
+      const mergedPdf = await PDFDocument.create();
+      for (let index = 0; index < files.length; index++) {
+        setStatus(`${index + 1}/${files.length}件目を結合中です。`);
+        const sourcePdf = await PDFDocument.load(await files[index].arrayBuffer(), { ignoreEncryption: true });
+        const copiedPages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
+        copiedPages.forEach((page) => mergedPdf.addPage(page));
+        await nextFrame();
+      }
+      return new Blob([await mergedPdf.save()], { type: "application/pdf" });
     }
 
     function objectsToPdfBlobFromPageImages(pageImages) {

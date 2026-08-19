@@ -2111,7 +2111,11 @@ function syncBasicFieldsFromPreviousMonth(currentList, previousList) {
         const currentOffice = normalizeFaxOffices(source.faxOffices)[index];
         return { ...office, checked: Boolean(currentOffice?.checked) };
       }),
-      customFields: normalizeCustomFieldValues(prev.customFields)
+      // Custom columns are shared between months, but their values belong to
+      // the displayed month. Keep an existing month's edits intact.
+      customFields: current
+        ? { ...normalizeCustomFieldValues(prev.customFields), ...normalizeCustomFieldValues(current.customFields) }
+        : normalizeCustomFieldValues(prev.customFields)
     };
   });
   currentNormalized.forEach(item => {
@@ -3572,7 +3576,21 @@ function saveAddedColumn() {
     item.customFields = normalizeCustomFieldValues(item.customFields);
     item.customFields[key] = type === 'check' ? 0 : '';
   });
-  saveMonthData(curYear, curMonth, currentData);
+  const all = loadAll();
+  saveUndoSnapshot(all);
+  // Existing future months need the new column too, so it can be edited
+  // immediately without changing any of their already-entered values.
+  Object.entries(all).forEach(([month, list]) => {
+    if (month <= monthKey(curYear, curMonth) || !Array.isArray(list)) return;
+    all[month] = list.map(item => {
+      const customFields = normalizeCustomFieldValues(item.customFields);
+      if (Object.prototype.hasOwnProperty.call(customFields, key)) return item;
+      return { ...item, customFields: { ...customFields, [key]: type === 'check' ? 0 : '' } };
+    });
+  });
+  all[monthKey(curYear, curMonth)] = sortClientsByName(dedupeClients(currentData));
+  saveAll(all);
+  updateUndoButton();
   render();
   renderColumnEditorModal();
 }

@@ -164,6 +164,10 @@
       display: none;
     }
 
+    .rotate-btn.active {
+      background: #0f766e;
+    }
+
     .reset-btn {
       width: auto;
       min-height: 32px;
@@ -373,8 +377,9 @@
     <div class="notice">PDF結合は元のPDFをそのまま結合します。変換機能は白黒のみ対応です。</div>
 
     <div class="tools">
-      <button id="rotateLeftBtn" class="rotate-btn" type="button" title="左に90度回転">↺ 反転</button>
-      <button id="rotateRightBtn" class="rotate-btn" type="button" title="右に90度回転">反転 ↻</button>
+      <button id="rotateLeftBtn" class="rotate-btn" type="button" title="左向きの原稿を上向きに補正">左向き原稿</button>
+      <button id="rotateRightBtn" class="rotate-btn" type="button" title="右向きの原稿を上向きに補正">右向き原稿</button>
+      <button id="rotateUpsideDownBtn" class="rotate-btn" type="button" title="原稿の上下を反転">上下逆</button>
       <button id="resetBtn" class="reset-btn" type="button">リセット</button>
     </div>
 
@@ -425,6 +430,7 @@
     const saveBtn = document.getElementById("saveBtn");
     const rotateLeftBtn = document.getElementById("rotateLeftBtn");
     const rotateRightBtn = document.getElementById("rotateRightBtn");
+    const rotateUpsideDownBtn = document.getElementById("rotateUpsideDownBtn");
     const resetBtn = document.getElementById("resetBtn");
     const contrastButtons = Array.from(document.querySelectorAll(".contrast-btn"));
     const sizeButtons = Array.from(document.querySelectorAll(".size-btn"));
@@ -437,7 +443,8 @@
     let outputDirectory = null;
     let blackThreshold = 172;
     let sizeScale = 1;
-    const rotations = { merge: 0, care: 0, burden: 0 };
+    const orientationDirections = { merge: -90, care: -90, burden: -90 };
+    const upsideDown = { merge: false, care: false, burden: false };
     const modeStates = {
       merge: emptyModeState(),
       care: emptyModeState(),
@@ -461,13 +468,16 @@
     });
 
     rotateLeftBtn.addEventListener("click", () => {
-      rotateSelected(-90);
-      if (outputCanvases.length) showPreview(outputCanvases[0]);
+      setOrientationDirection(90);
     });
 
     rotateRightBtn.addEventListener("click", () => {
-      rotateSelected(90);
-      if (outputCanvases.length) showPreview(outputCanvases[0]);
+      setOrientationDirection(-90);
+    });
+
+    rotateUpsideDownBtn.addEventListener("click", () => {
+      upsideDown[selectedDocType()] = !upsideDown[selectedDocType()];
+      rebuildForOrientationChange();
     });
 
     resetBtn.addEventListener("click", () => {
@@ -606,6 +616,11 @@
       const hidden = isMergeMode();
       rotateLeftBtn.classList.toggle("hidden", hidden);
       rotateRightBtn.classList.toggle("hidden", hidden);
+      rotateUpsideDownBtn.classList.toggle("hidden", hidden);
+      const type = selectedDocType();
+      rotateLeftBtn.classList.toggle("active", orientationDirections[type] === 90);
+      rotateRightBtn.classList.toggle("active", orientationDirections[type] === -90);
+      rotateUpsideDownBtn.classList.toggle("active", upsideDown[type]);
     }
 
     function updateControlsVisibility() {
@@ -625,10 +640,23 @@
       });
     }
 
-    function rotateSelected(degrees) {
-      const type = selectedDocType();
-      rotations[type] = (rotations[type] + degrees + 360) % 360;
-      saveModeState(type);
+    function setOrientationDirection(degrees) {
+      orientationDirections[selectedDocType()] = degrees;
+      rebuildForOrientationChange();
+    }
+
+    function rebuildForOrientationChange() {
+      updateRotateButtons();
+      if (!outputCanvases.length || isMergeMode()) return;
+      saveBtn.disabled = true;
+      showLoading();
+      requestAnimationFrame(() => {
+        rebuildForCurrentMode();
+        showPreview();
+        saveModeState(currentDocType);
+        saveBtn.disabled = false;
+        setStatus(`${outputCanvases.length}ページ分の向きを補正しました。`);
+      });
     }
 
     function resetLoadedFiles() {
@@ -843,15 +871,9 @@
       const orientation = selectedOrientation();
       const shouldRotate = (orientation === "landscape" && canvas.height > canvas.width)
         || (orientation === "portrait" && canvas.width > canvas.height);
-      if (!shouldRotate) return canvas;
-      const out = document.createElement("canvas");
-      out.width = canvas.height;
-      out.height = canvas.width;
-      const ctx = out.getContext("2d");
-      ctx.translate(out.width / 2, out.height / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-      return out;
+      const type = selectedDocType();
+      const oriented = shouldRotate ? rotateCanvas(canvas, orientationDirections[type]) : canvas;
+      return upsideDown[type] ? rotateCanvas(oriented, 180) : oriented;
     }
 
     function refreshOutputCanvases() {
@@ -916,7 +938,7 @@
       const previewLandscape = isMergeMode() ? canvas.width > canvas.height : selectedOrientation() === "landscape";
       if (previewLandscape) sheet.classList.add("landscape");
       const preview = document.createElement("canvas");
-      const displayCanvas = isMergeMode() ? canvas : applySelectedRotation(canvas);
+      const displayCanvas = canvas;
       const page = isMergeMode() ? pageSizeForCanvas(displayCanvas) : selectedPageSize();
       const box = isMergeMode() ? { wMm: page.wMm - 10, hMm: page.hMm - 10 } : largePlacementBox(page);
       preview.width = displayCanvas.width;
@@ -973,7 +995,7 @@
 
     function buildA4PageJpeg(canvas) {
       const page = selectedPageSize();
-      const displayCanvas = applySelectedRotation(canvas);
+      const displayCanvas = canvas;
       const doc = document.createElement("canvas");
       doc.width = Math.round(page.wMm * MM_TO_PX);
       doc.height = Math.round(page.hMm * MM_TO_PX);
@@ -1012,11 +1034,10 @@
       return { data: jpegData, width: doc.width, height: doc.height, page };
     }
 
-    function applySelectedRotation(canvas) {
-      const rotation = rotations[selectedDocType()];
-      if (rotation === 0) return canvas;
+    function rotateCanvas(canvas, rotation) {
       const out = document.createElement("canvas");
-      const quarterTurn = rotation === 90 || rotation === 270;
+      const normalizedRotation = (rotation + 360) % 360;
+      const quarterTurn = normalizedRotation === 90 || normalizedRotation === 270;
       out.width = quarterTurn ? canvas.height : canvas.width;
       out.height = quarterTurn ? canvas.width : canvas.height;
       const ctx = out.getContext("2d");

@@ -347,6 +347,10 @@
       cursor: not-allowed;
     }
 
+    .print-btn {
+      background: #2563eb;
+    }
+
     .status {
       min-height: 22px;
       color: var(--muted);
@@ -403,6 +407,7 @@
     </div>
 
     <button id="saveBtn" type="button" disabled>PDF保存</button>
+    <button id="printBtn" class="print-btn" type="button" disabled>印刷（FAX送信）</button>
 
     <div id="drop" class="drop">
       <div id="placeholder" class="placeholder">
@@ -428,6 +433,7 @@
     const drop = document.getElementById("drop");
     const placeholder = document.getElementById("placeholder");
     const saveBtn = document.getElementById("saveBtn");
+    const printBtn = document.getElementById("printBtn");
     const rotateLeftBtn = document.getElementById("rotateLeftBtn");
     const rotateRightBtn = document.getElementById("rotateRightBtn");
     const rotateUpsideDownBtn = document.getElementById("rotateUpsideDownBtn");
@@ -541,7 +547,7 @@
 
     saveBtn.addEventListener("click", async () => {
       if (isMergeMode() ? !mergeFiles.length : !outputCanvases.length) return;
-      saveBtn.disabled = true;
+      setActionButtonsDisabled(true);
       try {
         if (isMergeMode()) {
           await saveSingleBlob(await buildMergedPdfBlob(mergeFiles), "PDF結合.pdf");
@@ -584,7 +590,40 @@
         console.error(error);
         setStatus("保存を中止しました。");
       } finally {
-        saveBtn.disabled = false;
+        setActionButtonsDisabled(false);
+      }
+    });
+
+    printBtn.addEventListener("click", async () => {
+      if (isMergeMode() ? !mergeFiles.length : !outputCanvases.length) return;
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        setStatus("印刷画面を開けませんでした。ポップアップを許可して、もう一度お試しください。");
+        return;
+      }
+      setActionButtonsDisabled(true);
+      try {
+        setStatus("印刷用PDFを作成中です。");
+        await nextFrame();
+        const blob = isMergeMode()
+          ? await buildMergedPdfBlob(mergeFiles)
+          : buildOutputPdfBlob(outputCanvases);
+        const url = URL.createObjectURL(blob);
+        printWindow.addEventListener("load", () => {
+          setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+          }, 400);
+        }, { once: true });
+        printWindow.location.href = url;
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        setStatus("印刷画面を開きました。");
+      } catch (error) {
+        console.error(error);
+        printWindow.close();
+        setStatus("印刷用PDFの作成に失敗しました。");
+      } finally {
+        setActionButtonsDisabled(false);
       }
     });
 
@@ -623,6 +662,11 @@
       rotateUpsideDownBtn.classList.toggle("active", upsideDown[type]);
     }
 
+    function setActionButtonsDisabled(disabled) {
+      saveBtn.disabled = disabled;
+      printBtn.disabled = disabled;
+    }
+
     function updateControlsVisibility() {
       document.querySelector(".contrast").classList.toggle("hidden", isMergeMode());
       document.querySelector(".size-control").classList.toggle("hidden", isMergeMode());
@@ -648,13 +692,13 @@
     function rebuildForOrientationChange() {
       updateRotateButtons();
       if (!outputCanvases.length || isMergeMode()) return;
-      saveBtn.disabled = true;
+      setActionButtonsDisabled(true);
       showLoading();
       requestAnimationFrame(() => {
         rebuildForCurrentMode();
         showPreview();
         saveModeState(currentDocType);
-        saveBtn.disabled = false;
+        setActionButtonsDisabled(false);
         setStatus(`${outputCanvases.length}ページ分の向きを補正しました。`);
       });
     }
@@ -665,7 +709,7 @@
       outputCanvases = [];
       mergeFiles = [];
       mergePageCount = 0;
-      saveBtn.disabled = true;
+      setActionButtonsDisabled(true);
       showPlaceholder();
       setStatus(modeStatusText());
       saveModeState(currentDocType);
@@ -707,7 +751,7 @@
       updateContrastButtons();
       updateSizeButtons();
       const hasOutput = isMergeMode() ? mergeFiles.length : outputCanvases.length;
-      saveBtn.disabled = !hasOutput;
+      setActionButtonsDisabled(!hasOutput);
       if (hasOutput) {
         if (isMergeMode()) showMergeSummary();
         else showPreview();
@@ -734,7 +778,7 @@
     async function loadFiles(files) {
       setStatus(`${files.length}件を読み込み中です。`);
       showLoading();
-      saveBtn.disabled = true;
+      setActionButtonsDisabled(true);
       if (!isMergeMode()) {
         loadedCanvases = [];
         sourceCanvases = [];
@@ -754,7 +798,7 @@
           }
           saveModeState(currentDocType);
           showMergeSummary();
-          saveBtn.disabled = false;
+          setActionButtonsDisabled(false);
           setStatus(`${mergeFiles.length}件・${mergePageCount}ページ分のPDF結合準備が完了しました。`);
           return;
         }
@@ -767,7 +811,7 @@
         rebuildForCurrentMode();
         saveModeState(currentDocType);
         showPreview();
-        saveBtn.disabled = false;
+        setActionButtonsDisabled(false);
         setStatus(`${outputCanvases.length}ページ分の切り抜きと白黒変換が完了しました。`);
       } catch (error) {
         console.error(error);
@@ -954,6 +998,10 @@
     function buildPdfBlob(canvas) {
       const pageImages = [buildA4PageJpeg(canvas)];
       return objectsToPdfBlobFromPageImages(pageImages);
+    }
+
+    function buildOutputPdfBlob(canvases) {
+      return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageJpeg(canvas)));
     }
 
     async function buildMergedPdfBlob(files) {

@@ -3466,6 +3466,7 @@ function getColumnEditorItems() {
 function openColumnEditorModal() {
   columnEditorReorderMode = false;
   columnEditorTextMode = false;
+  selectedColumnKey = '';
   selectedColumnReorderKey = '';
   renderColumnEditorModal();
 }
@@ -3482,18 +3483,14 @@ function renderColumnEditorModal() {
       <button class="editor-action-btn" onclick="openAddColumnModal()">追加</button>
       <button class="editor-action-btn subtle${columnEditorReorderMode ? ' is-active' : ''}" onclick="toggleColumnEditorReorderMode()">並び替え</button>
       <button class="editor-action-btn subtle${columnEditorTextMode ? ' is-active' : ''}" onclick="toggleColumnEditorTextMode()">文字編集</button>
+      <button class="editor-action-btn danger" onclick="toggleDeleteColumnMode()">削除</button>
+      <button class="editor-action-btn subtle" onclick="openRestoreColumnsModal()">戻す</button>
     </div>
-    <div class="reorder-hint">${columnEditorTextMode ? '名前を変えたい項目を押してください。' : (columnEditorReorderMode ? (selectedColumnReorderKey ? '緑の項目を移動中です。入れたい位置の項目を押してください。' : '移動したい項目を押してください。') : '横列の項目一覧です。追加項目のみ削除できます。')}</div>
+    <div class="reorder-hint">${columnEditorTextMode ? '名前を変えたい項目を押してください。' : (columnEditorReorderMode ? (selectedColumnReorderKey ? '緑の項目を移動中です。入れたい位置の項目を押してください。' : '移動したい項目を押してください。') : '項目を選んでから削除を押すと非表示になります。戻すから再表示できます。')}</div>
     <div class="editor-list">
       ${items.map(item => `
         <div class="editor-row${(columnEditorReorderMode ? selectedColumnReorderKey === item.key : selectedColumnKey === item.key) ? ' is-selected' : ''}" onclick="${rowClick(item)}">
           <div class="editor-row-label">${esc(item.label)}</div>
-          <div class="editor-row-actions">
-            ${columnEditorReorderMode || columnEditorTextMode
-              ? ``
-              : `${item.custom ? `<button class="editor-chip" onclick="event.stopPropagation();confirmDeleteColumn('${esc(item.key)}')">削除</button>` : ''}`
-            }
-          </div>
         </div>
       `).join('')}
     </div>`
@@ -3597,36 +3594,53 @@ function saveAddedColumn() {
 
 function toggleDeleteColumnMode() {
   if (!selectedColumnKey) {
-    alert('消したい項目を先にダブルクリックしてください');
+    alert('非表示にしたい項目を先に選んでください');
     return;
   }
   confirmDeleteColumn(selectedColumnKey);
 }
 
 function confirmDeleteColumn(key) {
-  const column = getCustomColumn(key);
-  if (!column) {
-    alert('追加した項目のみ削除できます');
+  if (!getAllMovableColumnKeys().includes(key)) {
+    alert('項目が見つかりません');
     return;
   }
-  document.getElementById('cf-title').textContent = '項目を削除';
-  document.getElementById('cf-msg').textContent = `${column.label} を削除しますか？`;
+  const label = getColumnLabel(key);
+  document.getElementById('cf-title').textContent = '項目を非表示';
+  document.getElementById('cf-msg').textContent = `${label} を画面から非表示にしますか？ データは消えず、「戻す」から再表示できます。`;
   document.getElementById('cf-ok').onclick = () => {
-    customColumns = customColumns.filter(item => item.key !== key);
-    saveCustomColumns();
     columnOrder = columnOrder.filter(item => item !== key);
     saveColumnOrder();
-    currentData.forEach(item => {
-      item.customFields = normalizeCustomFieldValues(item.customFields);
-      delete item.customFields[key];
-    });
-    saveMonthData(curYear, curMonth, currentData);
     if (selectedColumnKey === key) selectedColumnKey = '';
     closeConfirm();
     render();
     renderColumnEditorModal();
   };
   document.getElementById('confirm').classList.add('show');
+}
+
+function openRestoreColumnsModal() {
+  const hiddenKeys = getAllMovableColumnKeys().filter(key => !columnOrder.includes(key));
+  if (hiddenKeys.length === 0) {
+    alert('現在、非表示の項目はありません');
+    return;
+  }
+  showModal('項目を表示', '',
+    `<div class="reorder-hint" style="color:#4b6b40;margin-bottom:10px">表示を戻したい項目を選んでください。</div>
+     <div class="office-modal-actions">
+       ${hiddenKeys.map(key => `<button class="mact green" onclick="restoreColumn('${esc(key)}')">${esc(getColumnLabel(key))} を表示</button>`).join('')}
+     </div>`
+  );
+  document.getElementById('modal').classList.add('compact-picker');
+}
+
+function restoreColumn(key) {
+  if (!getAllMovableColumnKeys().includes(key) || columnOrder.includes(key)) return;
+  columnOrder = [...columnOrder, key];
+  saveColumnOrder();
+  closeModal();
+  render();
+  renderColumnEditorModal();
 }
 
 function moveArrayItem(list, index, delta) {

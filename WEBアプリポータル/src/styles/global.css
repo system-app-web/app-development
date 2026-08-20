@@ -480,7 +480,41 @@ a {
   }
 
   .app-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .app-card {
+    min-height: 212px;
+    padding: 14px;
+  }
+
+  .app-card-top {
+    gap: 10px;
+  }
+
+  .app-icon,
+  .app-icon-image {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+  }
+
+  .app-card h3 {
+    font-size: 1rem;
+  }
+
+  .app-description {
+    margin: 14px 0 16px;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .button {
+    min-height: 42px;
+    padding: 10px 8px;
+    border-radius: 12px;
+    font-size: 0.88rem;
   }
 
   .app-section {

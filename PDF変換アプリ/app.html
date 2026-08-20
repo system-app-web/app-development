@@ -512,9 +512,12 @@
       const corrections = [];
       for (let index = 0; index < canvases.length; index++) {
         setStatus(`${fileName} ${index + 1}/${canvases.length}ページの向きを自動判定中です。`);
-        const { data } = await worker.detect(makeOrientationPreview(canvases[index]));
+        // First apply the established landscape baseline. OSD only decides whether it is upside down.
+        const baseline = normalizeOrientation(cropDocument(canvases[index]));
+        const { data } = await worker.detect(makeOrientationPreview(baseline));
         const orientation = data.orientation_degrees ?? 0;
-        corrections.push((360 - orientation) % 360);
+        const confidence = data.orientation_confidence ?? 0;
+        corrections.push(orientation === 180 && confidence >= 8 ? 180 : 0);
         await nextFrame();
       }
       return corrections;

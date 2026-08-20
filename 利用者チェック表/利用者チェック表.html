@@ -1583,6 +1583,7 @@ const UNDO_KEY = 'riyosha_check_undo_v1';
 const FAC_KEY = 'riyosha_facilities_v1';
 const ORDER_MODE_KEY = 'riyosha_order_mode_v1';
 const COLUMN_ORDER_KEY = 'riyosha_column_order_v1';
+const MONTH_COLUMN_ACTIONS_KEY = 'riyosha_month_column_actions_v1';
 const CUSTOM_COLUMNS_KEY = 'riyosha_custom_columns_v1';
 const COLUMN_LABELS_KEY = 'riyosha_column_labels_v1';
 const CHK = ['monita', 'sikien', 'drive', 'hand', 'fax'];
@@ -1603,7 +1604,7 @@ const DEFAULT_COLUMN_LABELS = {
 };
 const nameCollator = new Intl.Collator('ja', { sensitivity: 'base', numeric: true });
 const NAME_YOMI = {};
-const EXPORT_SCHEMA_VERSION = 1;
+const EXPORT_SCHEMA_VERSION = 2;
 let allDateReiwa = true;
 const visitChoices = ['TEL', '入院中'];
 const levelChoices = ['支1', '支2', '1', '2', '3', '4', '5'];
@@ -1763,6 +1764,60 @@ function loadColumnOrder() {
 
 function saveColumnOrder() {
   localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(columnOrder));
+}
+
+function loadMonthColumnActions() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MONTH_COLUMN_ACTIONS_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([month, actions]) => /^\d{4}-\d{2}$/.test(month) && actions && typeof actions === 'object' && !Array.isArray(actions))
+        .map(([month, actions]) => [month, Object.fromEntries(
+          Object.entries(actions).filter(([, action]) => ['hide', 'show', 'delete'].includes(action))
+        )])
+    );
+  } catch {
+    return {};
+  }
+}
+
+function saveMonthColumnActions(actions) {
+  localStorage.setItem(MONTH_COLUMN_ACTIONS_KEY, JSON.stringify(actions));
+}
+
+function getColumnStateForMonth(y = curYear, m = curMonth) {
+  const targetMonth = monthKey(y, m);
+  const state = { hidden: new Set(), deleted: new Set() };
+  const actions = loadMonthColumnActions();
+  Object.keys(actions)
+    .filter(month => month <= targetMonth)
+    .sort()
+    .forEach(month => {
+      Object.entries(actions[month]).forEach(([key, action]) => {
+        if (action === 'delete') {
+          state.deleted.add(key);
+          state.hidden.delete(key);
+        } else if (action === 'hide' && !state.deleted.has(key)) {
+          state.hidden.add(key);
+        } else if (action === 'show' && !state.deleted.has(key)) {
+          state.hidden.delete(key);
+        }
+      });
+    });
+  return state;
+}
+
+function getVisibleColumnKeys(y = curYear, m = curMonth) {
+  const state = getColumnStateForMonth(y, m);
+  return columnOrder.filter(key => !state.hidden.has(key) && !state.deleted.has(key));
+}
+
+function saveColumnActionForCurrentMonth(key, action) {
+  const actions = loadMonthColumnActions();
+  const currentMonth = monthKey(curYear, curMonth);
+  actions[currentMonth] = { ...(actions[currentMonth] || {}), [key]: action };
+  saveMonthColumnActions(actions);
 }
 
 function saveOrderMode(mode) {
@@ -2245,7 +2300,8 @@ function buildExportPayload() {
     facilities: loadFacilities(),
     orderMode: loadOrderMode(),
     customColumns: loadCustomColumns(),
-    columnLabels: loadColumnLabels()
+    columnLabels: loadColumnLabels(),
+    monthColumnActions: loadMonthColumnActions()
   };
 }
 
@@ -2303,12 +2359,14 @@ function importLocalDataFromFile(file) {
       const importedOrderMode = parsed && typeof parsed === 'object' ? parsed.orderMode : null;
       const importedCustomColumns = parsed && typeof parsed === 'object' ? parsed.customColumns : null;
       const importedColumnLabels = parsed && typeof parsed === 'object' ? parsed.columnLabels : null;
+      const importedMonthColumnActions = parsed && typeof parsed === 'object' ? parsed.monthColumnActions : null;
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('invalid');
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       localStorage.setItem(FAC_KEY, JSON.stringify(Array.isArray(facilities) ? facilities : []));
       localStorage.setItem(ORDER_MODE_KEY, importedOrderMode === 'custom' ? 'custom' : 'name');
       localStorage.setItem(CUSTOM_COLUMNS_KEY, JSON.stringify(Array.isArray(importedCustomColumns) ? importedCustomColumns : []));
       localStorage.setItem(COLUMN_LABELS_KEY, JSON.stringify(importedColumnLabels && typeof importedColumnLabels === 'object' && !Array.isArray(importedColumnLabels) ? importedColumnLabels : {}));
+      localStorage.setItem(MONTH_COLUMN_ACTIONS_KEY, JSON.stringify(importedMonthColumnActions && typeof importedMonthColumnActions === 'object' && !Array.isArray(importedMonthColumnActions) ? importedMonthColumnActions : {}));
       customColumns = loadCustomColumns();
       columnLabels = loadColumnLabels();
       columnOrder = loadColumnOrder();
@@ -3450,7 +3508,7 @@ function getBaseColumnEditorItems() {
 
 function getColumnEditorItems() {
   const fixedMap = new Map(getBaseColumnEditorItems().map(item => [item.key, item]));
-  return columnOrder.map(key => {
+  return getVisibleColumnKeys().map(key => {
     const fixed = fixedMap.get(key);
     if (fixed) return fixed;
     const custom = getCustomColumn(key);
@@ -3484,9 +3542,10 @@ function renderColumnEditorModal() {
       <button class="editor-action-btn subtle${columnEditorReorderMode ? ' is-active' : ''}" onclick="toggleColumnEditorReorderMode()">並び替え</button>
       <button class="editor-action-btn subtle${columnEditorTextMode ? ' is-active' : ''}" onclick="toggleColumnEditorTextMode()">文字編集</button>
       <button class="editor-action-btn danger" onclick="toggleDeleteColumnMode()">削除</button>
+      <button class="editor-action-btn subtle" onclick="toggleHideColumnMode()">非表示</button>
       <button class="editor-action-btn subtle" onclick="openRestoreColumnsModal()">戻す</button>
     </div>
-    <div class="reorder-hint">${columnEditorTextMode ? '名前を変えたい項目を押してください。' : (columnEditorReorderMode ? (selectedColumnReorderKey ? '緑の項目を移動中です。入れたい位置の項目を押してください。' : '移動したい項目を押してください。') : '項目を選んでから削除を押すと非表示になります。戻すから再表示できます。')}</div>
+    <div class="reorder-hint">${columnEditorTextMode ? '名前を変えたい項目を押してください。' : (columnEditorReorderMode ? (selectedColumnReorderKey ? '緑の項目を移動中です。入れたい位置の項目を押してください。' : '移動したい項目を押してください。') : '削除は当月以降の値も消します。非表示は値を残し、戻すから再表示できます。')}</div>
     <div class="editor-list">
       ${items.map(item => `
         <div class="editor-row${(columnEditorReorderMode ? selectedColumnReorderKey === item.key : selectedColumnKey === item.key) ? ' is-selected' : ''}" onclick="${rowClick(item)}">
@@ -3594,10 +3653,18 @@ function saveAddedColumn() {
 
 function toggleDeleteColumnMode() {
   if (!selectedColumnKey) {
-    alert('非表示にしたい項目を先に選んでください');
+    alert('削除したい項目を先に選んでください');
     return;
   }
   confirmDeleteColumn(selectedColumnKey);
+}
+
+function toggleHideColumnMode() {
+  if (!selectedColumnKey) {
+    alert('非表示にしたい項目を先に選んでください');
+    return;
+  }
+  confirmHideColumn(selectedColumnKey);
 }
 
 function confirmDeleteColumn(key) {
@@ -3606,11 +3673,36 @@ function confirmDeleteColumn(key) {
     return;
   }
   const label = getColumnLabel(key);
-  document.getElementById('cf-title').textContent = '項目を非表示';
-  document.getElementById('cf-msg').textContent = `${label} を画面から非表示にしますか？ データは消えず、「戻す」から再表示できます。`;
+  document.getElementById('cf-title').textContent = '項目を削除';
+  document.getElementById('cf-msg').textContent = `${label} を当月以降から削除しますか？ 当月以降の入力値も消え、「戻す」からは再表示できません。`;
   document.getElementById('cf-ok').onclick = () => {
-    columnOrder = columnOrder.filter(item => item !== key);
-    saveColumnOrder();
+    const all = loadAll();
+    saveUndoSnapshot(all);
+    Object.keys(all)
+      .filter(month => month >= monthKey(curYear, curMonth) && Array.isArray(all[month]))
+      .forEach(month => {
+        all[month] = all[month].map(item => clearColumnValue(item, key));
+      });
+    saveAll(all);
+    saveColumnActionForCurrentMonth(key, 'delete');
+    if (selectedColumnKey === key) selectedColumnKey = '';
+    closeConfirm();
+    render();
+    renderColumnEditorModal();
+  };
+  document.getElementById('confirm').classList.add('show');
+}
+
+function confirmHideColumn(key) {
+  if (!getAllMovableColumnKeys().includes(key)) {
+    alert('項目が見つかりません');
+    return;
+  }
+  const label = getColumnLabel(key);
+  document.getElementById('cf-title').textContent = '項目を非表示';
+  document.getElementById('cf-msg').textContent = `${label} を当月以降で非表示にしますか？ 入力値は残り、「戻す」から再表示できます。`;
+  document.getElementById('cf-ok').onclick = () => {
+    saveColumnActionForCurrentMonth(key, 'hide');
     if (selectedColumnKey === key) selectedColumnKey = '';
     closeConfirm();
     render();
@@ -3620,7 +3712,8 @@ function confirmDeleteColumn(key) {
 }
 
 function openRestoreColumnsModal() {
-  const hiddenKeys = getAllMovableColumnKeys().filter(key => !columnOrder.includes(key));
+  const state = getColumnStateForMonth();
+  const hiddenKeys = getAllMovableColumnKeys().filter(key => state.hidden.has(key) && !state.deleted.has(key));
   if (hiddenKeys.length === 0) {
     alert('現在、非表示の項目はありません');
     return;
@@ -3635,12 +3728,25 @@ function openRestoreColumnsModal() {
 }
 
 function restoreColumn(key) {
-  if (!getAllMovableColumnKeys().includes(key) || columnOrder.includes(key)) return;
-  columnOrder = [...columnOrder, key];
-  saveColumnOrder();
+  if (!getAllMovableColumnKeys().includes(key)) return;
+  saveColumnActionForCurrentMonth(key, 'show');
   closeModal();
   render();
   renderColumnEditorModal();
+}
+
+function clearColumnValue(item, key) {
+  const next = { ...item };
+  if (isCustomColumnKey(key)) {
+    const customFields = normalizeCustomFieldValues(next.customFields);
+    delete customFields[key];
+    return { ...next, customFields };
+  }
+  if (key === 'visit') return { ...next, visit: '', visitDate: '', visitTag1: '', visitTag2: '' };
+  if (key === 'meeting') return { ...next, meeting: 0, meetingDate: '', meetingTag1: '', meetingTag2: '' };
+  if (key === 'fax') return { ...next, fax: 0, faxOffices: [] };
+  if (key === 'seho') return { ...next, seho: '', sehoCw: '' };
+  return { ...next, [key]: CHK.includes(key) ? 0 : '' };
 }
 
 function moveArrayItem(list, index, delta) {
@@ -3984,14 +4090,16 @@ function getColumnHeaderInnerHtml(key) {
 function renderColumnHeaderOrder() {
   const headerRow = document.querySelector('thead tr');
   if (!headerRow) return;
+  const visibleColumnKeys = getVisibleColumnKeys();
   Array.from(headerRow.querySelectorAll('th[data-custom-col="1"]')).forEach(th => th.remove());
   Array.from(headerRow.querySelectorAll('th[data-col-key]')).forEach(th => {
     const key = th.dataset.colKey || '';
     th.innerHTML = getColumnHeaderInnerHtml(key);
+    th.style.display = visibleColumnKeys.includes(key) ? '' : 'none';
   });
   const fixedStart = Array.from(headerRow.querySelectorAll('th')).slice(0, 3);
   const fixedEnd = headerRow.querySelector('th.h-biko');
-  customColumns.forEach(item => {
+  customColumns.filter(item => visibleColumnKeys.includes(item.key)).forEach(item => {
     const th = document.createElement('th');
     th.className = `h-rot${item.type === 'date' ? ' h-rot-date' : ''} col-movable`;
     th.dataset.colKey = item.key;
@@ -4002,7 +4110,7 @@ function renderColumnHeaderOrder() {
   const movableMap = new Map(
     Array.from(headerRow.querySelectorAll('th[data-col-key]')).map(th => [th.dataset.colKey, th])
   );
-  columnOrder.forEach(key => {
+  visibleColumnKeys.forEach(key => {
     const th = movableMap.get(key);
     if (th) headerRow.insertBefore(th, fixedEnd);
   });
@@ -4357,7 +4465,7 @@ function render() {
       columnCells[column.key] = td;
     });
 
-    columnOrder.forEach(key => {
+    getVisibleColumnKeys().forEach(key => {
       const td = columnCells[key];
       if (td) tr.appendChild(td);
     });

@@ -616,10 +616,6 @@ th[data-col-key="meeting"] { width: 44px; }
 th.h-biko { width: 168px; font-size: 8px; color: #2d7a1a; font-weight: 700; text-align: center; vertical-align: middle; padding-left: 0; padding-right: 0; border-left: 2px solid #86d46a; min-width: 168px; }
 th.col-movable { cursor: pointer; }
 th[data-col-key], td[data-col-key] { transition: background-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease; }
-th.col-selected {
-  background: #dff5d2 !important;
-  box-shadow: inset 0 0 0 2px #65b842;
-}
 th.col-dragging {
   background: #eefce6 !important;
   box-shadow: 0 8px 20px rgba(58,158,32,0.22), inset 0 0 0 2px #65b842;
@@ -4118,9 +4114,6 @@ function renderColumnHeaderOrder() {
     const anchor = headerRow.children[index];
     if (anchor !== th) headerRow.insertBefore(th, anchor || headerRow.firstChild);
   });
-  Array.from(headerRow.querySelectorAll('th[data-col-key]')).forEach(th => {
-    th.classList.toggle('col-selected', th.dataset.colKey === selectedColumnKey);
-  });
   bindMovableColumnHeaders();
 }
 
@@ -4159,12 +4152,6 @@ function bindMovableColumnHeaders() {
   document.querySelectorAll('th[data-col-key]').forEach(th => {
     if (th.dataset.bound === '1') return;
     th.dataset.bound = '1';
-    th.addEventListener('dblclick', event => {
-      event.stopPropagation();
-      const key = th.dataset.colKey || '';
-      selectedColumnKey = selectedColumnKey === key ? '' : key;
-      renderColumnHeaderOrder();
-    });
   });
 }
 

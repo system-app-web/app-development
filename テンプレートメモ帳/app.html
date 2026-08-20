@@ -587,18 +587,24 @@ const DEFAULT_DATA = {
     { id: 'g_other',   label: 'その他' },
   ],
   categories: [
-    { id: 'free', groupId: 'g_other', label: '自由記述', template: `【支援記録】
-
-` },
+    { id: 'free', groupId: 'g_other', label: '自由記述', template: `` },
   ]
 };
+
+function normalizeData(data) {
+  const free = data.categories?.find(c => c.id === 'free');
+  if (free && free.template.trim() === '【支援記録】') {
+    free.template = '';
+  }
+  return data;
+}
 
 // ── ストレージ ──
 function getData() {
   try {
     const s = localStorage.getItem('tmpl_data_v4');
-    return s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA));
-  } catch { return JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+    return normalizeData(s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)));
+  } catch { return normalizeData(JSON.parse(JSON.stringify(DEFAULT_DATA))); }
 }
 
 function saveData(data) {

@@ -3539,7 +3539,7 @@ function renderColumnEditorModal() {
       <button class="editor-action-btn subtle${columnEditorTextMode ? ' is-active' : ''}" onclick="toggleColumnEditorTextMode()">文字編集</button>
       <button class="editor-action-btn danger" onclick="toggleDeleteColumnMode()">削除</button>
       <button class="editor-action-btn subtle" onclick="toggleHideColumnMode()">非表示</button>
-      <button class="editor-action-btn subtle" onclick="openRestoreColumnsModal()">戻す</button>
+      <button class="editor-action-btn subtle" onclick="openRestoreColumnsModal()">非表示を戻す</button>
     </div>
     <div class="reorder-hint">${columnEditorTextMode ? '名前を変えたい項目を押してください。' : (columnEditorReorderMode ? (selectedColumnReorderKey ? '緑の項目を移動中です。入れたい位置の項目を押してください。' : '移動したい項目を押してください。') : '削除は当月以降の値も消します。非表示は値を残し、戻すから再表示できます。')}</div>
     <div class="editor-list">

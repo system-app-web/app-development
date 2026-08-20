@@ -159,6 +159,33 @@
       color: #fff;
     }
 
+    .rotation-tools {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .rotation-btn {
+      width: auto;
+      min-height: 32px;
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .rotation-btn.hidden {
+      display: none;
+    }
+
+    .rotation-btn.active {
+      border-color: #0f766e;
+      background: #0f766e;
+      color: #fff;
+    }
+
     .control-row {
       display: flex;
       gap: 10px;
@@ -364,6 +391,12 @@
       <label><input type="radio" name="docType" value="burden"><span>負担割合証（縦印刷）</span></label>
     </div>
 
+    <div class="rotation-tools" aria-label="原稿の向き補正">
+      <button id="rotateLeftBtn" class="rotation-btn" type="button" title="左向きの原稿として補正">左向き原稿</button>
+      <button id="rotateRightBtn" class="rotation-btn" type="button" title="右向きの原稿として補正">右向き原稿</button>
+      <button id="rotateUpsideDownBtn" class="rotation-btn" type="button" title="原稿の上下を反転">上下逆</button>
+    </div>
+
     <div class="notice"><strong>変換機能は白黒のみ対応です</strong><br>カラー・濃いグレースケールの書類は黒くなったり、影が出たりする場合があります。PDF結合は元のPDFをそのまま結合します。</div>
 
     <div class="control-row contrast">
@@ -415,6 +448,9 @@
     const saveBtn = document.getElementById("saveBtn");
     const printBtn = document.getElementById("printBtn");
     const resetBtn = document.getElementById("resetBtn");
+    const rotateLeftBtn = document.getElementById("rotateLeftBtn");
+    const rotateRightBtn = document.getElementById("rotateRightBtn");
+    const rotateUpsideDownBtn = document.getElementById("rotateUpsideDownBtn");
     const contrastButtons = Array.from(document.querySelectorAll(".contrast-btn"));
     const sizeButtons = Array.from(document.querySelectorAll(".size-btn"));
     const statusEl = document.getElementById("status");
@@ -429,6 +465,9 @@
     let blackThreshold = 172;
     let sizeScale = 1;
     let orientationWorkerPromise = null;
+    const manualOrientationDirections = { merge: -90, care: -90, burden: -90 };
+    const manualOrientationEnabled = { merge: false, care: false, burden: false };
+    const manualUpsideDown = { merge: false, care: false, burden: false };
     const modeStates = {
       merge: emptyModeState(),
       care: emptyModeState(),
@@ -445,9 +484,25 @@
       input.addEventListener("change", () => {
         saveModeState(currentDocType);
         currentDocType = selectedDocType();
+        updateRotationButtons();
         updateControlsVisibility();
         loadModeState(currentDocType);
       });
+    });
+
+    rotateLeftBtn.addEventListener("click", () => {
+      setManualOrientation(90);
+    });
+
+    rotateRightBtn.addEventListener("click", () => {
+      setManualOrientation(-90);
+    });
+
+    rotateUpsideDownBtn.addEventListener("click", () => {
+      const type = selectedDocType();
+      manualOrientationEnabled[type] = true;
+      manualUpsideDown[type] = !manualUpsideDown[type];
+      rebuildForManualOrientation();
     });
 
     resetBtn.addEventListener("click", () => {
@@ -523,6 +578,7 @@
       return corrections;
     }
 
+    updateRotationButtons();
     updateControlsVisibility();
     updateContrastButtons();
     updateSizeButtons();
@@ -659,6 +715,39 @@
     function updateControlsVisibility() {
       document.querySelector(".contrast").classList.toggle("hidden", isMergeMode());
       document.querySelector(".size-control").classList.toggle("hidden", isMergeMode());
+    }
+
+    function updateRotationButtons() {
+      const type = selectedDocType();
+      const hidden = isMergeMode();
+      rotateLeftBtn.classList.toggle("hidden", hidden);
+      rotateRightBtn.classList.toggle("hidden", hidden);
+      rotateUpsideDownBtn.classList.toggle("hidden", hidden);
+      rotateLeftBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === 90);
+      rotateRightBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === -90);
+      rotateUpsideDownBtn.classList.toggle("active", manualOrientationEnabled[type] && manualUpsideDown[type]);
+    }
+
+    function setManualOrientation(degrees) {
+      const type = selectedDocType();
+      manualOrientationEnabled[type] = true;
+      manualOrientationDirections[type] = degrees;
+      manualUpsideDown[type] = false;
+      rebuildForManualOrientation();
+    }
+
+    function rebuildForManualOrientation() {
+      updateRotationButtons();
+      if (!loadedCanvases.length || isMergeMode()) return;
+      setActionButtonsDisabled(true);
+      showLoading();
+      requestAnimationFrame(() => {
+        rebuildForCurrentMode();
+        showPreview();
+        saveModeState(currentDocType);
+        setActionButtonsDisabled(false);
+        setStatus(`${outputCanvases.length}ページ分の向きを補正しました。`);
+      });
     }
 
     function updateContrastButtons() {
@@ -908,7 +997,10 @@
       const orientation = selectedOrientation();
       const shouldRotate = (orientation === "landscape" && canvas.height > canvas.width)
         || (orientation === "portrait" && canvas.width > canvas.height);
-      return shouldRotate ? rotateCanvas(canvas, -90) : canvas;
+      const type = selectedDocType();
+      const direction = manualOrientationEnabled[type] ? manualOrientationDirections[type] : -90;
+      const oriented = shouldRotate ? rotateCanvas(canvas, direction) : canvas;
+      return manualOrientationEnabled[type] && manualUpsideDown[type] ? rotateCanvas(oriented, 180) : oriented;
     }
 
     function refreshOutputCanvases() {
@@ -924,7 +1016,9 @@
         return;
       }
       for (let index = 0; index < loadedCanvases.length; index++) {
-        const corrected = rotateCanvas(loadedCanvases[index], pageRotationCorrections[index] ?? 0);
+        const type = selectedDocType();
+        const correction = manualOrientationEnabled[type] ? 0 : (pageRotationCorrections[index] ?? 0);
+        const corrected = rotateCanvas(loadedCanvases[index], correction);
         const cropped = cropDocument(corrected);
         const oriented = normalizeOrientation(cropped);
         sourceCanvases.push(addOuterMargin(oriented));

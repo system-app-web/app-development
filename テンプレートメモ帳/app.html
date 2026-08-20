@@ -607,7 +607,7 @@ function saveData(data) {
 
 // ── 状態 ──
 let currentCatId = null;
-let collapsedGroups = {};  // groupId → true で折りたたみ
+let collapsedGroups = {};  // groupId → false で展開、未設定は折りたたみ
 
 // 編集中
 let editingGroupId = null;
@@ -624,7 +624,7 @@ function renderSidebar() {
   list.innerHTML = '';
 
   data.groups.forEach(group => {
-    const collapsed = collapsedGroups[group.id];
+    const collapsed = collapsedGroups[group.id] !== false;
 
     // グループヘッダー
     const header = document.createElement('div');

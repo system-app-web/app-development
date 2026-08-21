@@ -2158,10 +2158,9 @@ function syncBasicFieldsFromPreviousMonth(currentList, previousList) {
       seho: currentValue('seho'),
       sehoCw: currentValue('sehoCw'),
       biko: currentValue('biko'),
-      faxOffices: normalizeFaxOffices(prev.faxOffices).map((office, index) => {
-        const currentOffice = normalizeFaxOffices(source.faxOffices)[index];
-        return { ...office, checked: Boolean(currentOffice?.checked) };
-      }),
+      // Keep this month's office list and checks together. Matching by list
+      // position caused checks to shift when one office was deleted.
+      faxOffices: normalizeFaxOffices(source.faxOffices),
       // Custom columns are shared between months, but their values belong to
       // the displayed month. Keep an existing month's edits intact.
       customFields: current
@@ -2521,7 +2520,7 @@ function openFaxOfficeChecklist(i) {
         <div class="office-check-name">${esc(office.name)}</div>
         <button class="office-check-mark${office.checked ? ' is-on' : ''}" ondblclick="toggleFaxOffice('${esc(office.id)}')">${office.checked ? '✓' : '○'}</button>
         <div class="office-check-actions">
-          <button class="office-mini-btn" onclick="openFaxOfficeEdit('${esc(office.id)}')">編集</button>
+          <button class="office-mini-btn" onclick="openFaxOfficeEdit('${esc(office.id)}')">事業所名変更</button>
           <button class="office-mini-btn danger" onclick="deleteFaxOffice('${esc(office.id)}')">削除</button>
         </div>
       </div>`).join('')
@@ -2529,7 +2528,7 @@ function openFaxOfficeChecklist(i) {
   showModal('次月提供票', item.name,
     `<div class="office-check-list">${rows}</div>
      <div class="office-modal-actions">
-       <button class="mact green" onclick="openFaxOfficeAdd()">追加</button>
+       <button class="mact green" onclick="openFaxOfficeAdd()">事業所追加</button>
        <button class="mact green" onclick="closeModal();render();">OK</button>
      </div>`
   );
@@ -2561,6 +2560,7 @@ function openFaxOfficeAdd() {
      <button class="mact green" style="width:100%;margin-top:8px" onclick="saveFaxOfficeAdd()">追加する</button>`
   );
   document.getElementById('modal').classList.add('compact-picker');
+  document.querySelector('#modal .modal-close').onclick = returnToFaxOfficeChecklist;
   setTimeout(() => document.getElementById('fax-office-name')?.focus(), 100);
 }
 
@@ -2580,12 +2580,17 @@ function openFaxOfficeEdit(id) {
   const item = currentData[modalIndex];
   const office = normalizeFaxOffices(item?.faxOffices).find(entry => entry.id === id);
   if (!office) return;
-  showModal('事業所編集', currentData[modalIndex]?.name || '',
+  showModal('事業所名変更', currentData[modalIndex]?.name || '',
     `<input class="modal-input" id="fax-office-name" placeholder="事業所名" value="${esc(office.name)}">
      <button class="mact green" style="width:100%;margin-top:8px" onclick="saveFaxOfficeEdit('${esc(id)}')">保存する</button>`
   );
   document.getElementById('modal').classList.add('compact-picker');
+  document.querySelector('#modal .modal-close').onclick = returnToFaxOfficeChecklist;
   setTimeout(() => document.getElementById('fax-office-name')?.focus(), 100);
+}
+
+function returnToFaxOfficeChecklist() {
+  openFaxOfficeChecklist(modalIndex);
 }
 
 function saveFaxOfficeEdit(id) {
@@ -3940,6 +3945,7 @@ function showModal(col, name, html) {
   document.getElementById('mc').textContent = col;
   document.getElementById('mn').textContent = name;
   document.getElementById('ma').innerHTML = html;
+  document.querySelector('#modal .modal-close').onclick = closeModal;
   document.getElementById('modal').classList.add('show');
 }
 

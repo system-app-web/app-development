@@ -404,12 +404,6 @@
       <label><input type="radio" name="docType" value="burden"><span>負担割合証（縦印刷）</span></label>
     </div>
 
-    <div class="rotation-tools" aria-label="原稿の向き補正">
-      <button id="rotateLeftBtn" class="rotation-btn" type="button" title="左向きの原稿として補正">左向き原稿</button>
-      <button id="rotateRightBtn" class="rotation-btn" type="button" title="右向きの原稿として補正">右向き原稿</button>
-      <button id="rotateUpsideDownBtn" class="rotation-btn" type="button" title="原稿の上下を反転">上下逆</button>
-    </div>
-
     <div class="notice"><strong>変換機能は白黒のみ対応です</strong><br>カラー・濃いグレースケールの書類は黒くなったり、影が出たりする場合があります。PDF結合は元のPDFをそのまま結合します。</div>
 
     <div class="control-row contrast">
@@ -438,6 +432,12 @@
       <div id="placeholder" class="placeholder">
         白黒の写真またはPDFを<br>ここにドラッグ
       </div>
+    </div>
+
+    <div class="rotation-tools" aria-label="生成後の原稿向き補正">
+      <button id="rotateLeftBtn" class="rotation-btn" type="button" title="左向きの原稿として補正">左向き原稿</button>
+      <button id="rotateRightBtn" class="rotation-btn" type="button" title="右向きの原稿として補正">右向き原稿</button>
+      <button id="rotateUpsideDownBtn" class="rotation-btn" type="button" title="原稿の上下を反転">上下逆</button>
     </div>
 
     <div id="status" class="status">複数のPDFをドラッグすると、元のページをそのまま1つのPDFに結合します。</div>
@@ -728,7 +728,7 @@
 
     function updateRotationButtons() {
       const type = selectedDocType();
-      const hidden = isMergeMode();
+      const hidden = isMergeMode() || !loadedCanvases.length;
       rotateLeftBtn.classList.toggle("hidden", hidden);
       rotateRightBtn.classList.toggle("hidden", hidden);
       rotateUpsideDownBtn.classList.toggle("hidden", hidden);
@@ -782,6 +782,7 @@
       mergePreviewCanvas = null;
       setActionButtonsDisabled(true);
       showPlaceholder();
+      updateRotationButtons();
       setStatus(modeStatusText());
       saveModeState(currentDocType);
     }
@@ -830,6 +831,7 @@
       sizeScale = state.sizeScale;
       updateContrastButtons();
       updateSizeButtons();
+      updateRotationButtons();
       const hasOutput = isMergeMode() ? mergeFiles.length : outputCanvases.length;
       setActionButtonsDisabled(!hasOutput);
       if (hasOutput) {
@@ -911,6 +913,7 @@
         rebuildForCurrentMode();
         saveModeState(currentDocType);
         showPreview();
+        updateRotationButtons();
         setActionButtonsDisabled(false);
         setStatus(orientationDetectionFailed
           ? `${outputCanvases.length}ページ分の変換が完了しました。自動判定できないページは標準の向きで処理しています。`

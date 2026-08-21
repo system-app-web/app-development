@@ -251,6 +251,19 @@
       gap: 14px;
     }
 
+    .merge-preview-content {
+      width: 100%;
+      display: grid;
+      gap: 14px;
+      justify-items: center;
+    }
+
+    .merge-summary {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
     .drop.dragover {
       border-color: var(--accent);
       background: #ecfdf5;
@@ -462,6 +475,7 @@
     let orientationDetectionFailed = false;
     let mergeFiles = [];
     let mergePageCount = 0;
+    let mergePreviewCanvas = null;
     let outputDirectory = null;
     let blackThreshold = 172;
     let sizeScale = 1;
@@ -765,6 +779,7 @@
       orientationDetectionFailed = false;
       mergeFiles = [];
       mergePageCount = 0;
+      mergePreviewCanvas = null;
       setActionButtonsDisabled(true);
       showPlaceholder();
       setStatus(modeStatusText());
@@ -780,6 +795,7 @@
         orientationDetectionFailed: false,
         mergeFiles: [],
         mergePageCount: 0,
+        mergePreviewCanvas: null,
         blackThreshold: 172,
         sizeScale: 1
       };
@@ -794,6 +810,7 @@
         orientationDetectionFailed,
         mergeFiles: [...mergeFiles],
         mergePageCount,
+        mergePreviewCanvas,
         blackThreshold,
         sizeScale
       };
@@ -808,6 +825,7 @@
       orientationDetectionFailed = state.orientationDetectionFailed;
       mergeFiles = [...state.mergeFiles];
       mergePageCount = state.mergePageCount;
+      mergePreviewCanvas = state.mergePreviewCanvas;
       blackThreshold = state.blackThreshold;
       sizeScale = state.sizeScale;
       updateContrastButtons();
@@ -857,6 +875,13 @@
             const sourcePdf = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
             mergeFiles.push(file);
             mergePageCount += sourcePdf.getPageCount();
+            if (!mergePreviewCanvas) {
+              try {
+                mergePreviewCanvas = await renderPdfPreviewPage(file);
+              } catch (error) {
+                console.warn("Failed to render merge preview.", error);
+              }
+            }
             setStatus(`${mergeFiles.length}件・${mergePageCount}ページ分を確認中です。`);
             await nextFrame();
           }
@@ -940,6 +965,18 @@
         canvases.push(canvas);
       }
       return canvases;
+    }
+
+    async function renderPdfPreviewPage(file) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 0.8 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      return canvas;
     }
 
     function cropDocument(canvas) {
@@ -1048,13 +1085,16 @@
     }
 
     function showMergeSummary() {
-      drop.classList.remove("merge-preview");
-      drop.innerHTML = `
-        <div class="placeholder">
-          ${mergeFiles.length}件・${mergePageCount}ページを結合します<br>
-          元のPDFをそのまま結合するため、大量ページでも軽く処理できます
-        </div>
-      `;
+      drop.classList.toggle("merge-preview", Boolean(mergePreviewCanvas));
+      drop.innerHTML = "";
+      const content = document.createElement("div");
+      content.className = "merge-preview-content";
+      if (mergePreviewCanvas) content.appendChild(buildPreviewSheet(mergePreviewCanvas));
+      const summary = document.createElement("div");
+      summary.className = "merge-summary";
+      summary.innerHTML = `${mergeFiles.length}件・${mergePageCount}ページを結合します<br>元のPDFをそのまま結合するため、大量ページでも軽く処理できます`;
+      content.appendChild(summary);
+      drop.appendChild(content);
     }
 
     function buildPreviewSheet(canvas) {

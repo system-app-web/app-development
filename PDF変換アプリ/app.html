@@ -437,6 +437,7 @@
 
     const A4 = { wMm: 210, hMm: 297, wPt: 595.28, hPt: 841.89 };
     const DPI = 300;
+    const PRINT_DPI = 200;
     const MM_TO_PX = DPI / 25.4;
     const originalSizes = {
       portrait: { wMm: 91, hMm: 128 },
@@ -665,7 +666,7 @@
         if (isMergeMode()) {
           openPdfPrintDialog(printWindow, await buildMergedPdfBlob(mergeFiles));
         } else {
-          openCanvasPrintDialog(printWindow, outputCanvases);
+          await openCanvasPrintDialog(printWindow, outputCanvases);
         }
         setStatus("印刷ダイアログを開いています。");
       } catch (error) {
@@ -1084,11 +1085,14 @@
       return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageJpeg(canvas)));
     }
 
-    function openCanvasPrintDialog(printWindow, canvases) {
-      const pages = canvases.map((canvas) => {
-        const { canvas: pageCanvas, page } = buildA4PageCanvas(canvas);
-        return { image: pageCanvas.toDataURL("image/jpeg", 0.92), page };
-      });
+    async function openCanvasPrintDialog(printWindow, canvases) {
+      const pages = [];
+      for (let index = 0; index < canvases.length; index++) {
+        setStatus(`印刷用ページを準備中です。${index + 1}/${canvases.length}`);
+        const { canvas: pageCanvas, page } = buildA4PageCanvas(canvases[index], PRINT_DPI);
+        pages.push({ image: pageCanvas.toDataURL("image/jpeg", 0.9), page });
+        await nextFrame();
+      }
       const page = pages[0].page;
       const pageMarkup = pages.map(({ image }) => `<section class="page"><img src="${image}" alt=""></section>`).join("");
       printWindow.document.open();
@@ -1176,19 +1180,20 @@
       return { data: jpegData, width: doc.width, height: doc.height, page };
     }
 
-    function buildA4PageCanvas(canvas) {
+    function buildA4PageCanvas(canvas, dpi = DPI) {
       const page = selectedPageSize();
       const displayCanvas = canvas;
+      const pxPerMm = dpi / 25.4;
       const doc = document.createElement("canvas");
-      doc.width = Math.round(page.wMm * MM_TO_PX);
-      doc.height = Math.round(page.hMm * MM_TO_PX);
+      doc.width = Math.round(page.wMm * pxPerMm);
+      doc.height = Math.round(page.hMm * pxPerMm);
       const ctx = doc.getContext("2d");
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, doc.width, doc.height);
       const box = largePlacementBox(page);
       const fitted = fitWithin(displayCanvas.width, displayCanvas.height, box.wMm, box.hMm);
-      const targetW = Math.round(fitted.wMm * MM_TO_PX);
-      const targetH = Math.round(fitted.hMm * MM_TO_PX);
+      const targetW = Math.round(fitted.wMm * pxPerMm);
+      const targetH = Math.round(fitted.hMm * pxPerMm);
       const x = Math.round((doc.width - targetW) / 2);
       const y = Math.round((doc.height - targetH) / 2);
       ctx.imageSmoothingEnabled = true;

@@ -2521,7 +2521,7 @@ function openFaxOfficeChecklist(i) {
         <button class="office-check-mark${office.checked ? ' is-on' : ''}" ondblclick="toggleFaxOffice('${esc(office.id)}')">${office.checked ? '✓' : '○'}</button>
         <div class="office-check-actions">
           <button class="office-mini-btn" onclick="openFaxOfficeEdit('${esc(office.id)}')">事業所名変更</button>
-          <button class="office-mini-btn danger" onclick="deleteFaxOffice('${esc(office.id)}')">削除</button>
+          <button class="office-mini-btn danger" onclick="confirmDeleteFaxOffice('${esc(office.id)}')">削除</button>
         </div>
       </div>`).join('')
     : '<div class="office-empty-note">事業所を追加してください</div>';
@@ -2614,6 +2614,19 @@ function deleteFaxOffice(id) {
   saveFaxOfficeState();
   render();
   openFaxOfficeChecklist(modalIndex);
+}
+
+function confirmDeleteFaxOffice(id) {
+  const item = currentData[modalIndex];
+  const office = normalizeFaxOffices(item?.faxOffices).find(entry => entry.id === id);
+  if (!office) return;
+  document.getElementById('cf-title').textContent = '事業所を削除';
+  document.getElementById('cf-msg').textContent = `${office.name} を削除しますか？`;
+  document.getElementById('cf-ok').onclick = () => {
+    closeConfirm();
+    deleteFaxOffice(id);
+  };
+  document.getElementById('confirm').classList.add('show');
 }
 
 function openVisit(i) {

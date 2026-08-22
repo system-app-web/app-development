@@ -148,7 +148,7 @@ header h1 {
 .btn-ghost:hover { background: #D0DCE8; }
 
 /* ── Main layout ── */
-.main { display: flex; flex: 1; overflow: hidden; }
+.main { --input-panel-width: 320px; display: flex; flex: 1; overflow: hidden; position: relative; }
 
 /* ── Input panel ── */
 .input-panel {
@@ -405,8 +405,7 @@ header h1 {
 .canvas-wrap {
   flex: 1;
   position: relative;
-  z-index: 1;
-  overflow: visible;
+  overflow: hidden;
   background-color: #fff;
   isolation: isolate;
 }
@@ -434,7 +433,7 @@ header h1 {
 .canvas-edit-guide {
   position: absolute;
   top: calc(50% + 100px);
-  left: 76px;
+  left: calc(var(--input-panel-width) - 16px);
   transform: translateY(-50%);
   z-index: 3000;
   writing-mode: vertical-rl;
@@ -565,12 +564,14 @@ body.template-selected .canvas-edit-guide {
 
 /* ── レスポンシブ ── */
 @media (max-width: 768px) {
+  .main { --input-panel-width: 220px; }
   .input-panel { width: 220px; min-width: 180px; }
   .template-hero-btn { padding-right: 22px; }
   .template-hero-label { font-size: 17px; letter-spacing: 0.1px; }
   .template-hero-sub { font-size: 12px; }
 }
 @media (max-width: 480px) {
+  .main { --input-panel-width: 180px; }
   .input-panel { width: 180px; min-width: 160px; font-size: 11px; }
   .template-hero-btn { padding: 17px 14px 12px; min-height: 66px; margin-top: 32px; }
   .template-hero-cta { left: 8px; top: -27px; font-size: 11px; padding: 5px 9px 6px; }
@@ -625,7 +626,6 @@ body.template-selected .canvas-edit-guide {
   <div class="canvas-wrap" id="canvasWrap">
     <button onclick="exportPNG(false)" style="position:absolute;bottom:94px;left:50%;transform:translateX(-50%);z-index:20;padding:8px 20px;border:none;border-radius:999px;background:rgba(91,164,207,0.15);color:#2a6a9a;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.2s;letter-spacing:0.4px;" onmouseover="this.style.background='rgba(91,164,207,0.3)'" onmouseout="this.style.background='rgba(91,164,207,0.15)'">＋ フォルダ保存</button>
     <button onclick="saveTemplate()" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:20;padding:8px 20px;border:none;border-radius:999px;background:rgba(91,164,207,0.15);color:#2a6a9a;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.2s;letter-spacing:0.4px;" onmouseover="this.style.background='rgba(91,164,207,0.3)'" onmouseout="this.style.background='rgba(91,164,207,0.15)'">＋ テンプレートに追加</button>
-    <div class="canvas-edit-guide">こちらで編集👈</div>
     <div class="canvas-hint" id="canvasHint">
 <div class="txt">左パネルのテンプレート選択<br>または家族を追加で自動反映されます</div>
     </div>
@@ -711,6 +711,7 @@ body.template-selected .canvas-edit-guide {
     </div>
 
   </div>
+  <div class="canvas-edit-guide">こちらで編集👈</div>
 </div>
 
 

@@ -144,36 +144,17 @@ h1 {
   font-weight: 400;
   line-height: 1;
 }
-.selection-menu {
-  padding: 12px;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 12px;
-}
 .item-control-slot {
-  padding: 0;
-  flex: 0 0 auto;
+  padding: 10px 12px;
+  flex: 1;
 }
-.selection-toggle {
-  width: 100%;
-  min-height: 52px;
-  border: 1.5px solid #cdeaf0;
-  border-radius: 10px;
-  background: #f5fdff;
-  color: #2e7884;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  text-align: left;
-  padding: 10px 14px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.selection-toggle:hover,
-.item-control-slot.open .selection-toggle {
-  background: #e8f9fd;
-  border-color: #7ac5cf;
+.item-control-heading {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  letter-spacing: 0;
 }
 .template-panel-body {
   display: none;
@@ -345,14 +326,6 @@ h1 {
     padding: 12px 50px 12px 18px;
   }
   .template-chevron { right: 16px; font-size: 28px; }
-  .selection-menu {
-    padding: 10px;
-    gap: 10px;
-  }
-  .selection-toggle {
-    min-height: 48px;
-    font-size: 14px;
-  }
   .template-panel-body { padding-top: 8px; }
   .preset-btn {
     min-height: 42px;
@@ -386,18 +359,14 @@ h1 {
         <div id="templateBtns" class="template-btns"></div>
       </div>
     </div>
-    <div class="selection-menu">
-      <div class="item-control-slot">
-        <button id="palette-toggle" class="selection-toggle" type="button" onclick="togglePalette()" aria-expanded="false" aria-controls="item-palette">アイコン選択</button>
-        <div id="item-palette" class="item-palette">
-          <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
-          <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
-          <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
-          <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
-        </div>
-      </div>
-      <div class="floor-plan-control">
-        <button class="selection-toggle" type="button" onclick="toggleTemplatePanel()" data-template-toggle aria-expanded="false" aria-controls="templateBtns">間取り選択</button>
+    <div class="item-control-slot">
+      <div class="item-control-heading">アイコンを選択</div>
+      <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette">☰</button>
+      <div id="item-palette" class="item-palette">
+        <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
+        <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
+        <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
+        <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
       </div>
     </div>
   </div>

@@ -178,6 +178,14 @@ h1 {
   cursor: crosshair;
   touch-action: none;
 }
+.canvas-rotate-trigger {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 36;
+}
+#layer-nodes g.selected > *[stroke] { stroke: #2daec0; }
+#layer-nodes g.selected > text { fill: #247a8a; }
 .item-control-slot {
   padding: 10px 12px;
   flex: 1;
@@ -219,6 +227,11 @@ h1 {
   background: #dff5f8;
   border-color: #2daec0;
   box-shadow: 0 0 0 2px rgba(45, 174, 192, 0.18);
+}
+.dtool-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  box-shadow: none;
 }
 .floating-picker {
   position: absolute;
@@ -346,6 +359,7 @@ h1 {
   </div>
 
   <div class="canvas-wrap">
+    <button id="rotate-selected" class="dtool-btn canvas-rotate-trigger" type="button" onclick="rotateSelectedItem()" title="選択したアイテムを回転" aria-label="選択したアイテムを回転" disabled>↻</button>
     <div id="stroke-size-picker" class="floating-picker" style="top:10px;left:54px;padding:8px;">
       <div style="display:flex;gap:6px;">
         <button class="size-btn" onclick="setStrokeWidth(1.5,this)" title="細">細</button>
@@ -438,6 +452,7 @@ let currentDrawMode = "";
 let currentPlaceMode = "";
 let currentTextSize = 28;
 let currentTextDir = "h";
+let selectedRoomId = null;
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -451,7 +466,8 @@ function createRoom(data = {}) {
     x: Number(data.x ?? 90),
     y: Number(data.y ?? 90),
     w: Number(data.w ?? 180),
-    h: Number(data.h ?? 120)
+    h: Number(data.h ?? 120),
+    rotation: Number(data.rotation ?? 0)
   };
 }
 
@@ -473,6 +489,7 @@ function renderTemplateButtons() {
 
 function applyTemplate(template) {
   rooms = template.rooms.map((room) => createRoom(room));
+  selectedRoomId = null;
   renderAll();
   showToast(`${template.name} を読み込みました`);
 }
@@ -483,9 +500,10 @@ function renderSVG(showHint = true) {
   layerNodes.innerHTML = "";
   rooms.forEach((room) => {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.setAttribute("transform", `translate(${room.x} ${room.y})`);
+    group.setAttribute("transform", `translate(${room.x} ${room.y}) rotate(${room.rotation} ${room.w / 2} ${room.h / 2})`);
     group.dataset.id = room.id;
     group.style.cursor = "grab";
+    group.classList.toggle("selected", room.id === selectedRoomId);
 
     if (room.type === "bed") renderBed(group, room);
     else if (room.type === "door") renderDoor(group, room);
@@ -496,6 +514,7 @@ function renderSVG(showHint = true) {
     group.addEventListener("pointerdown", (event) => startDrag(event, room.id));
   });
   document.getElementById("canvasHint").style.display = showHint && rooms.length === 0 ? "flex" : "none";
+  updateSelectionControls();
 }
 
 function renderSpace(group, room) {
@@ -567,11 +586,19 @@ function startDrag(event, id) {
   event.stopPropagation();
   const room = rooms.find((item) => item.id === id);
   if (!room) return;
+  selectedRoomId = id;
+  renderAll(false);
   dragState = { id, startX: event.clientX, startY: event.clientY, origX: room.x, origY: room.y };
 }
 
 function placeItemOnCanvas(event) {
-  if (!currentPlaceMode) return;
+  if (!currentPlaceMode) {
+    if (selectedRoomId) {
+      selectedRoomId = null;
+      renderAll(false);
+    }
+    return;
+  }
 
   const item = {
     bed: { name: "ベッド", type: "bed", w: 260, h: 380 },
@@ -615,6 +642,7 @@ window.addEventListener("pointerup", () => {
 
 function clearAll() {
   rooms = [];
+  selectedRoomId = null;
   clearPlaceMode();
   ["layer-lines", "layer-nodes", "layer-draw", "layer-handles"].forEach((id) => {
     const layer = document.getElementById(id);
@@ -663,6 +691,8 @@ function setDrawMode(mode, button) {
 function setPlaceMode(mode, button) {
   currentPlaceMode = currentPlaceMode === mode ? "" : mode;
   currentDrawMode = "";
+  selectedRoomId = null;
+  renderAll(false);
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
   document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
   if (currentPlaceMode && button) button.classList.add("active");
@@ -674,6 +704,18 @@ function clearPlaceMode() {
   currentPlaceMode = "";
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
   document.querySelector(".canvas-wrap").classList.remove("place-mode");
+}
+
+function updateSelectionControls() {
+  document.getElementById("rotate-selected").disabled = !selectedRoomId;
+}
+
+function rotateSelectedItem() {
+  const room = rooms.find((item) => item.id === selectedRoomId);
+  if (!room) return;
+  room.rotation = (room.rotation + 90) % 360;
+  renderAll(false);
+  showToast(`${room.name}を回転しました`);
 }
 
 function deleteSelected() {

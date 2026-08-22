@@ -605,16 +605,18 @@ function renderFloorPlan(group, room) {
   group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "transparent", stroke: "#000", "stroke-width": 5 }));
 
   if (room.id === selectedRoomId) {
-    const handle = svgEl("rect", {
-      x: room.w - 16,
-      y: room.h - 16,
-      width: 16,
-      height: 16,
-      fill: "#2daec0"
+    const handles = [
+      { corner: "nw", x: -8, y: -8, cursor: "nwse-resize" },
+      { corner: "ne", x: room.w - 8, y: -8, cursor: "nesw-resize" },
+      { corner: "sw", x: -8, y: room.h - 8, cursor: "nesw-resize" },
+      { corner: "se", x: room.w - 8, y: room.h - 8, cursor: "nwse-resize" }
+    ];
+    handles.forEach(({ corner, x, y, cursor }) => {
+      const handle = svgEl("rect", { x, y, width: 16, height: 16, fill: "#2daec0" });
+      handle.style.cursor = cursor;
+      handle.addEventListener("pointerdown", (event) => startResize(event, room.id, corner));
+      group.appendChild(handle);
     });
-    handle.style.cursor = "nwse-resize";
-    handle.addEventListener("pointerdown", (event) => startResize(event, room.id));
-    group.appendChild(handle);
   }
 }
 
@@ -663,13 +665,22 @@ function startDrag(event, id) {
   dragState = { id, startX: event.clientX, startY: event.clientY, origX: room.x, origY: room.y };
 }
 
-function startResize(event, id) {
+function startResize(event, id, corner) {
   if (currentPlaceMode) return;
   event.stopPropagation();
   event.preventDefault();
   const room = rooms.find((item) => item.id === id);
   if (!room) return;
-  resizeState = { id, startX: event.clientX, startY: event.clientY, origW: room.w, origH: room.h };
+  resizeState = {
+    id,
+    corner,
+    startX: event.clientX,
+    startY: event.clientY,
+    origX: room.x,
+    origY: room.y,
+    origW: room.w,
+    origH: room.h
+  };
 }
 
 function snapToGrid(value) {
@@ -735,10 +746,22 @@ window.addEventListener("pointermove", (event) => {
   if (resizeState) {
     const room = rooms.find((item) => item.id === resizeState.id);
     if (!room) return;
-    const maxW = 1200 - room.x;
-    const maxH = 800 - room.y;
-    room.w = Math.max(GRID_SIZE, Math.min(maxW, snapToGrid(resizeState.origW + (event.clientX - resizeState.startX) * scaleX)));
-    room.h = Math.max(GRID_SIZE, Math.min(maxH, snapToGrid(resizeState.origH + (event.clientY - resizeState.startY) * scaleY)));
+    let left = resizeState.origX;
+    let top = resizeState.origY;
+    let right = resizeState.origX + resizeState.origW;
+    let bottom = resizeState.origY + resizeState.origH;
+    const pointerX = snapToGrid(resizeState.origX + (event.clientX - resizeState.startX) * scaleX);
+    const pointerY = snapToGrid(resizeState.origY + (event.clientY - resizeState.startY) * scaleY);
+
+    if (resizeState.corner.includes("w")) left = Math.max(0, Math.min(right - GRID_SIZE, pointerX));
+    if (resizeState.corner.includes("e")) right = Math.min(1200, Math.max(left + GRID_SIZE, pointerX + resizeState.origW));
+    if (resizeState.corner.includes("n")) top = Math.max(0, Math.min(bottom - GRID_SIZE, pointerY));
+    if (resizeState.corner.includes("s")) bottom = Math.min(800, Math.max(top + GRID_SIZE, pointerY + resizeState.origH));
+
+    room.x = left;
+    room.y = top;
+    room.w = right - left;
+    room.h = bottom - top;
     renderAll(false);
     return;
   }

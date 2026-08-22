@@ -228,11 +228,6 @@ h1 {
   border-color: #2daec0;
   box-shadow: 0 0 0 2px rgba(45, 174, 192, 0.18);
 }
-.dtool-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-  box-shadow: none;
-}
 .floating-picker {
   position: absolute;
   display: none;
@@ -359,7 +354,7 @@ h1 {
   </div>
 
   <div class="canvas-wrap">
-    <button id="rotate-selected" class="dtool-btn canvas-rotate-trigger" type="button" onclick="rotateSelectedItem()" title="選択したアイテムを回転" aria-label="選択したアイテムを回転" disabled>↻</button>
+    <button id="rotate-selected" class="dtool-btn canvas-rotate-trigger" type="button" onclick="rotateSelectedItem()" title="選択したアイテムを回転" aria-label="選択したアイテムを回転">↻</button>
     <div id="stroke-size-picker" class="floating-picker" style="top:10px;left:54px;padding:8px;">
       <div style="display:flex;gap:6px;">
         <button class="size-btn" onclick="setStrokeWidth(1.5,this)" title="細">細</button>
@@ -514,7 +509,6 @@ function renderSVG(showHint = true) {
     group.addEventListener("pointerdown", (event) => startDrag(event, room.id));
   });
   document.getElementById("canvasHint").style.display = showHint && rooms.length === 0 ? "flex" : "none";
-  updateSelectionControls();
 }
 
 function renderSpace(group, room) {
@@ -706,13 +700,12 @@ function clearPlaceMode() {
   document.querySelector(".canvas-wrap").classList.remove("place-mode");
 }
 
-function updateSelectionControls() {
-  document.getElementById("rotate-selected").disabled = !selectedRoomId;
-}
-
 function rotateSelectedItem() {
   const room = rooms.find((item) => item.id === selectedRoomId);
-  if (!room) return;
+  if (!room) {
+    showToast("回転するアイテムを選択してください");
+    return;
+  }
   room.rotation = (room.rotation + 90) % 360;
   renderAll(false);
   showToast(`${room.name}を回転しました`);

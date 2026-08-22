@@ -98,37 +98,38 @@ h1 {
   overflow: hidden;
   box-shadow: 0 18px 36px rgba(70, 155, 168, 0.10);
 }
-.template-block {
+.selection-menu {
   padding: 12px;
-  flex-shrink: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
 }
-.template-hero-btn {
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #effbfd, #ddf6f8);
-  color: var(--accent-strong);
+.template-block,
+.item-control-slot {
+  padding: 0;
+  flex: 0 0 auto;
+}
+.selection-toggle {
+  width: 100%;
+  min-height: 52px;
+  border: 1.5px solid #cdeaf0;
+  border-radius: 10px;
+  background: #f5fdff;
+  color: #2e7884;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px #d7edf1;
+  transition: background 0.15s, border-color 0.15s;
 }
-.template-hero-cta {
-  display: inline-block;
-  margin-bottom: 8px;
-  padding: 4px 9px 5px;
-  border-radius: 999px;
-  background: #fff;
-  color: #2d7f8d;
-  font-size: 11px;
-  font-weight: 800;
-  border: 1px solid #d4edf1;
-}
-.template-hero-label {
-  font-size: 16px;
-  font-weight: 800;
-}
-.template-hero-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #4d8b94;
+.selection-toggle:hover,
+.template-block.open .selection-toggle,
+.item-control-slot.open .selection-toggle {
+  background: #e8f9fd;
+  border-color: #7ac5cf;
 }
 .template-panel-body {
   display: none;
@@ -190,18 +191,6 @@ h1 {
 }
 #layer-nodes g.selected > *[stroke] { stroke: #2daec0; }
 #layer-nodes g.selected > text { fill: #247a8a; }
-.item-control-slot {
-  padding: 10px 12px;
-  flex: 1;
-}
-.item-control-heading {
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 16px;
-  letter-spacing: 0;
-}
 .item-palette {
   display: none;
   flex-wrap: wrap;
@@ -307,11 +296,14 @@ h1 {
     overflow: visible;
     border-radius: 16px;
   }
-  .template-block { padding: 10px; }
-  .template-hero-btn { padding: 10px 12px; }
-  .template-hero-cta { margin-bottom: 5px; }
-  .template-hero-label { font-size: 15px; }
-  .template-hero-sub { font-size: 11px; }
+  .selection-menu {
+    padding: 10px;
+    gap: 10px;
+  }
+  .selection-toggle {
+    min-height: 48px;
+    font-size: 14px;
+  }
   .template-panel-body { padding-top: 8px; }
   .preset-btn {
     min-height: 42px;
@@ -335,24 +327,21 @@ h1 {
 
 <div class="main">
   <div class="input-panel">
-    <div id="templateBlock" class="template-block">
-      <div class="template-hero-btn" onclick="toggleTemplatePanel()">
-        <div class="template-hero-cta">テンプレート</div>
-        <div class="template-hero-label">間取りを選ぶ</div>
-        <div class="template-hero-sub">1L、1DK、1LDK、2LDK など</div>
+    <div class="selection-menu">
+      <div class="item-control-slot">
+        <button id="palette-toggle" class="selection-toggle" type="button" onclick="togglePalette()" aria-expanded="false" aria-controls="item-palette">アイコン選択</button>
+        <div id="item-palette" class="item-palette">
+          <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
+          <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
+          <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
+          <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
+        </div>
       </div>
-      <div class="template-panel-body">
-        <div id="templateBtns" class="template-btns"></div>
-      </div>
-    </div>
-    <div class="item-control-slot">
-      <div class="item-control-heading">アイコンを選択</div>
-      <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette">☰</button>
-      <div id="item-palette" class="item-palette">
-        <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
-        <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
-        <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
-        <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
+      <div id="templateBlock" class="template-block">
+        <button id="template-toggle" class="selection-toggle" type="button" onclick="toggleTemplatePanel()" aria-expanded="false" aria-controls="templateBtns">間取り選択</button>
+        <div class="template-panel-body">
+          <div id="templateBtns" class="template-btns"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -471,7 +460,9 @@ function createRoom(data = {}) {
 }
 
 function toggleTemplatePanel() {
-  document.getElementById("templateBlock").classList.toggle("open");
+  const block = document.getElementById("templateBlock");
+  const isOpen = block.classList.toggle("open");
+  document.getElementById("template-toggle").setAttribute("aria-expanded", String(isOpen));
 }
 
 function renderTemplateButtons() {

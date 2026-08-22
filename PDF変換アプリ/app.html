@@ -166,6 +166,10 @@
       flex-wrap: wrap;
     }
 
+    .rotation-tools.hidden {
+      display: none;
+    }
+
     .rotation-heading {
       min-width: 64px;
       color: #475569;
@@ -451,8 +455,8 @@
 
     <div class="rotation-tools" aria-label="原稿の回転">
       <span class="rotation-heading">回転</span>
-      <button id="rotateRightBtn" class="rotation-btn" type="button" aria-label="右回転" title="右回転">&#8635;</button>
-      <button id="rotateLeftBtn" class="rotation-btn" type="button" aria-label="左回転" title="左回転">&#8634;</button>
+      <button id="rotateRightBtn" class="rotation-btn" type="button" title="右回転">右回転</button>
+      <button id="rotateLeftBtn" class="rotation-btn" type="button" title="左回転">左回転</button>
     </div>
 
     <div class="control-row contrast">
@@ -763,9 +767,7 @@
 
     function updateRotationButtons() {
       const type = selectedDocType();
-      const disabled = isMergeMode();
-      rotateLeftBtn.disabled = disabled;
-      rotateRightBtn.disabled = disabled;
+      document.querySelector(".rotation-tools").classList.toggle("hidden", isMergeMode());
       rotateLeftBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === 90);
       rotateRightBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === -90);
     }

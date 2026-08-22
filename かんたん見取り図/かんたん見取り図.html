@@ -251,7 +251,7 @@ h1 {
   overflow: hidden;
   white-space: pre-wrap;
 }
-#layer-draw .selected-draw .canvas-text-editor { outline: 1.5px solid #2daec0; }
+#layer-draw .selected-draw .canvas-text-editor { color: #247a8a; outline: 1.5px solid #2daec0; }
 #layer-nodes g.selected.floorplan .floor-plan-outline {
   stroke: #f15f69;
   stroke-dasharray: 16 12;
@@ -537,6 +537,7 @@ let currentTextDir = "h";
 let selectedRoomId = null;
 let resizeState = null;
 let lineDrawState = null;
+let drawDragState = null;
 let selectedDrawElement = null;
 const actionHistory = [];
 const GRID_PIXELS = 28;
@@ -823,8 +824,8 @@ function startTextDraw(event) {
   editor.spellcheck = false;
   text.appendChild(editor);
   updateTextDrawElement(text);
-  text.addEventListener("pointerdown", (textEvent) => selectDrawElement(textEvent, text, true));
-  editor.addEventListener("pointerdown", (textEvent) => selectDrawElement(textEvent, text, true));
+  text.addEventListener("pointerdown", (textEvent) => startTextElementInteraction(textEvent, text));
+  editor.addEventListener("pointerdown", (textEvent) => startTextElementInteraction(textEvent, text));
   editor.addEventListener("blur", () => {
     if (!editor.textContent.trim()) text.remove();
   });
@@ -866,6 +867,23 @@ function updateAllTextDrawElements() {
 function clearDrawSelection() {
   if (selectedDrawElement) selectedDrawElement.classList.remove("selected-draw");
   selectedDrawElement = null;
+}
+
+function startTextElementInteraction(event, element) {
+  if (currentDrawMode || currentPlaceMode) return;
+  if (selectedDrawElement !== element) {
+    selectDrawElement(event, element, true);
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  drawDragState = {
+    element,
+    startX: event.clientX,
+    startY: event.clientY,
+    origX: Number(element.getAttribute("x")) || 0,
+    origY: Number(element.getAttribute("y")) || 0
+  };
 }
 
 function selectDrawElement(event, element, keepFocus = false) {
@@ -1012,6 +1030,19 @@ window.addEventListener("pointermove", (event) => {
   }
 });
 
+window.addEventListener("pointermove", (event) => {
+  if (!drawDragState) return;
+  const svg = document.getElementById("svg-main");
+  const element = drawDragState.element;
+  const width = Number(element.getAttribute("width")) || 0;
+  const height = Number(element.getAttribute("height")) || 0;
+  const x = drawDragState.origX + (event.clientX - drawDragState.startX) * (1200 / svg.clientWidth);
+  const y = drawDragState.origY + (event.clientY - drawDragState.startY) * (800 / svg.clientHeight);
+  element.setAttribute("x", Math.max(0, Math.min(1200 - width, x)));
+  element.setAttribute("y", Math.max(0, Math.min(800 - height, y)));
+  updateTextDrawElement(element);
+});
+
 window.addEventListener("pointerup", () => {
   if (lineDrawState) {
     if (!lineDrawState.moved) {
@@ -1049,8 +1080,21 @@ window.addEventListener("pointerup", () => {
       });
     }
   }
+  if (drawDragState) {
+    const { element, origX, origY } = drawDragState;
+    const nextX = Number(element.getAttribute("x")) || 0;
+    const nextY = Number(element.getAttribute("y")) || 0;
+    if (nextX !== origX || nextY !== origY) {
+      actionHistory.push(() => {
+        element.setAttribute("x", origX);
+        element.setAttribute("y", origY);
+        updateTextDrawElement(element);
+      });
+    }
+  }
   dragState = null;
   resizeState = null;
+  drawDragState = null;
 });
 
 window.addEventListener("resize", updateAllTextDrawElements);

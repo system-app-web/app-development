@@ -260,13 +260,17 @@
 
     .merge-preview-grid {
       width: 100%;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      overflow-x: auto;
+      padding: 4px 2px 12px;
       gap: 14px;
-      align-items: start;
     }
 
     .merge-preview-item {
+      flex: 0 0 170px;
+      min-width: 0;
       display: grid;
       gap: 6px;
       justify-items: center;
@@ -278,28 +282,10 @@
     .merge-preview-item .sheet,
     .merge-preview-item .sheet.landscape {
       width: 100%;
-      max-width: 280px;
-    }
-
-    .merge-preview-grid.large-merge-previews {
-      display: flex;
-      flex-wrap: nowrap;
-      justify-content: flex-start;
-      overflow-x: auto;
-      padding: 4px 2px 12px;
-    }
-
-    .large-merge-previews .merge-preview-item {
-      flex: 0 0 170px;
-      min-width: 0;
-    }
-
-    .large-merge-previews .merge-preview-item .sheet,
-    .large-merge-previews .merge-preview-item .sheet.landscape {
       max-width: 170px;
     }
 
-    .large-merge-previews .merge-preview-item > div:last-child {
+    .merge-preview-item > div:last-child {
       width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -924,17 +910,10 @@
             }
             const sourcePdf = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
             const pageCount = sourcePdf.getPageCount();
-            const previousPageCount = mergePageCount;
             mergeFiles.push(file);
             mergePageCount += pageCount;
             try {
-              if (mergePageCount <= 30) {
-                await appendMergePreviews(file, pageCount, mergeFiles.length);
-              } else if (previousPageCount <= 30) {
-                await rebuildLargeMergePreviews();
-              } else {
-                await appendMergePreviews(file, 1, mergeFiles.length);
-              }
+              await appendMergePreviews(file);
             } catch (error) {
               console.warn("Failed to render merge preview.", error);
             }
@@ -1024,23 +1003,14 @@
       return canvases;
     }
 
-    async function appendMergePreviews(file, pageCount, fileIndex) {
-      const previews = await renderPdfPreviewPages(file, pageCount);
-      const isLargeMerge = mergePageCount > 30;
-      previews.forEach((canvas, index) => {
+    async function appendMergePreviews(file) {
+      const previews = await renderPdfPreviewPages(file, 1);
+      previews.forEach((canvas) => {
         mergePreviewCanvases.push({
           canvas,
-          label: isLargeMerge ? `${file.name}（1ページ目）` : `${fileIndex}件目・${index + 1}ページ`
+          label: `${file.name}（1ページ目）`
         });
       });
-    }
-
-    async function rebuildLargeMergePreviews() {
-      mergePreviewCanvases = [];
-      for (let index = 0; index < mergeFiles.length; index++) {
-        await appendMergePreviews(mergeFiles[index], 1, index + 1);
-        await nextFrame();
-      }
     }
 
     async function renderPdfPreviewPages(file, pageCount) {
@@ -1173,7 +1143,6 @@
       if (mergePreviewCanvases.length) {
         const grid = document.createElement("div");
         grid.className = "merge-preview-grid";
-        grid.classList.toggle("large-merge-previews", mergePageCount > 30);
         mergePreviewCanvases.forEach(({ canvas, label }) => {
           const item = document.createElement("div");
           item.className = "merge-preview-item";

@@ -175,9 +175,8 @@ h1 {
   background-size: 28px 28px;
 }
 .item-control-slot {
-  position: relative;
   padding: 10px 12px;
-  flex-shrink: 0;
+  flex: 1;
 }
 .item-control-heading {
   margin-bottom: 8px;
@@ -187,6 +186,13 @@ h1 {
   line-height: 16px;
   letter-spacing: 0;
 }
+.item-palette {
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.item-control-slot.open .item-palette { display: flex; }
 .dtool-btn, .size-btn, .item-btn {
   width: 36px;
   height: 36px;
@@ -325,14 +331,12 @@ h1 {
     </div>
     <div class="item-control-slot">
       <div class="item-control-heading">アイコンを選択</div>
-      <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム">☰</button>
-      <div id="item-palette" class="floating-picker" style="top:34px;left:54px;padding:8px;">
-        <div style="display:flex;gap:6px;">
-          <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
-          <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
-          <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
-          <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
-        </div>
+      <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette">☰</button>
+      <div id="item-palette" class="item-palette">
+        <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
+        <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
+        <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
+        <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
       </div>
     </div>
   </div>
@@ -595,8 +599,9 @@ function showToast(message) {
 }
 
 function togglePalette() {
-  const palette = document.getElementById("item-palette");
-  palette.style.display = palette.style.display === "none" || !palette.style.display ? "block" : "none";
+  const slot = document.querySelector(".item-control-slot");
+  const isOpen = slot.classList.toggle("open");
+  document.getElementById("palette-toggle").setAttribute("aria-expanded", String(isOpen));
 }
 
 function toggleStrokePicker() {

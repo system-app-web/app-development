@@ -765,8 +765,8 @@ function addFloorPlan() {
   const count = rooms.filter((room) => room.type === "floorplan").length;
   const stepX = gridStep("x");
   const stepY = gridStep("y");
-  const width = stepX * 6;
-  const height = stepY * 8;
+  const width = stepX * 4;
+  const height = stepY * 6;
   const plan = createRoom({
     name: "間取り",
     type: "floorplan",

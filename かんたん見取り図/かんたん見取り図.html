@@ -178,100 +178,6 @@ h1 {
   text-align: center;
 }
 .preset-btn:hover { background: #e8f9fd; }
-.panel-hd {
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  letter-spacing: 1px;
-  flex-shrink: 0;
-}
-.room-list {
-  flex: 1;
-  min-height: 136px;
-  overflow-y: auto;
-  padding: 10px;
-}
-.room-card {
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  padding: 10px;
-  margin-bottom: 8px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,251,252,0.96));
-  box-shadow: 0 10px 18px rgba(67, 155, 168, 0.06);
-}
-.room-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.room-badge {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #cfeff2;
-  color: var(--accent-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-}
-.room-name {
-  flex: 1;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 8px;
-  font: inherit;
-  font-size: 13px;
-}
-.icon-btn {
-  border: none;
-  background: #fee2e2;
-  color: #d33a3a;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  cursor: pointer;
-  font-weight: 800;
-}
-.room-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-.room-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.room-grid input, .room-grid select {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 5px 7px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--text);
-}
-.full { grid-column: span 2; }
-.add-btn {
-  margin: 0 12px 12px;
-  border: none;
-  border-radius: 16px;
-  padding: 12px 14px;
-  background: linear-gradient(135deg, #edfafd, #e4f5f7);
-  color: #2d7d89;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.add-btn:hover { background: linear-gradient(135deg, #e3f7fb, #d8f1f4); }
 .canvas-wrap {
   position: relative;
   flex: 1;
@@ -413,12 +319,6 @@ h1 {
     min-height: 42px;
     padding: 8px 10px;
   }
-  .room-list {
-    min-height: 0;
-    max-height: none;
-    overflow: visible;
-  }
-  .add-btn { margin: 0 10px 10px; }
   .canvas-wrap {
     min-height: 52svh;
     border-radius: 18px;
@@ -452,9 +352,6 @@ h1 {
         <div id="templateBtns" class="template-btns"></div>
       </div>
     </div>
-    <div class="panel-hd">部屋・設備リスト</div>
-    <div id="roomList" class="room-list"></div>
-    <button class="add-btn" onclick="addRoom()">＋ 部屋を追加</button>
   </div>
 
   <div class="canvas-wrap">
@@ -617,75 +514,6 @@ function loadDefaultTemplate() {
   applyTemplate(templates[0]);
 }
 
-function addRoom() {
-  rooms.push(createRoom({ name: `部屋${rooms.length + 1}`, x: 90 + rooms.length * 18, y: 90 + rooms.length * 18 }));
-  renderAll();
-}
-
-function removeRoom(id) {
-  rooms = rooms.filter((room) => room.id !== id);
-  renderAll();
-}
-
-function updateRoom(id, key, value) {
-  const room = rooms.find((item) => item.id === id);
-  if (!room) return;
-  room[key] = ["x", "y", "w", "h"].includes(key) ? Number(value || 0) : value;
-  if (key === "w") room.w = Math.max(40, room.w);
-  if (key === "h") room.h = Math.max(24, room.h);
-  renderAll(false);
-}
-
-function renderRoomList() {
-  const wrap = document.getElementById("roomList");
-  wrap.innerHTML = "";
-  rooms.forEach((room, index) => {
-    const card = document.createElement("div");
-    card.className = "room-card";
-    card.innerHTML = `
-      <div class="room-top">
-        <div class="room-badge">${index + 1}</div>
-        <input class="room-name" value="${escapeHtml(room.name)}" data-id="${room.id}" data-key="name">
-        <button class="icon-btn" data-del="${room.id}">×</button>
-      </div>
-      <div class="room-grid">
-        <label>種類
-          <select data-id="${room.id}" data-key="type">
-            <option value="room" ${room.type === "room" ? "selected" : ""}>部屋</option>
-            <option value="hall" ${room.type === "hall" ? "selected" : ""}>廊下</option>
-            <option value="entry" ${room.type === "entry" ? "selected" : ""}>玄関</option>
-            <option value="toilet" ${room.type === "toilet" ? "selected" : ""}>トイレ</option>
-            <option value="wet" ${room.type === "wet" ? "selected" : ""}>水回り</option>
-            <option value="storage" ${room.type === "storage" ? "selected" : ""}>収納</option>
-            <option value="bed" ${room.type === "bed" ? "selected" : ""}>ベッド</option>
-            <option value="furniture" ${room.type === "furniture" ? "selected" : ""}>家具</option>
-            <option value="door" ${room.type === "door" ? "selected" : ""}>ドア</option>
-          </select>
-        </label>
-        <label>幅
-          <input type="number" min="40" data-id="${room.id}" data-key="w" value="${room.w}">
-        </label>
-        <label>X
-          <input type="number" data-id="${room.id}" data-key="x" value="${room.x}">
-        </label>
-        <label>Y
-          <input type="number" data-id="${room.id}" data-key="y" value="${room.y}">
-        </label>
-        <label class="full">高さ
-          <input type="number" min="24" data-id="${room.id}" data-key="h" value="${room.h}">
-        </label>
-      </div>
-    `;
-    wrap.appendChild(card);
-  });
-  wrap.querySelectorAll("[data-key]").forEach((el) => {
-    el.addEventListener("input", (event) => updateRoom(event.target.dataset.id, event.target.dataset.key, event.target.value));
-  });
-  wrap.querySelectorAll("[data-del]").forEach((el) => {
-    el.addEventListener("click", () => removeRoom(el.dataset.del));
-  });
-}
-
 function renderSVG(showHint = true) {
   const layerNodes = document.getElementById("layer-nodes");
   if (!layerNodes) return;
@@ -768,7 +596,6 @@ function svgEl(name, attrs) {
 }
 
 function renderAll(showHint = true) {
-  renderRoomList();
   renderSVG(showHint);
 }
 
@@ -864,14 +691,6 @@ function setTextDir(dir) {
   currentTextDir = dir;
   document.getElementById("text-dir-h").classList.toggle("active", dir === "h");
   document.getElementById("text-dir-v").classList.toggle("active", dir === "v");
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 async function exportPNG() {

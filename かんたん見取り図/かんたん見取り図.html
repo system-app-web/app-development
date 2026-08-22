@@ -200,7 +200,11 @@ h1 {
   width: 100%;
   height: 100%;
   display: block;
-  background: #fff;
+  background-image:
+    linear-gradient(to right, #d8e2ea 1px, transparent 1px),
+    linear-gradient(to bottom, #d8e2ea 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-color: transparent;
 }
 .canvas-wrap.place-mode #svg-main {
   cursor: crosshair;
@@ -421,12 +425,6 @@ h1 {
     </div>
 
     <svg id="svg-main" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.09)" stroke-width="1" />
-        </pattern>
-      </defs>
-      <rect width="1200" height="800" fill="url(#grid-pattern)" pointer-events="none" />
       <g id="canvas-offset">
         <g id="layer-lines"></g>
         <g id="layer-nodes"></g>
@@ -503,7 +501,7 @@ let currentTextSize = 28;
 let currentTextDir = "h";
 let selectedRoomId = null;
 let resizeState = null;
-const GRID_SIZE = 40;
+const GRID_PIXELS = 28;
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -683,8 +681,17 @@ function startResize(event, id, corner) {
   };
 }
 
-function snapToGrid(value) {
-  return Math.round(value / GRID_SIZE) * GRID_SIZE;
+function gridStep(axis) {
+  const svg = document.getElementById("svg-main");
+  if (!svg) return GRID_PIXELS;
+  return axis === "y"
+    ? GRID_PIXELS * (800 / svg.clientHeight)
+    : GRID_PIXELS * (1200 / svg.clientWidth);
+}
+
+function snapToGrid(value, axis) {
+  const step = gridStep(axis);
+  return Math.round(value / step) * step;
 }
 
 function placeItemOnCanvas(event) {
@@ -723,14 +730,17 @@ function placeItemOnCanvas(event) {
 function addFloorPlan() {
   clearPlaceMode();
   const count = rooms.filter((room) => room.type === "floorplan").length;
-  const offset = (count % 4) * GRID_SIZE * 2;
+  const stepX = gridStep("x");
+  const stepY = gridStep("y");
+  const width = stepX * 8;
+  const height = stepY * 8;
   const plan = createRoom({
     name: "間取り",
     type: "floorplan",
-    x: Math.min(1200 - 320, 280 + offset),
-    y: Math.min(800 - 320, 160 + offset),
-    w: 320,
-    h: 320
+    x: Math.min(1200 - width, stepX * (7 + (count % 4) * 2)),
+    y: Math.min(800 - height, stepY * (4 + (count % 4) * 2)),
+    w: width,
+    h: height
   });
   rooms.push(plan);
   selectedRoomId = plan.id;
@@ -746,17 +756,19 @@ window.addEventListener("pointermove", (event) => {
   if (resizeState) {
     const room = rooms.find((item) => item.id === resizeState.id);
     if (!room) return;
+    const minW = gridStep("x");
+    const minH = gridStep("y");
     let left = resizeState.origX;
     let top = resizeState.origY;
     let right = resizeState.origX + resizeState.origW;
     let bottom = resizeState.origY + resizeState.origH;
-    const pointerX = snapToGrid(resizeState.origX + (event.clientX - resizeState.startX) * scaleX);
-    const pointerY = snapToGrid(resizeState.origY + (event.clientY - resizeState.startY) * scaleY);
+    const pointerX = snapToGrid(resizeState.origX + (event.clientX - resizeState.startX) * scaleX, "x");
+    const pointerY = snapToGrid(resizeState.origY + (event.clientY - resizeState.startY) * scaleY, "y");
 
-    if (resizeState.corner.includes("w")) left = Math.max(0, Math.min(right - GRID_SIZE, pointerX));
-    if (resizeState.corner.includes("e")) right = Math.min(1200, Math.max(left + GRID_SIZE, pointerX + resizeState.origW));
-    if (resizeState.corner.includes("n")) top = Math.max(0, Math.min(bottom - GRID_SIZE, pointerY));
-    if (resizeState.corner.includes("s")) bottom = Math.min(800, Math.max(top + GRID_SIZE, pointerY + resizeState.origH));
+    if (resizeState.corner.includes("w")) left = Math.max(0, Math.min(right - minW, pointerX));
+    if (resizeState.corner.includes("e")) right = Math.min(1200, Math.max(left + minW, pointerX + resizeState.origW));
+    if (resizeState.corner.includes("n")) top = Math.max(0, Math.min(bottom - minH, pointerY));
+    if (resizeState.corner.includes("s")) bottom = Math.min(800, Math.max(top + minH, pointerY + resizeState.origH));
 
     room.x = left;
     room.y = top;
@@ -772,10 +784,10 @@ window.addEventListener("pointermove", (event) => {
   const x = dragState.origX + (event.clientX - dragState.startX) * scaleX;
   const y = dragState.origY + (event.clientY - dragState.startY) * scaleY;
   room.x = room.type === "floorplan"
-    ? Math.max(0, Math.min(1200 - room.w, snapToGrid(x)))
+    ? Math.max(0, Math.min(1200 - room.w, snapToGrid(x, "x")))
     : Math.max(0, Math.round(x));
   room.y = room.type === "floorplan"
-    ? Math.max(0, Math.min(800 - room.h, snapToGrid(y)))
+    ? Math.max(0, Math.min(800 - room.h, snapToGrid(y, "y")))
     : Math.max(0, Math.round(y));
   renderAll(false);
 });

@@ -245,7 +245,7 @@ h1 {
 #layer-draw .canvas-text-editor {
   color: #000;
   font-family: "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.25;
   outline: none;
   overflow: hidden;
@@ -454,8 +454,8 @@ h1 {
       <div style="font-size:10px;color:#6e8f94;font-weight:700;">文字サイズ</div>
       <input id="text-size-input" type="number" min="6" max="96" step="1" value="28" style="width:56px;text-align:center;border:1px solid #bcdfe4;border-radius:6px;padding:4px 5px;font-size:14px;font-weight:700;" oninput="setTextSize(parseInt(this.value)||28)">
       <div style="display:flex;gap:4px;">
-        <button id="text-dir-h" onclick="setTextDir('h')" class="dtool-btn" style="width:auto;padding:0 10px;">横</button>
-        <button id="text-dir-v" onclick="setTextDir('v')" class="dtool-btn active" style="width:auto;padding:0 10px;">縦</button>
+        <button id="text-dir-h" onclick="setTextDir('h')" class="dtool-btn active" style="width:auto;padding:0 10px;">横</button>
+        <button id="text-dir-v" onclick="setTextDir('v')" class="dtool-btn" style="width:auto;padding:0 10px;">縦</button>
       </div>
     </div>
 
@@ -533,7 +533,7 @@ const LINE_STROKE_WIDTH = 5;
 let currentDrawMode = "";
 let currentPlaceMode = "";
 let currentTextSize = 28;
-let currentTextDir = "v";
+let currentTextDir = "h";
 let selectedRoomId = null;
 let resizeState = null;
 let lineDrawState = null;

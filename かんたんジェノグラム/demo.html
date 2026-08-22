@@ -1614,7 +1614,7 @@ function drawMarriage(layer, fp, tp, rel) {
     x1, y1, x2, y2,
     stroke: '#000', 'stroke-width': '14', 'stroke-opacity': '0',
     'stroke-dasharray': rel.style === 'dashed' ? '6,4' : 'none',
-    'data-rel-id': rel.id, style: 'cursor:grab',
+    'data-rel-id': rel.id, style: 'cursor:move',
   });
   layer.appendChild(hitLine);
   const visLine = el('line', {
@@ -1624,18 +1624,16 @@ function drawMarriage(layer, fp, tp, rel) {
     'data-rel-id': rel.id, style: 'pointer-events:none',
   });
   layer.appendChild(visLine);
-  let skipClick = false;
 
   hitLine.addEventListener('click', e => {
     if (drawMode || placeMode) return;
     e.stopPropagation();
-    if (skipClick) { skipClick = false; return; }
     selectRelLine(rel.id, visLine);
   });
   hitLine.addEventListener('mousedown', e => {
     if (drawMode || placeMode) return;
+    if (selectedRelId !== rel.id) return; // 選択済みのみドラッグ
     e.preventDefault(); e.stopPropagation();
-    hitLine.style.cursor = 'grabbing';
     const startCX = e.clientX, startCY = e.clientY;
     const baseDx = off.dx, baseDy = off.dy;
     let dragged = false;
@@ -1653,9 +1651,7 @@ function drawMarriage(layer, fp, tp, rel) {
     const onUp = uev => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      hitLine.style.cursor = 'grab';
       if (!dragged) return;
-      skipClick = true;
       const prevOff = relLineOffsets.get(rel.id);
       const newOff = { dx: baseDx + uev.clientX - startCX, dy: baseDy + uev.clientY - startCY };
       relLineOffsets.set(rel.id, newOff);
@@ -1732,13 +1728,11 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
     const visLine = el('line', { x1, y1, x2, y2, stroke:'#000', 'stroke-width':'3', style:'pointer-events:none' });
     layer.appendChild(visLine);
     if (!firstVis) firstVis = visLine;
-    const hitLine = el('line', { x1, y1, x2, y2, stroke:'transparent', 'stroke-width':'14', style:'cursor:grab' });
+    const hitLine = el('line', { x1, y1, x2, y2, stroke:'transparent', 'stroke-width':'14', style:'cursor:move' });
     layer.appendChild(hitLine);
-    let skipClick = false;
     hitLine.addEventListener('click', e => {
       if (drawMode || placeMode) return;
       e.stopPropagation();
-      if (skipClick) { skipClick = false; return; }
       clearDrawElSelection(); clearNodeSelection();
       if (selectedEl) { selectedEl.removeAttribute('stroke-dasharray'); clearSelection(); }
       if (selectedRelId === relId && selectedSegmentEls?.segIdx === segIdx) { clearRelSelection(); return; }
@@ -1750,8 +1744,8 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
     });
     hitLine.addEventListener('mousedown', e => {
       if (drawMode || placeMode) return;
+      if (selectedRelId !== relId || selectedSegmentEls?.segIdx !== segIdx) return; // 選択済みのみドラッグ
       e.preventDefault(); e.stopPropagation();
-      hitLine.style.cursor = 'grabbing';
       const startCX = e.clientX, startCY = e.clientY;
       const ox1 = parseFloat(visLine.getAttribute('x1')), oy1 = parseFloat(visLine.getAttribute('y1'));
       const ox2 = parseFloat(visLine.getAttribute('x2')), oy2 = parseFloat(visLine.getAttribute('y2'));
@@ -1768,9 +1762,7 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
       const onUp = uev => {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        hitLine.style.cursor = 'grab';
         if (!dragged) return;
-        skipClick = true;
         const dx = uev.clientX - startCX, dy = uev.clientY - startCY;
         const prevOv = (segmentOverrides.get(relId) || {})[segIdx];
         if (!segmentOverrides.has(relId)) segmentOverrides.set(relId, {});
@@ -2299,8 +2291,6 @@ function nearestPathSeg(pathEl, clientX, clientY) {
 
 function addEraseListener(elem) {
   let origStroke = null;
-  let skipClick = false;
-  elem.style.cursor = 'grab';
   function getVis() {
     return (elem.querySelector && elem.querySelector('.enc-visible')) || elem;
   }
@@ -2311,7 +2301,6 @@ function addEraseListener(elem) {
     if (placeMode === 'divorce') return;
     if (drawMode || placeMode) return;
     e.stopPropagation();
-    if (skipClick) { skipClick = false; return; }
     if (selectedDrawEl === elem) {
       if (elem.tagName === 'path') {
         const { nearIdx, pts } = nearestPathSeg(elem, e.clientX, e.clientY);
@@ -2342,8 +2331,8 @@ function addEraseListener(elem) {
   // mousedown: 辺選択済みなら辺ドラッグ、そうでなければ全体ドラッグ
   elem.addEventListener('mousedown', e => {
     if (drawMode || placeMode) return;
+    if (selectedDrawEl !== elem) return;
     e.preventDefault(); e.stopPropagation();
-    elem.style.cursor = 'grabbing';
     const startCX = e.clientX, startCY = e.clientY;
     let dragged = false;
 
@@ -2365,9 +2354,7 @@ function addEraseListener(elem) {
       const onUp = () => {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        elem.style.cursor = 'grab';
         if (!dragged) return;
-        skipClick = true;
         const prevD = buildLinearPath(origPts);
         pushUndo(() => { elem.setAttribute('d', prevD); clearPathSegSelection(); });
       };
@@ -2391,9 +2378,7 @@ function addEraseListener(elem) {
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      elem.style.cursor = 'grab';
       if (!dragged) return;
-      skipClick = true;
       pushUndo(() => {
         if (origTransform) elem.setAttribute('transform', origTransform);
         else elem.removeAttribute('transform');

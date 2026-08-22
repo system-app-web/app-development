@@ -1789,7 +1789,7 @@ function renderNodes() {
   persons.forEach(p => {
     const pos = nodePositions[p.id];
     if (!pos) return;
-    const g = el('g', { transform: `translate(${pos.x},${pos.y})`, cursor:'grab', 'data-id': p.id });
+    const g = el('g', { transform: `translate(${pos.x},${pos.y})`, cursor: drawMode || placeMode ? 'default' : 'grab', 'data-id': p.id });
     g.style.userSelect = 'none';
 
     // Shape
@@ -1814,18 +1814,18 @@ function renderNodes() {
     }
 
     // Relation label (inside) — ダブルクリックで編集可
-    const rt = el('text',{ x:NW/2, y:NH/2+4, 'text-anchor':'middle', 'font-size':11, fill:'#000', 'font-family':'inherit', 'font-weight':'500', cursor:'text' });
+    const rt = el('text',{ x:NW/2, y:NH/2+4, 'text-anchor':'middle', 'font-size':11, fill:'#000', 'font-family':'inherit', 'font-weight':'500' });
     rt.textContent = p.label || p.relation;
     rt.addEventListener('dblclick', e => { e.stopPropagation(); openLabelEditor(e, p, rt); });
     g.appendChild(rt);
     if (p.kp) {
-      const kpt = el('text',{ x:NW/2, y:NH/2+17, 'text-anchor':'middle', 'font-size':10, fill:'#000', 'font-family':'inherit', 'font-weight':'700', cursor:'text' });
+      const kpt = el('text',{ x:NW/2, y:NH/2+17, 'text-anchor':'middle', 'font-size':10, fill:'#000', 'font-family':'inherit', 'font-weight':'700' });
       kpt.textContent = p.kpLabel || '(KP)';
       kpt.addEventListener('dblclick', e => { e.stopPropagation(); openKpLabelEditor(e, p, kpt); });
       g.appendChild(kpt);
     }
     if (p.memo) {
-      const mt = el('text',{ x:NW/2, y:NH+13, 'text-anchor':'middle', 'font-size':9, fill:'#666', 'font-family':'inherit', cursor:'text' });
+      const mt = el('text',{ x:NW/2, y:NH+13, 'text-anchor':'middle', 'font-size':9, fill:'#666', 'font-family':'inherit' });
       mt.textContent = p.memo;
       mt.addEventListener('dblclick', e => { e.stopPropagation(); openMemoEditor(e, p, mt); });
       g.appendChild(mt);
@@ -2020,6 +2020,7 @@ function setDrawMode(mode) {
   palBtn.style.background = ''; palBtn.style.borderColor = '';
   const svg = document.getElementById('svg-main');
   svg.style.cursor = drawMode ? 'crosshair' : '';
+  syncNodeDragCursors();
   document.getElementById('layer-nodes').classList.toggle('enc-mode', drawMode === 'enclose' || drawMode === 'rect-enc');
   updateEncHitState();
   // 直線・囲い線・ペン選択時に太さピッカー、テキスト選択時に文字サイズピッカーを表示
@@ -2053,6 +2054,13 @@ function setDrawMode(mode) {
 // ── アイテムパレット ──
 let placeMode = null;
 let freePid = 10000;
+
+function syncNodeDragCursors() {
+  const cursor = drawMode || placeMode ? 'default' : 'grab';
+  document.querySelectorAll('#layer-nodes [data-id]').forEach(node => {
+    node.style.cursor = cursor;
+  });
+}
 
 function toggleStrokePicker() {
   const picker = document.getElementById('stroke-size-picker');
@@ -2102,6 +2110,7 @@ function setPlaceMode(mode) {
   }
   const svg = document.getElementById('svg-main');
   svg.style.cursor = placeMode ? 'crosshair' : '';
+  syncNodeDragCursors();
   // 離婚モード中はハンドル・囲い当たり判定を無効化して線を選択できるようにする
   const divorcing = placeMode === 'divorce';
   document.getElementById('layer-handles').style.pointerEvents = divorcing ? 'none' : '';
@@ -3790,7 +3799,7 @@ function setupDrag(g, id) {
   g.addEventListener('click', e => { if (!drawMode) e.stopPropagation(); });
   g.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
-    if (drawMode) return;
+    if (drawMode || placeMode) return;
     e.preventDefault();
     const pos = nodePositions[id];
     const sx = e.clientX - pos.x, sy = e.clientY - pos.y;

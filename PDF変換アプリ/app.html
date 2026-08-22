@@ -281,6 +281,31 @@
       max-width: 280px;
     }
 
+    .merge-preview-grid.large-merge-previews {
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      overflow-x: auto;
+      padding: 4px 2px 12px;
+    }
+
+    .large-merge-previews .merge-preview-item {
+      flex: 0 0 170px;
+      min-width: 0;
+    }
+
+    .large-merge-previews .merge-preview-item .sheet,
+    .large-merge-previews .merge-preview-item .sheet.landscape {
+      max-width: 170px;
+    }
+
+    .large-merge-previews .merge-preview-item > div:last-child {
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .merge-summary {
       font-size: 15px;
       font-weight: 700;
@@ -1005,7 +1030,7 @@
       previews.forEach((canvas, index) => {
         mergePreviewCanvases.push({
           canvas,
-          label: isLargeMerge ? `${fileIndex}件目・1ページ目` : `${fileIndex}件目・${index + 1}ページ`
+          label: isLargeMerge ? `${file.name}（1ページ目）` : `${fileIndex}件目・${index + 1}ページ`
         });
       });
     }
@@ -1148,6 +1173,7 @@
       if (mergePreviewCanvases.length) {
         const grid = document.createElement("div");
         grid.className = "merge-preview-grid";
+        grid.classList.toggle("large-merge-previews", mergePageCount > 30);
         mergePreviewCanvases.forEach(({ canvas, label }) => {
           const item = document.createElement("div");
           item.className = "merge-preview-item";

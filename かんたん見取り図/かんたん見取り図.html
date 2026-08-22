@@ -246,6 +246,31 @@ h1 {
   border-color: #2daec0;
   box-shadow: 0 0 0 2px rgba(45, 174, 192, 0.18);
 }
+.floor-plan-icon {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 1.6px solid currentColor;
+}
+.floor-plan-icon::before,
+.floor-plan-icon::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+.floor-plan-icon::before {
+  top: 0;
+  bottom: 0;
+  left: 8px;
+  width: 1.6px;
+}
+.floor-plan-icon::after {
+  right: 0;
+  bottom: 6px;
+  left: 8px;
+  height: 1.6px;
+}
 .floating-picker {
   position: absolute;
   display: none;
@@ -367,6 +392,7 @@ h1 {
         <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
         <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
         <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
+        <button class="item-btn" onclick="addFloorPlan()" title="間取りを配置" aria-label="間取りを配置"><span class="floor-plan-icon" aria-hidden="true"></span></button>
       </div>
     </div>
   </div>
@@ -522,7 +548,8 @@ function renderSVG(showHint = true) {
     group.style.cursor = "grab";
     group.classList.toggle("selected", room.id === selectedRoomId);
 
-    if (room.type === "bed") renderBed(group, room);
+    if (room.type === "floorplan") renderFloorPlan(group, room);
+    else if (room.type === "bed") renderBed(group, room);
     else if (room.type === "door") renderDoor(group, room);
     else if (room.type === "furniture") renderFurniture(group, room);
     else renderSpace(group, room);
@@ -560,6 +587,13 @@ function renderBed(group, room) {
   group.appendChild(svgEl("rect", { x: 28, y: 20, width: room.w - 56, height: 70, rx: 14, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
   group.appendChild(svgEl("line", { x1: 0, y1: 110, x2: room.w, y2: 110, stroke: "#000", "stroke-width": 5 }));
   addLabel(group, room.name, room.w / 2, room.h / 2 + 20, 42);
+}
+
+function renderFloorPlan(group, room) {
+  group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "#fff", stroke: "#000", "stroke-width": 6 }));
+  group.appendChild(svgEl("line", { x1: room.w * 0.55, y1: 0, x2: room.w * 0.55, y2: room.h, stroke: "#000", "stroke-width": 5 }));
+  group.appendChild(svgEl("line", { x1: room.w * 0.55, y1: room.h * 0.45, x2: room.w, y2: room.h * 0.45, stroke: "#000", "stroke-width": 5 }));
+  addLabel(group, room.name, room.w * 0.275, room.h / 2 + 8, 28);
 }
 
 function renderDoor(group, room) {
@@ -638,6 +672,23 @@ function placeItemOnCanvas(event) {
   renderAll(false);
   clearPlaceMode();
   showToast(`${item.name}を配置しました`);
+}
+
+function addFloorPlan() {
+  clearPlaceMode();
+  const existing = rooms.find((room) => room.type === "floorplan");
+  if (existing) {
+    selectedRoomId = existing.id;
+    renderAll(false);
+    showToast("配置済みの間取りを選択しました");
+    return;
+  }
+
+  const plan = createRoom({ name: "間取り", type: "floorplan", x: 360, y: 160, w: 480, h: 480 });
+  rooms.push(plan);
+  selectedRoomId = plan.id;
+  renderAll(false);
+  showToast("四角の間取りを配置しました");
 }
 
 window.addEventListener("pointermove", (event) => {

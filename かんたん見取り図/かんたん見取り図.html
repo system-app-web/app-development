@@ -179,6 +179,14 @@ h1 {
   padding: 10px 12px;
   flex-shrink: 0;
 }
+.item-control-heading {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  letter-spacing: 0;
+}
 .dtool-btn, .size-btn, .item-btn {
   width: 36px;
   height: 36px;
@@ -316,8 +324,9 @@ h1 {
       </div>
     </div>
     <div class="item-control-slot">
+      <div class="item-control-heading">アイコンを選択</div>
       <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム">☰</button>
-      <div id="item-palette" class="floating-picker" style="top:10px;left:54px;padding:8px;">
+      <div id="item-palette" class="floating-picker" style="top:34px;left:54px;padding:8px;">
         <div style="display:flex;gap:6px;">
           <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
           <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>

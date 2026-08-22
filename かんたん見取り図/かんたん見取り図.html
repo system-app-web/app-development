@@ -122,6 +122,7 @@ h1 {
 .template-block {
   border-bottom: 1px solid var(--border);
   padding: 12px;
+  flex-shrink: 0;
 }
 .template-hero-btn {
   padding: 12px 14px;
@@ -160,20 +161,21 @@ h1 {
 .template-block.open .template-panel-body { display: flex; }
 .template-btns {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .preset-btn {
   border: 1px solid #cdeaf0;
   background: #f5fdff;
   color: #2e7884;
-  border-radius: 14px;
-  padding: 12px 14px;
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
   font: inherit;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  text-align: left;
+  text-align: center;
 }
 .preset-btn:hover { background: #e8f9fd; }
 .panel-hd {
@@ -183,9 +185,11 @@ h1 {
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 1px;
+  flex-shrink: 0;
 }
 .room-list {
   flex: 1;
+  min-height: 136px;
   overflow-y: auto;
   padding: 10px;
 }
@@ -265,6 +269,7 @@ h1 {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .add-btn:hover { background: linear-gradient(135deg, #e3f7fb, #d8f1f4); }
 .canvas-wrap {
@@ -365,8 +370,59 @@ h1 {
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
 @media (max-width: 768px) {
-  .main { padding: 10px; gap: 10px; }
-  .input-panel { width: 230px; min-width: 170px; }
+  body {
+    height: auto;
+    min-height: 100svh;
+    overflow: auto;
+  }
+  header {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  h1 { font-size: 17px; }
+  .btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .main {
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+    overflow: visible;
+  }
+  .input-panel {
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+    border-radius: 16px;
+  }
+  .side-intro { padding: 12px; }
+  .side-kicker {
+    margin-bottom: 6px;
+    padding: 4px 8px;
+  }
+  .side-title { font-size: 16px; }
+  .side-sub { font-size: 11px; }
+  .template-block { padding: 10px; }
+  .template-hero-btn { padding: 10px 12px; }
+  .template-hero-cta { margin-bottom: 5px; }
+  .template-hero-label { font-size: 15px; }
+  .template-hero-sub { font-size: 11px; }
+  .template-panel-body { padding-top: 8px; }
+  .preset-btn {
+    min-height: 42px;
+    padding: 8px 10px;
+  }
+  .room-list {
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+  .add-btn { margin: 0 10px 10px; }
+  .canvas-wrap {
+    min-height: 52svh;
+    border-radius: 18px;
+  }
 }
 </style>
 </head>

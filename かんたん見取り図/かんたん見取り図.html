@@ -99,36 +99,85 @@ h1 {
   box-shadow: 0 18px 36px rgba(70, 155, 168, 0.10);
 }
 .template-block {
-  padding: 12px;
+  position: relative;
+  padding: 54px 12px 12px;
   flex-shrink: 0;
 }
-.template-hero-btn {
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #effbfd, #ddf6f8);
-  color: var(--accent-strong);
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px #d7edf1;
-}
-.template-hero-cta {
-  display: inline-block;
-  margin-bottom: 8px;
-  padding: 4px 9px 5px;
-  border-radius: 999px;
-  background: #fff;
-  color: #2d7f8d;
-  font-size: 11px;
+.template-callout {
+  position: absolute;
+  top: 10px;
+  left: 28px;
+  z-index: 1;
+  padding: 9px 16px;
+  border: 2px solid #cfe8ee;
+  border-radius: 18px;
+  background: #f7feff;
+  color: #277886;
+  font-size: 14px;
   font-weight: 800;
-  border: 1px solid #d4edf1;
+  line-height: 1.2;
+  box-shadow: 0 5px 14px rgba(40, 132, 148, 0.16);
+  animation: template-callout-float 2.6s ease-in-out infinite;
+}
+.template-callout::after {
+  content: "";
+  position: absolute;
+  left: 42px;
+  bottom: -9px;
+  width: 16px;
+  height: 16px;
+  background: #f7feff;
+  border-right: 2px solid #cfe8ee;
+  border-bottom: 2px solid #cfe8ee;
+  transform: rotate(45deg);
+}
+.template-hero-btn {
+  position: relative;
+  width: 100%;
+  min-height: 148px;
+  border: 2px solid #7ec7d8;
+  border-radius: 18px;
+  padding: 44px 56px 24px 20px;
+  background: linear-gradient(110deg, #369fc1, #61bdab);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 -3px 0 rgba(23, 103, 125, 0.18), 0 6px 14px rgba(39, 135, 158, 0.16);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.template-hero-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 -3px 0 rgba(23, 103, 125, 0.18), 0 9px 18px rgba(39, 135, 158, 0.22);
 }
 .template-hero-label {
-  font-size: 16px;
+  display: block;
+  font-size: 24px;
   font-weight: 800;
+  line-height: 1.25;
 }
 .template-hero-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #4d8b94;
+  display: block;
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.94);
+}
+.template-chevron {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1;
+}
+@keyframes template-callout-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .template-callout { animation: none; }
 }
 .template-panel-body {
   display: none;
@@ -277,11 +326,19 @@ h1 {
     overflow: visible;
     border-radius: 16px;
   }
-  .template-block { padding: 10px; }
-  .template-hero-btn { padding: 10px 12px; }
-  .template-hero-cta { margin-bottom: 5px; }
-  .template-hero-label { font-size: 15px; }
-  .template-hero-sub { font-size: 11px; }
+  .template-block { padding: 50px 10px 10px; }
+  .template-callout {
+    top: 8px;
+    left: 22px;
+    font-size: 13px;
+  }
+  .template-hero-btn {
+    min-height: 136px;
+    padding: 40px 52px 22px 18px;
+  }
+  .template-hero-label { font-size: 22px; }
+  .template-hero-sub { font-size: 14px; }
+  .template-chevron { right: 18px; }
   .template-panel-body { padding-top: 8px; }
   .preset-btn {
     min-height: 42px;
@@ -306,11 +363,12 @@ h1 {
 <div class="main">
   <div class="input-panel">
     <div id="templateBlock" class="template-block">
-      <div class="template-hero-btn" onclick="toggleTemplatePanel()">
-        <div class="template-hero-cta">テンプレート</div>
-        <div class="template-hero-label">間取りを選ぶ</div>
-        <div class="template-hero-sub">1L、1DK、1LDK、2LDK など</div>
-      </div>
+      <div class="template-callout">まずは間取りを選択</div>
+      <button id="templateToggle" class="template-hero-btn" type="button" onclick="toggleTemplatePanel()" aria-expanded="false" aria-controls="templateBtns">
+        <span class="template-hero-label">間取りを選ぶ</span>
+        <span class="template-hero-sub">選ぶだけで見取り図を作成</span>
+        <span class="template-chevron" aria-hidden="true">⌄</span>
+      </button>
       <div class="template-panel-body">
         <div id="templateBtns" class="template-btns"></div>
       </div>
@@ -439,7 +497,9 @@ function createRoom(data = {}) {
 }
 
 function toggleTemplatePanel() {
-  document.getElementById("templateBlock").classList.toggle("open");
+  const block = document.getElementById("templateBlock");
+  const isOpen = block.classList.toggle("open");
+  document.getElementById("templateToggle").setAttribute("aria-expanded", String(isOpen));
 }
 
 function renderTemplateButtons() {

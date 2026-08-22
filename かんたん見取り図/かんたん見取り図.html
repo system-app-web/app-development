@@ -228,6 +228,7 @@ h1 {
   padding: 0;
 }
 .canvas-text-trigger,
+.canvas-move-trigger,
 .canvas-delete-trigger,
 .canvas-undo-trigger {
   position: absolute;
@@ -235,9 +236,10 @@ h1 {
   z-index: 36;
   padding: 0;
 }
-.canvas-text-trigger { top: 98px; }
-.canvas-delete-trigger { top: 142px; }
-.canvas-undo-trigger { top: 186px; font-size: 14px; }
+.canvas-move-trigger { top: 98px; }
+.canvas-text-trigger { top: 142px; }
+.canvas-delete-trigger { top: 186px; }
+.canvas-undo-trigger { top: 230px; font-size: 14px; }
 #layer-nodes g.selected > *[stroke] { stroke: #2daec0; }
 #layer-nodes g.selected > text { fill: #247a8a; }
 #layer-draw .selected-draw { stroke: #2daec0; }
@@ -262,6 +264,7 @@ h1 {
   cursor: move;
 }
 #text-overlay .canvas-text-editor.selected-draw { color: #247a8a; }
+.canvas-wrap.move-mode #text-overlay .canvas-text-editor { cursor: grab; }
 #text-overlay .text-selection-controls {
   position: absolute;
   box-sizing: border-box;
@@ -473,11 +476,12 @@ h1 {
       <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><line x1="3" y1="19" x2="19" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
     <button id="rotate-selected" class="dtool-btn canvas-rotate-trigger" type="button" onclick="rotateSelectedItem()" title="選択したアイテムを回転" aria-label="選択したアイテムを回転">回転</button>
+    <button id="dtool-move" class="dtool-btn canvas-move-trigger" type="button" onclick="setMoveMode(this)" title="移動" aria-label="移動"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 3a1 1 0 0 1 1 1v4a1 1 0 0 1 2 0V7a1 1 0 0 1 2 0v1.5a1 1 0 0 1 2 0V9a1 1 0 0 1 2 0v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V4a1 1 0 0 1 1-1Z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg></button>
     <button id="dtool-text" class="dtool-btn canvas-text-trigger" type="button" onclick="setDrawMode('text', this)" title="テキスト" aria-label="テキスト"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><text x="3" y="16" font-size="15" font-weight="700" fill="currentColor" font-family="sans-serif">A</text><line x1="2" y1="19" x2="20" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <button class="dtool-btn canvas-delete-trigger" type="button" onclick="deleteSelected()" title="選択した要素を削除" aria-label="選択した要素を削除"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><polyline points="2,4 16,4" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><path d="M5 4V3a1 1 0 011-1h6a1 1 0 011 1v1" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><rect x="3.5" y="4" width="11" height="11" rx="1.5" stroke="#c44" stroke-width="1.8"/><line x1="7" y1="7.5" x2="7" y2="12" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><line x1="11" y1="7.5" x2="11" y2="12" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <button class="dtool-btn canvas-undo-trigger" type="button" onclick="undoAction()" title="元に戻す" aria-label="元に戻す">↩</button>
 
-    <div id="text-size-picker" class="floating-picker" style="top:98px;left:54px;padding:10px;flex-direction:column;align-items:center;gap:6px;">
+    <div id="text-size-picker" class="floating-picker" style="top:142px;left:54px;padding:10px;flex-direction:column;align-items:center;gap:6px;">
       <div style="font-size:10px;color:#6e8f94;font-weight:700;">文字サイズ</div>
       <input id="text-size-input" type="number" min="6" max="96" step="1" value="28" style="width:56px;text-align:center;border:1px solid #bcdfe4;border-radius:6px;padding:4px 5px;font-size:14px;font-weight:700;" oninput="setTextSize(parseInt(this.value)||28)">
       <div style="display:flex;gap:4px;">
@@ -560,6 +564,7 @@ let dragState = null;
 const LINE_STROKE_WIDTH = 5;
 let currentDrawMode = "";
 let currentPlaceMode = "";
+let currentMoveMode = false;
 let currentTextSize = 28;
 let currentTextDir = "h";
 let selectedRoomId = null;
@@ -754,7 +759,7 @@ function startDrag(event, id) {
   clearDrawSelection();
   const room = rooms.find((item) => item.id === id);
   if (!room) return;
-  selectedRoomId = id;
+  selectedRoomId = currentMoveMode ? null : id;
   renderAll(false);
   dragState = { id, startX: event.clientX, startY: event.clientY, origX: room.x, origY: room.y };
 }
@@ -940,6 +945,19 @@ function startTextResize(event, element, corner) {
 
 function startTextElementInteraction(event, element) {
   if (currentDrawMode || currentPlaceMode) return;
+  if (currentMoveMode) {
+    event.preventDefault();
+    event.stopPropagation();
+    clearDrawSelection();
+    drawDragState = {
+      element,
+      startX: event.clientX,
+      startY: event.clientY,
+      origX: element.offsetLeft,
+      origY: element.offsetTop
+    };
+    return;
+  }
   if (selectedDrawElement !== element) {
     selectDrawElement(event, element, true);
     return;
@@ -1009,6 +1027,7 @@ function placeItemOnCanvas(event) {
 
 function addFloorPlan() {
   clearPlaceMode();
+  clearMoveMode();
   currentDrawMode = "";
   document.getElementById("svg-main").style.cursor = "";
   document.getElementById("dtool-line").classList.remove("active");
@@ -1215,6 +1234,7 @@ function clearAll() {
   rooms = [];
   selectedRoomId = null;
   clearDrawSelection();
+  clearMoveMode();
   actionHistory.length = 0;
   clearPlaceMode();
   ["layer-lines", "layer-nodes", "layer-draw", "layer-handles"].forEach((id) => {
@@ -1243,6 +1263,7 @@ function togglePalette() {
 function setDrawMode(mode, button) {
   currentDrawMode = currentDrawMode === mode ? "" : mode;
   clearPlaceMode();
+  clearMoveMode();
   clearDrawSelection();
   document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
@@ -1252,9 +1273,30 @@ function setDrawMode(mode, button) {
   showToast(currentDrawMode ? `${mode} を選択しました` : "描画モードを解除しました");
 }
 
+function setMoveMode(button) {
+  currentMoveMode = !currentMoveMode;
+  currentDrawMode = "";
+  clearPlaceMode();
+  clearDrawSelection();
+  document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
+  document.getElementById("text-size-picker").style.display = "none";
+  document.querySelector(".canvas-wrap").classList.toggle("move-mode", currentMoveMode);
+  document.getElementById("svg-main").style.cursor = currentMoveMode ? "grab" : "";
+  if (currentMoveMode) button.classList.add("active");
+  showToast(currentMoveMode ? "移動モードを選択しました" : "移動モードを解除しました");
+}
+
+function clearMoveMode() {
+  currentMoveMode = false;
+  document.querySelector(".canvas-wrap").classList.remove("move-mode");
+  document.getElementById("dtool-move").classList.remove("active");
+  document.getElementById("svg-main").style.cursor = "";
+}
+
 function setPlaceMode(mode, button) {
   currentPlaceMode = currentPlaceMode === mode ? "" : mode;
   currentDrawMode = "";
+  clearMoveMode();
   selectedRoomId = null;
   clearDrawSelection();
   renderAll(false);

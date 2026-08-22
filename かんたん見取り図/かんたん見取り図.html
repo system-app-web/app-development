@@ -222,6 +222,12 @@ h1 {
 }
 #layer-nodes g.selected > *[stroke] { stroke: #2daec0; }
 #layer-nodes g.selected > text { fill: #247a8a; }
+#layer-nodes g.selected.floorplan .floor-plan-outline {
+  stroke: #f15f69;
+  stroke-dasharray: 16 12;
+  stroke-linecap: square;
+}
+#layer-nodes g.selected.floorplan .floor-plan-handle { stroke: #3972ad; }
 .item-palette {
   display: none;
   flex-wrap: wrap;
@@ -557,6 +563,7 @@ function renderSVG(showHint = true) {
     group.dataset.id = room.id;
     group.style.cursor = "grab";
     group.classList.toggle("selected", room.id === selectedRoomId);
+    group.classList.toggle("floorplan", room.type === "floorplan");
 
     if (room.type === "floorplan") renderFloorPlan(group, room);
     else if (room.type === "bed") renderBed(group, room);
@@ -600,17 +607,43 @@ function renderBed(group, room) {
 }
 
 function renderFloorPlan(group, room) {
-  group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "transparent", stroke: "#000", "stroke-width": 5 }));
+  const outline = svgEl("rect", {
+    width: room.w,
+    height: room.h,
+    fill: "transparent",
+    stroke: "#000",
+    "stroke-width": 5,
+    class: "floor-plan-outline"
+  });
+  group.appendChild(outline);
 
   if (room.id === selectedRoomId) {
+    const handleW = gridStep("x") * 0.65;
+    const handleH = gridStep("y") * 0.65;
+    const halfW = handleW / 2;
+    const halfH = handleH / 2;
     const handles = [
-      { corner: "nw", x: -8, y: -8, cursor: "nwse-resize" },
-      { corner: "ne", x: room.w - 8, y: -8, cursor: "nesw-resize" },
-      { corner: "sw", x: -8, y: room.h - 8, cursor: "nesw-resize" },
-      { corner: "se", x: room.w - 8, y: room.h - 8, cursor: "nwse-resize" }
+      { corner: "nw", x: -halfW, y: -halfH, cursor: "nwse-resize" },
+      { corner: "n", x: room.w / 2 - halfW, y: -halfH, cursor: "ns-resize" },
+      { corner: "ne", x: room.w - halfW, y: -halfH, cursor: "nesw-resize" },
+      { corner: "w", x: -halfW, y: room.h / 2 - halfH, cursor: "ew-resize" },
+      { corner: "e", x: room.w - halfW, y: room.h / 2 - halfH, cursor: "ew-resize" },
+      { corner: "sw", x: -halfW, y: room.h - halfH, cursor: "nesw-resize" },
+      { corner: "s", x: room.w / 2 - halfW, y: room.h - halfH, cursor: "ns-resize" },
+      { corner: "se", x: room.w - halfW, y: room.h - halfH, cursor: "nwse-resize" }
     ];
     handles.forEach(({ corner, x, y, cursor }) => {
-      const handle = svgEl("rect", { x, y, width: 16, height: 16, fill: "#2daec0" });
+      const handle = svgEl("rect", {
+        x,
+        y,
+        width: handleW,
+        height: handleH,
+        rx: Math.min(handleW, handleH) * 0.2,
+        fill: "#fff",
+        stroke: "#3972ad",
+        "stroke-width": 3,
+        class: "floor-plan-handle"
+      });
       handle.style.cursor = cursor;
       handle.addEventListener("pointerdown", (event) => startResize(event, room.id, corner));
       group.appendChild(handle);

@@ -844,12 +844,23 @@ function updateTextDrawElement(element) {
   if (!editor) return;
   const size = Number(element.dataset.fontSize) || currentTextSize;
   const vertical = element.dataset.direction === "v";
+  const svg = document.getElementById("svg-main");
+  const x = Number(element.getAttribute("x")) || 0;
+  const y = Number(element.getAttribute("y")) || 0;
+  const stretchRatio = svg.clientHeight && svg.clientWidth
+    ? (svg.clientHeight / 800) / (svg.clientWidth / 1200)
+    : 1;
   element.setAttribute("width", vertical ? size + 20 : 280);
   element.setAttribute("height", vertical ? 320 : Math.max(size + 24, 60));
+  element.setAttribute("transform", `translate(${x} ${y}) scale(${stretchRatio} 1) translate(${-x} ${-y})`);
   editor.style.fontSize = `${size}px`;
   editor.style.width = vertical ? `${size + 20}px` : "280px";
   editor.style.height = vertical ? "320px" : `${Math.max(size + 24, 60)}px`;
   editor.style.writingMode = vertical ? "vertical-rl" : "horizontal-tb";
+}
+
+function updateAllTextDrawElements() {
+  document.querySelectorAll("#layer-draw .canvas-text").forEach(updateTextDrawElement);
 }
 
 function clearDrawSelection() {
@@ -1041,6 +1052,8 @@ window.addEventListener("pointerup", () => {
   dragState = null;
   resizeState = null;
 });
+
+window.addEventListener("resize", updateAllTextDrawElements);
 
 function clearAll() {
   rooms = [];

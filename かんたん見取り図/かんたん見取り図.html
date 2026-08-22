@@ -423,13 +423,6 @@ h1 {
       <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><line x1="3" y1="19" x2="19" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
     <button id="rotate-selected" class="dtool-btn canvas-rotate-trigger" type="button" onclick="rotateSelectedItem()" title="選択したアイテムを回転" aria-label="選択したアイテムを回転">回転</button>
-    <div id="stroke-size-picker" class="floating-picker" style="top:10px;left:54px;padding:8px;">
-      <div style="display:flex;gap:6px;">
-        <button class="size-btn" onclick="setStrokeWidth(1.5,this)" title="細">細</button>
-        <button class="size-btn active" onclick="setStrokeWidth(3,this)" title="中">中</button>
-        <button class="size-btn" onclick="setStrokeWidth(5,this)" title="太">太</button>
-      </div>
-    </div>
 
     <div id="text-size-picker" class="floating-picker" style="top:10px;left:54px;padding:10px;flex-direction:column;align-items:center;gap:6px;">
       <div style="font-size:10px;color:#6e8f94;font-weight:700;">文字サイズ</div>
@@ -510,7 +503,7 @@ const templates = [
 
 let rooms = [];
 let dragState = null;
-let currentStrokeWidth = 3;
+const LINE_STROKE_WIDTH = 5;
 let currentDrawMode = "";
 let currentPlaceMode = "";
 let currentTextSize = 28;
@@ -772,7 +765,7 @@ function startLineDraw(event) {
     d: `M ${start.x} ${start.y}`,
     fill: "none",
     stroke: "#000",
-    "stroke-width": currentStrokeWidth,
+    "stroke-width": LINE_STROKE_WIDTH,
     "stroke-linecap": "round",
     "stroke-linejoin": "round"
   });
@@ -818,7 +811,6 @@ function placeItemOnCanvas(event) {
 function addFloorPlan() {
   clearPlaceMode();
   currentDrawMode = "";
-  document.getElementById("stroke-size-picker").style.display = "none";
   document.getElementById("svg-main").style.cursor = "";
   document.getElementById("dtool-line").classList.remove("active");
   const count = rooms.filter((room) => room.type === "floorplan").length;
@@ -942,26 +934,12 @@ function togglePalette() {
   document.getElementById("palette-toggle").setAttribute("aria-expanded", String(isOpen));
 }
 
-function toggleStrokePicker() {
-  const picker = document.getElementById("stroke-size-picker");
-  picker.style.display = picker.style.display === "none" || !picker.style.display ? "block" : "none";
-}
-
-function setStrokeWidth(width, button) {
-  currentStrokeWidth = width;
-  document.querySelectorAll(".size-btn").forEach((el) => el.classList.remove("active"));
-  if (button) button.classList.add("active");
-  showToast(`線の太さを ${width} にしました`);
-}
-
 function setDrawMode(mode, button) {
   currentDrawMode = currentDrawMode === mode ? "" : mode;
   clearPlaceMode();
   document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
   if (currentDrawMode && button) button.classList.add("active");
-  const strokePicker = document.getElementById("stroke-size-picker");
-  strokePicker.style.display = currentDrawMode === "line" ? "flex" : "none";
   document.getElementById("text-size-picker").style.display = currentDrawMode === "text" ? "flex" : "none";
   document.getElementById("svg-main").style.cursor = currentDrawMode ? "crosshair" : "";
   showToast(currentDrawMode ? `${mode} を選択しました` : "描画モードを解除しました");
@@ -970,7 +948,6 @@ function setDrawMode(mode, button) {
 function setPlaceMode(mode, button) {
   currentPlaceMode = currentPlaceMode === mode ? "" : mode;
   currentDrawMode = "";
-  document.getElementById("stroke-size-picker").style.display = "none";
   selectedRoomId = null;
   renderAll(false);
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));

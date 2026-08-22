@@ -30,10 +30,10 @@ body {
     radial-gradient(circle at bottom right, rgba(198, 231, 255, 0.6) 0, transparent 28%),
     linear-gradient(180deg, #f4fffe 0%, #eaf7fb 100%);
   color: var(--text);
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
 }
 header {
   background: rgba(250,255,255,0.96);
@@ -76,14 +76,13 @@ h1 {
 .btn-soft:hover { background: #e9f9fb; }
 .main {
   display: flex;
-  flex: 1;
-  min-height: 0;
+  flex-direction: column;
   padding: 14px;
   gap: 14px;
 }
 .input-panel {
-  width: 312px;
-  min-width: 230px;
+  width: 100%;
+  min-width: 0;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 22px;
@@ -178,88 +177,19 @@ h1 {
   text-align: center;
 }
 .preset-btn:hover { background: #e8f9fd; }
-.canvas-wrap {
-  position: relative;
-  flex: 1;
+.item-canvas-wrap {
+  height: 560px;
+  min-height: 560px;
   overflow: hidden;
-  border-radius: 28px;
   border: 1px solid #d9edf1;
+  border-radius: 22px;
   background: #fff;
-  box-shadow: 0 22px 42px rgba(74, 166, 180, 0.10);
+  box-shadow: 0 18px 36px rgba(74, 166, 180, 0.08);
 }
-#svg-main {
+#itemCanvas {
   width: 100%;
   height: 100%;
   display: block;
-  background-image:
-    linear-gradient(to right, rgba(0,0,0,0.07) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0,0,0,0.07) 1px, transparent 1px);
-  background-size: 28px 28px;
-}
-.canvas-tools {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.canvas-tools-row {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  align-items: center;
-}
-.dtool-btn, .size-btn, .item-btn {
-  width: 36px;
-  height: 36px;
-  border: 1.5px solid #cde7eb;
-  border-radius: 10px;
-  background: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  color: #4b6c73;
-  font-size: 15px;
-}
-.dtool-btn:hover, .item-btn:hover, .size-btn:hover {
-  background: #edfafd;
-  border-color: #7ac5cf;
-}
-.dtool-btn.active, .item-btn.active, .size-btn.active {
-  background: #dff5f8;
-  border-color: #2daec0;
-  box-shadow: 0 0 0 2px rgba(45, 174, 192, 0.18);
-}
-.floating-picker {
-  position: absolute;
-  display: none;
-  z-index: 35;
-  background: rgba(255,255,255,0.96);
-  border: 1px solid #d8eef1;
-  border-radius: 16px;
-  box-shadow: 0 16px 28px rgba(71, 184, 200, 0.14);
-}
-.canvas-hint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  text-align: center;
-}
-.canvas-hint .txt {
-  color: #5f8c93;
-  line-height: 1.8;
-  font-size: 14px;
-  background: rgba(248,255,255,0.9);
-  padding: 16px 20px;
-  border-radius: 16px;
-  border: 1px solid #d8eef1;
 }
 .toast {
   position: fixed;
@@ -319,7 +249,8 @@ h1 {
     min-height: 42px;
     padding: 8px 10px;
   }
-  .canvas-wrap {
+  .item-canvas-wrap {
+    height: 52svh;
     min-height: 52svh;
     border-radius: 18px;
   }
@@ -354,59 +285,8 @@ h1 {
     </div>
   </div>
 
-  <div class="canvas-wrap">
-    <div class="canvas-tools">
-      <div class="canvas-tools-row">
-        <button id="palette-toggle" onclick="togglePalette()" title="アイテムメニュー" class="dtool-btn">☰</button>
-        <button class="dtool-btn" onclick="toggleStrokePicker()" title="線の太さ">〓</button>
-        <button class="dtool-btn" id="dtool-line" onclick="setDrawMode('line', this)" title="直線">／</button>
-        <button class="dtool-btn" id="dtool-dash-line" onclick="setDrawMode('dash-line', this)" title="点線">┄</button>
-        <button class="dtool-btn" id="dtool-enclose" onclick="setDrawMode('enclose', this)" title="楕円">○</button>
-        <button class="dtool-btn" id="dtool-rect-enc" onclick="setDrawMode('rect-enc', this)" title="四角">□</button>
-        <button class="dtool-btn" id="dtool-pen" onclick="setDrawMode('pen', this)" title="ペン">P</button>
-        <button class="dtool-btn" id="dtool-text" onclick="setDrawMode('text', this)" title="テキスト">A</button>
-        <button class="dtool-btn" onclick="deleteSelected()" title="削除">×</button>
-        <button class="dtool-btn" onclick="undoAction()" title="元に戻す">↩</button>
-      </div>
-    </div>
-
-    <div id="stroke-size-picker" class="floating-picker" style="top:10px;left:54px;padding:8px;">
-      <div style="display:flex;gap:6px;">
-        <button class="size-btn" onclick="setStrokeWidth(1.5,this)" title="細">細</button>
-        <button class="size-btn active" onclick="setStrokeWidth(3,this)" title="中">中</button>
-        <button class="size-btn" onclick="setStrokeWidth(5,this)" title="太">太</button>
-      </div>
-    </div>
-
-    <div id="item-palette" class="floating-picker" style="top:10px;left:54px;padding:8px;">
-      <div style="display:flex;gap:6px;">
-        <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
-        <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
-        <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
-        <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
-      </div>
-    </div>
-
-    <div id="text-size-picker" class="floating-picker" style="top:10px;left:54px;padding:10px;flex-direction:column;align-items:center;gap:6px;">
-      <div style="font-size:10px;color:#6e8f94;font-weight:700;">文字サイズ</div>
-      <input id="text-size-input" type="number" min="6" max="96" step="1" value="28" style="width:56px;text-align:center;border:1px solid #bcdfe4;border-radius:6px;padding:4px 5px;font-size:14px;font-weight:700;" oninput="setTextSize(parseInt(this.value)||28)">
-      <div style="display:flex;gap:4px;">
-        <button id="text-dir-h" onclick="setTextDir('h')" class="dtool-btn active" style="width:auto;padding:0 10px;">横</button>
-        <button id="text-dir-v" onclick="setTextDir('v')" class="dtool-btn" style="width:auto;padding:0 10px;">縦</button>
-      </div>
-    </div>
-
-    <svg id="svg-main" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
-      <g id="canvas-offset">
-        <g id="layer-lines"></g>
-        <g id="layer-nodes"></g>
-        <g id="layer-draw"></g>
-        <g id="layer-handles"></g>
-      </g>
-    </svg>
-    <div id="canvasHint" class="canvas-hint">
-      <div class="txt">左のテンプレートから<br>一般的な見取り図を作成できます</div>
-    </div>
+  <div class="item-canvas-wrap">
+    <canvas id="itemCanvas" width="1200" height="800" aria-label="アイテムキャンバス"></canvas>
   </div>
 </div>
 
@@ -465,28 +345,6 @@ const templates = [
 ];
 
 let rooms = [];
-let dragState = null;
-let currentStrokeWidth = 3;
-let currentDrawMode = "";
-let currentPlaceMode = "";
-let currentTextSize = 28;
-let currentTextDir = "h";
-
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-function createRoom(data = {}) {
-  return {
-    id: data.id || uid(),
-    name: data.name || "部屋",
-    type: data.type || "room",
-    x: Number(data.x ?? 90),
-    y: Number(data.y ?? 90),
-    w: Number(data.w ?? 180),
-    h: Number(data.h ?? 120)
-  };
-}
 
 function toggleTemplatePanel() {
   document.getElementById("templateBlock").classList.toggle("open");
@@ -505,129 +363,25 @@ function renderTemplateButtons() {
 }
 
 function applyTemplate(template) {
-  rooms = template.rooms.map((room) => createRoom(room));
-  renderAll();
-  showToast(`${template.name} を読み込みました`);
+  rooms = template.rooms.map((room) => ({ ...room }));
+  clearItemCanvas();
+  showToast(`${template.name} を選択しました`);
 }
 
 function loadDefaultTemplate() {
   applyTemplate(templates[0]);
 }
 
-function renderSVG(showHint = true) {
-  const layerNodes = document.getElementById("layer-nodes");
-  if (!layerNodes) return;
-  layerNodes.innerHTML = "";
-  rooms.forEach((room) => {
-    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.setAttribute("transform", `translate(${room.x} ${room.y})`);
-    group.dataset.id = room.id;
-    group.style.cursor = "grab";
-
-    if (room.type === "bed") renderBed(group, room);
-    else if (room.type === "door") renderDoor(group, room);
-    else if (room.type === "furniture") renderFurniture(group, room);
-    else renderSpace(group, room);
-
-    layerNodes.appendChild(group);
-    group.addEventListener("pointerdown", (event) => startDrag(event, room.id));
-  });
-  document.getElementById("canvasHint").style.display = showHint && rooms.length === 0 ? "flex" : "none";
+function clearItemCanvas() {
+  const canvas = document.getElementById("itemCanvas");
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
 }
-
-function renderSpace(group, room) {
-  const rect = svgEl("rect", {
-    width: room.w,
-    height: room.h,
-    rx: room.type === "toilet" || room.type === "wet" ? 2 : 0,
-    fill: "#fff",
-    stroke: "#000",
-    "stroke-width": room.type === "hall" ? 3 : 5
-  });
-  group.appendChild(rect);
-  addLabel(group, room.name, room.w / 2, room.h / 2 + 10, room.type === "storage" ? 34 : 42);
-
-  if (room.type === "toilet") {
-    group.appendChild(svgEl("ellipse", { cx: room.w / 2 + 16, cy: room.h / 2 + 28, rx: 58, ry: 38, fill: "none", stroke: "#000", "stroke-width": 5 }));
-    group.appendChild(svgEl("rect", { x: 22, y: room.h / 2, width: 62, height: 72, rx: 10, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
-  }
-  if (room.type === "wet") {
-    group.appendChild(svgEl("rect", { x: 26, y: room.h - 92, width: room.w - 52, height: 70, rx: 10, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
-    group.appendChild(svgEl("circle", { cx: room.w / 2, cy: room.h - 56, r: 7, fill: "#000" }));
-  }
-}
-
-function renderBed(group, room) {
-  group.appendChild(svgEl("rect", { width: room.w, height: room.h, rx: 14, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
-  group.appendChild(svgEl("rect", { x: 28, y: 20, width: room.w - 56, height: 70, rx: 14, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
-  group.appendChild(svgEl("line", { x1: 0, y1: 110, x2: room.w, y2: 110, stroke: "#000", "stroke-width": 5 }));
-  addLabel(group, room.name, room.w / 2, room.h / 2 + 20, 42);
-}
-
-function renderDoor(group, room) {
-  group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "#fff", stroke: "#000", "stroke-width": 3 }));
-  group.appendChild(svgEl("line", { x1: 0, y1: room.h / 2, x2: room.w, y2: room.h / 2, stroke: "#000", "stroke-width": 3 }));
-  addLabel(group, room.name, room.w / 2, room.h + 44, 42);
-}
-
-function renderFurniture(group, room) {
-  group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
-  group.appendChild(svgEl("line", { x1: room.w / 2, y1: 30, x2: room.w / 2, y2: room.h - 30, stroke: "#000", "stroke-width": 8 }));
-  addLabel(group, room.name, -42, room.h / 2, 42);
-}
-
-function addLabel(group, text, x, y, size) {
-  const label = svgEl("text", {
-    x, y,
-    "text-anchor": "middle",
-    "font-size": size,
-    "font-weight": 800,
-    fill: "#000",
-    "font-family": "Hiragino Sans, Yu Gothic UI, Meiryo, sans-serif"
-  });
-  label.textContent = text;
-  group.appendChild(label);
-}
-
-function svgEl(name, attrs) {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", name);
-  Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
-  return el;
-}
-
-function renderAll(showHint = true) {
-  renderSVG(showHint);
-}
-
-function startDrag(event, id) {
-  const room = rooms.find((item) => item.id === id);
-  if (!room) return;
-  dragState = { id, startX: event.clientX, startY: event.clientY, origX: room.x, origY: room.y };
-}
-
-window.addEventListener("pointermove", (event) => {
-  if (!dragState) return;
-  const svg = document.getElementById("svg-main");
-  const scaleX = 1200 / svg.clientWidth;
-  const scaleY = 800 / svg.clientHeight;
-  const room = rooms.find((item) => item.id === dragState.id);
-  if (!room) return;
-  room.x = Math.max(0, Math.round(dragState.origX + (event.clientX - dragState.startX) * scaleX));
-  room.y = Math.max(0, Math.round(dragState.origY + (event.clientY - dragState.startY) * scaleY));
-  renderAll(false);
-});
-
-window.addEventListener("pointerup", () => {
-  dragState = null;
-});
 
 function clearAll() {
   rooms = [];
-  ["layer-lines", "layer-nodes", "layer-draw", "layer-handles"].forEach((id) => {
-    const layer = document.getElementById(id);
-    if (layer) layer.innerHTML = "";
-  });
-  renderAll();
+  clearItemCanvas();
   showToast("見取り図をリセットしました");
 }
 
@@ -639,105 +393,34 @@ function showToast(message) {
   showToast._timer = setTimeout(() => el.classList.remove("show"), 1800);
 }
 
-function togglePalette() {
-  const palette = document.getElementById("item-palette");
-  palette.style.display = palette.style.display === "none" || !palette.style.display ? "block" : "none";
-}
-
-function toggleStrokePicker() {
-  const picker = document.getElementById("stroke-size-picker");
-  picker.style.display = picker.style.display === "none" || !picker.style.display ? "block" : "none";
-}
-
-function setStrokeWidth(width, button) {
-  currentStrokeWidth = width;
-  document.querySelectorAll(".size-btn").forEach((el) => el.classList.remove("active"));
-  if (button) button.classList.add("active");
-  showToast(`線の太さを ${width} にしました`);
-}
-
-function setDrawMode(mode, button) {
-  currentDrawMode = currentDrawMode === mode ? "" : mode;
-  currentPlaceMode = "";
-  document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
-  document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
-  if (currentDrawMode && button) button.classList.add("active");
-  document.getElementById("text-size-picker").style.display = currentDrawMode === "text" ? "flex" : "none";
-  showToast(currentDrawMode ? `${mode} を選択しました` : "描画モードを解除しました");
-}
-
-function setPlaceMode(mode, button) {
-  currentPlaceMode = currentPlaceMode === mode ? "" : mode;
-  currentDrawMode = "";
-  document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
-  document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
-  if (currentPlaceMode && button) button.classList.add("active");
-  showToast(currentPlaceMode ? `${mode} を選択しました` : "アイテム選択を解除しました");
-}
-
-function deleteSelected() {
-  showToast("削除ボタンは配置済みです");
-}
-
-function undoAction() {
-  showToast("元に戻すボタンは配置済みです");
-}
-
-function setTextSize(size) {
-  currentTextSize = size;
-}
-
-function setTextDir(dir) {
-  currentTextDir = dir;
-  document.getElementById("text-dir-h").classList.toggle("active", dir === "h");
-  document.getElementById("text-dir-v").classList.toggle("active", dir === "v");
-}
-
 async function exportPNG() {
-  const svg = document.getElementById("svg-main");
-  const xml = new XMLSerializer().serializeToString(svg);
-  const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const img = new Image();
-
-  img.onload = async () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1200;
-    canvas.height = 800;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    URL.revokeObjectURL(url);
-
-    const fileName = `見取り図_${new Date().toISOString().slice(0, 10)}.png`;
-    try {
-      if (window.showSaveFilePicker) {
-        const handle = await window.showSaveFilePicker({
-          suggestedName: fileName,
-          types: [{ description: "PNG画像", accept: { "image/png": [".png"] } }]
-        });
-        const writable = await handle.createWritable();
-        const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-        await writable.write(pngBlob);
-        await writable.close();
-        showToast("見取り図を保存しました");
-      } else {
-        const a = document.createElement("a");
-        a.href = canvas.toDataURL("image/png");
-        a.download = fileName;
-        a.click();
-        showToast("見取り図をダウンロードしました");
-      }
-    } catch (error) {
-      if (error && error.name !== "AbortError") alert("保存に失敗しました。");
+  const canvas = document.getElementById("itemCanvas");
+  const fileName = `見取り図_${new Date().toISOString().slice(0, 10)}.png`;
+  try {
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [{ description: "PNG画像", accept: { "image/png": [".png"] } }]
+      });
+      const writable = await handle.createWritable();
+      const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      await writable.write(pngBlob);
+      await writable.close();
+      showToast("見取り図を保存しました");
+    } else {
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = fileName;
+      a.click();
+      showToast("見取り図をダウンロードしました");
     }
-  };
-  img.src = url;
+  } catch (error) {
+    if (error && error.name !== "AbortError") alert("保存に失敗しました。");
+  }
 }
 
 renderTemplateButtons();
-renderAll();
+clearItemCanvas();
 </script>
 </body>
 </html>

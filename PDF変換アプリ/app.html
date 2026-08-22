@@ -719,7 +719,7 @@
         if (isMergeMode()) {
           openPdfPrintDialog(printWindow, await buildMergedPdfBlob(mergeFiles));
         } else {
-          await openCanvasPrintDialog(printWindow, outputCanvases);
+          openPdfPrintDialog(printWindow, buildOutputPdfBlob(outputCanvases, PRINT_DPI));
         }
         setStatus("印刷ダイアログを開いています。");
       } catch (error) {
@@ -1190,37 +1190,8 @@
       return objectsToPdfBlobFromPageImages(pageImages);
     }
 
-    function buildOutputPdfBlob(canvases) {
-      return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageJpeg(canvas)));
-    }
-
-    async function openCanvasPrintDialog(printWindow, canvases) {
-      const pages = [];
-      for (let index = 0; index < canvases.length; index++) {
-        setStatus(`印刷用ページを準備中です。${index + 1}/${canvases.length}`);
-        const { canvas: pageCanvas, page } = buildA4PageCanvas(canvases[index], PRINT_DPI);
-        pages.push({ image: pageCanvas.toDataURL("image/jpeg", 0.9), page });
-        await nextFrame();
-      }
-      const page = pages[0].page;
-      const pageMarkup = pages.map(({ image }) => `<section class="page"><img src="${image}" alt=""></section>`).join("");
-      printWindow.document.open();
-      printWindow.document.write(`<!doctype html>
-        <html lang="ja"><head><title>印刷</title><style>
-          @page { size: ${page.wMm}mm ${page.hMm}mm; margin: 0; }
-          * { box-sizing: border-box; }
-          html, body { margin: 0; padding: 0; background: #fff; }
-          .page { width: ${page.wMm}mm; height: ${page.hMm}mm; break-after: page; page-break-after: always; }
-          .page:last-child { break-after: auto; page-break-after: auto; }
-          img { display: block; width: 100%; height: 100%; }
-        </style></head><body>${pageMarkup}<script>
-          window.addEventListener("load", async () => {
-            const images = Array.from(document.images);
-            await Promise.all(images.map((image) => image.decode ? image.decode().catch(() => {}) : Promise.resolve()));
-            setTimeout(() => { window.focus(); window.print(); }, 100);
-          }, { once: true });
-        <\/script></body></html>`);
-      printWindow.document.close();
+    function buildOutputPdfBlob(canvases, dpi = DPI) {
+      return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageJpeg(canvas, dpi)));
     }
 
     function showPrintLoading(printWindow) {
@@ -1283,8 +1254,8 @@
       return objectsToPdfBlob(objects);
     }
 
-    function buildA4PageJpeg(canvas) {
-      const { canvas: doc, page } = buildA4PageCanvas(canvas);
+    function buildA4PageJpeg(canvas, dpi = DPI) {
+      const { canvas: doc, page } = buildA4PageCanvas(canvas, dpi);
       const jpegData = atob(doc.toDataURL("image/jpeg", 0.92).split(",")[1]);
       return { data: jpegData, width: doc.width, height: doc.height, page };
     }

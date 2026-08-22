@@ -913,7 +913,7 @@
             mergeFiles.push(file);
             mergePageCount += pageCount;
             try {
-              await appendMergePreviews(file);
+              await appendMergePreviews(file, mergeFiles.length);
             } catch (error) {
               console.warn("Failed to render merge preview.", error);
             }
@@ -1003,12 +1003,12 @@
       return canvases;
     }
 
-    async function appendMergePreviews(file) {
+    async function appendMergePreviews(file, fileIndex) {
       const previews = await renderPdfPreviewPages(file, 1);
       previews.forEach((canvas) => {
         mergePreviewCanvases.push({
           canvas,
-          label: `${file.name}（1ページ目）`
+          label: `No.${fileIndex}`
         });
       });
     }

@@ -315,9 +315,8 @@ h1 {
 <header>
   <h1>かんたん見取り図</h1>
   <button class="btn btn-soft" onclick="clearAll()">リセット</button>
-  <button class="btn btn-soft" onclick="loadDefaultTemplate()">標準テンプレート</button>
-  <div class="spacer"></div>
   <button class="btn btn-primary" onclick="exportPNG()">フォルダ保存</button>
+  <div class="spacer"></div>
 </header>
 
 <div class="main">
@@ -478,10 +477,6 @@ function applyTemplate(template) {
   rooms = template.rooms.map((room) => createRoom(room));
   renderAll();
   showToast(`${template.name} を読み込みました`);
-}
-
-function loadDefaultTemplate() {
-  applyTemplate(templates[0]);
 }
 
 function renderSVG(showHint = true) {

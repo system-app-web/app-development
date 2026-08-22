@@ -82,7 +82,7 @@ export const appData: PortalApp[] = [
   {
     id: 'simple-genogram',
     name: 'かんたんジェノグラム',
-    url: 'https://riyosha-simple-genogram-20260822.vercel.app',
+    url: 'https://easy-genogram-app.vercel.app',
     manualUrl: '',
     icon: 'genogram',
     iconImage: '/app-icons/genogram.png',

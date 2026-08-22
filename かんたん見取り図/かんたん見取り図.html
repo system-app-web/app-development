@@ -202,6 +202,12 @@ h1 {
     linear-gradient(to bottom, rgba(0,0,0,0.07) 1px, transparent 1px);
   background-size: 28px 28px;
 }
+.canvas-item-trigger {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 36;
+}
 .dtool-btn, .size-btn, .item-btn {
   width: 36px;
   height: 36px;
@@ -353,6 +359,7 @@ h1 {
   </div>
 
   <div class="canvas-wrap">
+    <button id="palette-toggle" class="dtool-btn canvas-item-trigger" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム">☰</button>
     <div id="stroke-size-picker" class="floating-picker" style="top:10px;left:54px;padding:8px;">
       <div style="display:flex;gap:6px;">
         <button class="size-btn" onclick="setStrokeWidth(1.5,this)" title="細">細</button>

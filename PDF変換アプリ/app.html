@@ -526,7 +526,7 @@
     let blackThreshold = 172;
     let sizeScale = 1;
     let orientationWorkerPromise = null;
-    const manualOrientationDirections = { merge: -90, care: -90, burden: -90 };
+    const manualOrientationDirections = { merge: 0, care: 0, burden: 0 };
     const manualOrientationEnabled = { merge: false, care: false, burden: false };
     const manualUpsideDown = { merge: false, care: false, burden: false };
     const modeStates = {
@@ -552,11 +552,11 @@
     });
 
     rotateLeftBtn.addEventListener("click", () => {
-      setManualOrientation(90);
+      setManualOrientation(-90);
     });
 
     rotateRightBtn.addEventListener("click", () => {
-      setManualOrientation(-90);
+      setManualOrientation(90);
     });
 
     resetBtn.addEventListener("click", () => {
@@ -768,14 +768,14 @@
     function updateRotationButtons() {
       const type = selectedDocType();
       document.querySelector(".rotation-tools").classList.toggle("hidden", isMergeMode());
-      rotateLeftBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === 90);
-      rotateRightBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === -90);
+      rotateLeftBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === 270);
+      rotateRightBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === 90);
     }
 
     function setManualOrientation(degrees) {
       const type = selectedDocType();
       manualOrientationEnabled[type] = true;
-      manualOrientationDirections[type] = degrees;
+      manualOrientationDirections[type] = (manualOrientationDirections[type] + degrees + 360) % 360;
       manualUpsideDown[type] = false;
       rebuildForManualOrientation();
     }
@@ -807,6 +807,7 @@
     }
 
     function resetLoadedFiles() {
+      const type = selectedDocType();
       loadedCanvases = [];
       sourceCanvases = [];
       outputCanvases = [];
@@ -815,6 +816,9 @@
       mergeFiles = [];
       mergePageCount = 0;
       mergePreviewCanvases = [];
+      manualOrientationDirections[type] = 0;
+      manualOrientationEnabled[type] = false;
+      manualUpsideDown[type] = false;
       setActionButtonsDisabled(true);
       showPlaceholder();
       updateRotationButtons();
@@ -1082,9 +1086,9 @@
       const shouldRotate = (orientation === "landscape" && canvas.height > canvas.width)
         || (orientation === "portrait" && canvas.width > canvas.height);
       const type = selectedDocType();
-      const direction = manualOrientationEnabled[type] ? manualOrientationDirections[type] : -90;
-      const oriented = shouldRotate ? rotateCanvas(canvas, direction) : canvas;
-      return manualOrientationEnabled[type] && manualUpsideDown[type] ? rotateCanvas(oriented, 180) : oriented;
+      const oriented = shouldRotate ? rotateCanvas(canvas, -90) : canvas;
+      const rotation = manualOrientationEnabled[type] ? manualOrientationDirections[type] : 0;
+      return rotation ? rotateCanvas(oriented, rotation) : oriented;
     }
 
     function refreshOutputCanvases() {
@@ -1101,7 +1105,7 @@
       }
       for (let index = 0; index < loadedCanvases.length; index++) {
         const type = selectedDocType();
-        const correction = manualOrientationEnabled[type] ? 0 : (pageRotationCorrections[index] ?? 0);
+        const correction = pageRotationCorrections[index] ?? 0;
         const corrected = rotateCanvas(loadedCanvases[index], correction);
         const cropped = cropDocument(corrected);
         const oriented = normalizeOrientation(cropped);

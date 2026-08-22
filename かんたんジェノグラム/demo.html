@@ -433,7 +433,7 @@ header h1 {
 .canvas-edit-guide {
   position: absolute;
   top: 50%;
-  left: 54px;
+  left: 9px;
   transform: translateY(-50%);
   z-index: 3000;
   writing-mode: vertical-rl;
@@ -672,14 +672,14 @@ body.template-selected .canvas-edit-guide {
     </div>
 
     <!-- 太さピッカー（ツールバー右に展開） -->
-    <div id="stroke-size-picker" style="position:absolute;left:54px;top:10px;display:none;flex-direction:row;gap:4px;z-index:10">
+    <div id="stroke-size-picker" style="position:absolute;left:118px;top:10px;display:none;flex-direction:row;gap:4px;z-index:10">
       <button class="dtool-btn" data-sw="1.5" onclick="setStrokeWidth(1.5,this)" title="細"><svg width="22" height="22" viewBox="0 0 22 22"><line x1="3" y1="11" x2="19" y2="11" stroke="#555" stroke-width="1.5" stroke-linecap="round"/></svg></button>
       <button class="dtool-btn active" data-sw="3"   onclick="setStrokeWidth(3,this)"   title="中"><svg width="22" height="22" viewBox="0 0 22 22"><line x1="3" y1="11" x2="19" y2="11" stroke="#555" stroke-width="3"   stroke-linecap="round"/></svg></button>
       <button class="dtool-btn" data-sw="5"   onclick="setStrokeWidth(5,this)"   title="太"><svg width="22" height="22" viewBox="0 0 22 22"><line x1="3" y1="11" x2="19" y2="11" stroke="#555" stroke-width="5"   stroke-linecap="round"/></svg></button>
     </div>
 
     <!-- アイテムパレット（初期非表示） -->
-    <div id="item-palette" style="position:absolute;top:10px;left:54px;display:none;flex-direction:row;gap:4px;z-index:10">
+    <div id="item-palette" style="position:absolute;top:10px;left:118px;display:none;flex-direction:row;gap:4px;z-index:10">
       <button class="item-btn" id="iitem-male" onclick="setPlaceMode('male')" title="男性">
         <svg width="22" height="22"><rect x="2" y="2" width="18" height="18" fill="white" stroke="black" stroke-width="2.5"/></svg>
       </button>
@@ -697,7 +697,7 @@ body.template-selected .canvas-edit-guide {
     </div>
 
     <!-- 描画ツールバー -->
-    <div id="draw-toolbar" style="position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:4px;z-index:10">
+    <div id="draw-toolbar" style="position:absolute;top:10px;left:74px;display:flex;flex-direction:column;gap:4px;z-index:10">
       <button id="palette-toggle" onclick="togglePalette()" title="アイテムメニュー" class="dtool-btn"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="0" y1="2" x2="18" y2="2" stroke="#555" stroke-width="2" stroke-linecap="round"/><line x1="0" y1="7" x2="18" y2="7" stroke="#555" stroke-width="2" stroke-linecap="round"/><line x1="0" y1="12" x2="18" y2="12" stroke="#555" stroke-width="2" stroke-linecap="round"/></svg></button>
       <button class="dtool-btn" id="dtool-line" onclick="setDrawMode('line')" title="直線"><svg width="22" height="22" viewBox="0 0 22 22"><line x1="3" y1="19" x2="19" y2="3" stroke="#555" stroke-width="2" stroke-linecap="round"/></svg></button>
       <button class="dtool-btn" id="dtool-dash-line" onclick="setDrawMode('dash-line')" title="点線の直線"><svg width="22" height="22" viewBox="0 0 22 22"><line x1="3" y1="19" x2="19" y2="3" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,3"/></svg></button>

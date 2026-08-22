@@ -956,6 +956,11 @@ const BUILTIN_PRESETS = {
     const w = mkPerson('妻','female'); w.doukyo = true; w.kp = true;
     return [h, w, mkPerson('長女','female'), mkPerson('次女','female')];
   },
+  '本人・妻・長男・長女・次女': () => {
+    const h = mkPerson('本人','male');
+    const w = mkPerson('妻','female'); w.doukyo = true; w.kp = true;
+    return [h, w, mkPerson('長男','male'), mkPerson('長女','female'), mkPerson('次女','female')];
+  },
 };
 
 function getSavedTemplates() {

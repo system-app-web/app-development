@@ -131,6 +131,26 @@ h1 {
   background: #e8f9fd;
   border-color: #7ac5cf;
 }
+.template-toggle-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.template-toggle-kicker {
+  display: inline-block;
+  padding: 1px 6px 2px;
+  border-radius: 999px;
+  background: #fff;
+  color: #2d7f8d;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+}
+.template-toggle-title {
+  font-size: 15px;
+  line-height: 18px;
+}
 .template-panel-body {
   display: none;
   padding-top: 10px;
@@ -338,7 +358,9 @@ h1 {
         </div>
       </div>
       <div id="templateBlock" class="template-block">
-        <button id="template-toggle" class="selection-toggle" type="button" onclick="toggleTemplatePanel()" aria-expanded="false" aria-controls="templateBtns">間取り選択</button>
+        <button id="template-toggle" class="selection-toggle" type="button" onclick="toggleTemplatePanel()" aria-expanded="false" aria-controls="templateBtns">
+          <span class="template-toggle-label"><span class="template-toggle-kicker">テンプレート</span><span class="template-toggle-title">間取り選択</span></span>
+        </button>
         <div class="template-panel-body">
           <div id="templateBtns" class="template-btns"></div>
         </div>

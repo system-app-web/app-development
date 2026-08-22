@@ -212,13 +212,20 @@ h1 {
 }
 .canvas-rotate-trigger {
   position: absolute;
-  top: 10px;
+  top: 54px;
   left: 10px;
   z-index: 36;
   padding: 0;
   font-size: 11px;
   font-weight: 400;
   white-space: nowrap;
+}
+.canvas-line-trigger {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 36;
+  padding: 0;
 }
 #layer-nodes g.selected > *[stroke] { stroke: #2daec0; }
 #layer-nodes g.selected > text { fill: #247a8a; }
@@ -412,6 +419,9 @@ h1 {
   </div>
 
   <div class="canvas-wrap">
+    <button id="dtool-line" class="dtool-btn canvas-line-trigger" type="button" onclick="setDrawMode('line', this)" title="直線" aria-label="直線">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><line x1="3" y1="19" x2="19" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
     <button id="rotate-selected" class="dtool-btn canvas-rotate-trigger" type="button" onclick="rotateSelectedItem()" title="選択したアイテムを回転" aria-label="選択したアイテムを回転">回転</button>
     <div id="stroke-size-picker" class="floating-picker" style="top:10px;left:54px;padding:8px;">
       <div style="display:flex;gap:6px;">
@@ -507,6 +517,7 @@ let currentTextSize = 28;
 let currentTextDir = "h";
 let selectedRoomId = null;
 let resizeState = null;
+let lineDrawState = null;
 const GRID_PIXELS = 28;
 
 function uid() {
@@ -687,7 +698,7 @@ function renderAll(showHint = true) {
 }
 
 function startDrag(event, id) {
-  if (currentPlaceMode) return;
+  if (currentPlaceMode || currentDrawMode) return;
   event.stopPropagation();
   const room = rooms.find((item) => item.id === id);
   if (!room) return;
@@ -727,7 +738,51 @@ function snapToGrid(value, axis) {
   return Math.round(value / step) * step;
 }
 
+function pointInSvg(event) {
+  const svg = document.getElementById("svg-main");
+  const bounds = svg.getBoundingClientRect();
+  return {
+    x: (event.clientX - bounds.left) * (1200 / bounds.width),
+    y: (event.clientY - bounds.top) * (800 / bounds.height)
+  };
+}
+
+function nearestGridEdge(point) {
+  const stepX = gridStep("x");
+  const stepY = gridStep("y");
+  const x = snapToGrid(point.x, "x");
+  const y = snapToGrid(point.y, "y");
+  const horizontalDistance = Math.abs(point.y - y) / stepY;
+  const verticalDistance = Math.abs(point.x - x) / stepX;
+  if (horizontalDistance <= verticalDistance) {
+    const column = Math.floor(point.x / stepX);
+    return { x1: column * stepX, y1: y, x2: (column + 1) * stepX, y2: y };
+  }
+  const row = Math.floor(point.y / stepY);
+  return { x1: x, y1: row * stepY, x2: x, y2: (row + 1) * stepY };
+}
+
+function startLineDraw(event) {
+  if (currentDrawMode !== "line" || event.button !== 0) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const point = pointInSvg(event);
+  const start = { x: snapToGrid(point.x, "x"), y: snapToGrid(point.y, "y") };
+  const line = svgEl("path", {
+    d: `M ${start.x} ${start.y}`,
+    fill: "none",
+    stroke: "#000",
+    "stroke-width": currentStrokeWidth,
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  });
+  line.style.pointerEvents = "none";
+  document.getElementById("layer-draw").appendChild(line);
+  lineDrawState = { line, start, points: [start], moved: false };
+}
+
 function placeItemOnCanvas(event) {
+  if (currentDrawMode) return;
   if (!currentPlaceMode) {
     if (selectedRoomId) {
       selectedRoomId = null;
@@ -762,6 +817,10 @@ function placeItemOnCanvas(event) {
 
 function addFloorPlan() {
   clearPlaceMode();
+  currentDrawMode = "";
+  document.getElementById("stroke-size-picker").style.display = "none";
+  document.getElementById("svg-main").style.cursor = "";
+  document.getElementById("dtool-line").classList.remove("active");
   const count = rooms.filter((room) => room.type === "floorplan").length;
   const stepX = gridStep("x");
   const stepY = gridStep("y");
@@ -825,7 +884,34 @@ window.addEventListener("pointermove", (event) => {
   renderAll(false);
 });
 
+window.addEventListener("pointermove", (event) => {
+  if (!lineDrawState) return;
+  const point = pointInSvg(event);
+  const last = lineDrawState.points[lineDrawState.points.length - 1];
+  const dx = point.x - last.x;
+  const dy = point.y - last.y;
+  let nextX = last.x;
+  let nextY = last.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    nextX = snapToGrid(point.x, "x");
+  } else {
+    nextY = snapToGrid(point.y, "y");
+  }
+  if (nextX !== last.x || nextY !== last.y) {
+    lineDrawState.points.push({ x: nextX, y: nextY });
+    lineDrawState.line.setAttribute("d", `M ${lineDrawState.points.map((item) => `${item.x} ${item.y}`).join(" L ")}`);
+    lineDrawState.moved = true;
+  }
+});
+
 window.addEventListener("pointerup", () => {
+  if (lineDrawState) {
+    if (!lineDrawState.moved) {
+      const edge = nearestGridEdge(lineDrawState.start);
+      lineDrawState.line.setAttribute("d", `M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`);
+    }
+    lineDrawState = null;
+  }
   dragState = null;
   resizeState = null;
 });
@@ -874,13 +960,17 @@ function setDrawMode(mode, button) {
   document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
   if (currentDrawMode && button) button.classList.add("active");
+  const strokePicker = document.getElementById("stroke-size-picker");
+  strokePicker.style.display = currentDrawMode === "line" ? "flex" : "none";
   document.getElementById("text-size-picker").style.display = currentDrawMode === "text" ? "flex" : "none";
+  document.getElementById("svg-main").style.cursor = currentDrawMode ? "crosshair" : "";
   showToast(currentDrawMode ? `${mode} を選択しました` : "描画モードを解除しました");
 }
 
 function setPlaceMode(mode, button) {
   currentPlaceMode = currentPlaceMode === mode ? "" : mode;
   currentDrawMode = "";
+  document.getElementById("stroke-size-picker").style.display = "none";
   selectedRoomId = null;
   renderAll(false);
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
@@ -970,7 +1060,9 @@ async function exportPNG() {
 
 renderTemplateButtons();
 renderAll();
-document.getElementById("svg-main").addEventListener("pointerdown", placeItemOnCanvas);
+const canvas = document.getElementById("svg-main");
+canvas.addEventListener("pointerdown", startLineDraw);
+canvas.addEventListener("pointerdown", placeItemOnCanvas);
 </script>
 </body>
 </html>

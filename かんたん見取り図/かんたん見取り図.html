@@ -52,6 +52,12 @@ h1 {
   letter-spacing: 0;
 }
 .spacer { flex: 1; }
+.header-logo {
+  width: 108px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+}
 .btn {
   border: none;
   border-radius: 999px;
@@ -275,6 +281,13 @@ h1 {
     padding: 8px 10px;
     font-size: 12px;
   }
+  .spacer { display: none; }
+  .header-logo {
+    width: 80px;
+    height: 42px;
+    margin-left: auto;
+  }
+  header { flex-wrap: wrap; }
   .main {
     flex-direction: column;
     padding: 10px;
@@ -317,6 +330,7 @@ h1 {
   <button class="btn btn-soft" onclick="clearAll()">リセット</button>
   <button class="btn btn-primary" onclick="exportPNG()">フォルダ保存</button>
   <div class="spacer"></div>
+  <img class="header-logo" src="./㈱K.T.M法人ロゴ.jpg" alt="K.T.M Keep Trust Meaning">
 </header>
 
 <div class="main">

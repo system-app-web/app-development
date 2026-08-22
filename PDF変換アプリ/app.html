@@ -161,8 +161,16 @@
 
     .rotation-tools {
       display: flex;
+      align-items: center;
       gap: 6px;
       flex-wrap: wrap;
+    }
+
+    .rotation-heading {
+      min-width: 64px;
+      color: #475569;
+      font-size: 14px;
+      font-weight: 800;
     }
 
     .rotation-btn {
@@ -176,14 +184,15 @@
       font-weight: 800;
     }
 
-    .rotation-btn.hidden {
-      display: none;
-    }
-
     .rotation-btn.active {
       border-color: #0f766e;
       background: #0f766e;
       color: #fff;
+    }
+
+    .rotation-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
     }
 
     .control-row {
@@ -440,10 +449,10 @@
 
     <div class="notice"><strong>変換機能は白黒のみ対応です</strong><br>カラー・濃いグレースケールの書類は黒くなったり、影が出たりする場合があります。PDF結合は元のPDFをそのまま結合します。</div>
 
-    <div class="rotation-tools" aria-label="生成後の原稿向き補正">
-      <button id="rotateLeftBtn" class="rotation-btn" type="button" title="左向きの原稿として補正">左向き原稿</button>
-      <button id="rotateRightBtn" class="rotation-btn" type="button" title="右向きの原稿として補正">右向き原稿</button>
-      <button id="rotateUpsideDownBtn" class="rotation-btn" type="button" title="原稿の上下を反転">上下逆</button>
+    <div class="rotation-tools" aria-label="原稿の回転">
+      <span class="rotation-heading">回転</span>
+      <button id="rotateRightBtn" class="rotation-btn" type="button" aria-label="右回転" title="右回転">&#8635;</button>
+      <button id="rotateLeftBtn" class="rotation-btn" type="button" aria-label="左回転" title="左回転">&#8634;</button>
     </div>
 
     <div class="control-row contrast">
@@ -498,7 +507,6 @@
     const resetBtn = document.getElementById("resetBtn");
     const rotateLeftBtn = document.getElementById("rotateLeftBtn");
     const rotateRightBtn = document.getElementById("rotateRightBtn");
-    const rotateUpsideDownBtn = document.getElementById("rotateUpsideDownBtn");
     const contrastButtons = Array.from(document.querySelectorAll(".contrast-btn"));
     const sizeButtons = Array.from(document.querySelectorAll(".size-btn"));
     const statusEl = document.getElementById("status");
@@ -545,13 +553,6 @@
 
     rotateRightBtn.addEventListener("click", () => {
       setManualOrientation(-90);
-    });
-
-    rotateUpsideDownBtn.addEventListener("click", () => {
-      const type = selectedDocType();
-      manualOrientationEnabled[type] = true;
-      manualUpsideDown[type] = !manualUpsideDown[type];
-      rebuildForManualOrientation();
     });
 
     resetBtn.addEventListener("click", () => {
@@ -762,13 +763,11 @@
 
     function updateRotationButtons() {
       const type = selectedDocType();
-      const hidden = isMergeMode() || !loadedCanvases.length;
-      rotateLeftBtn.classList.toggle("hidden", hidden);
-      rotateRightBtn.classList.toggle("hidden", hidden);
-      rotateUpsideDownBtn.classList.toggle("hidden", hidden);
+      const disabled = isMergeMode();
+      rotateLeftBtn.disabled = disabled;
+      rotateRightBtn.disabled = disabled;
       rotateLeftBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === 90);
       rotateRightBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === -90);
-      rotateUpsideDownBtn.classList.toggle("active", manualOrientationEnabled[type] && manualUpsideDown[type]);
     }
 
     function setManualOrientation(degrees) {

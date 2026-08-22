@@ -424,7 +424,7 @@ h1 {
       </div>
     </div>
 
-    <svg id="svg-main" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <svg id="svg-main" viewBox="0 0 1200 800" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
       <g id="canvas-offset">
         <g id="layer-lines"></g>
         <g id="layer-nodes"></g>
@@ -732,8 +732,8 @@ function addFloorPlan() {
   const count = rooms.filter((room) => room.type === "floorplan").length;
   const stepX = gridStep("x");
   const stepY = gridStep("y");
-  const width = stepX * 8;
-  const height = stepY * 8;
+  const width = stepX * 6;
+  const height = stepY * 10;
   const plan = createRoom({
     name: "間取り",
     type: "floorplan",

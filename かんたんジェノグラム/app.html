@@ -409,12 +409,6 @@ header h1 {
   background-color: #fff;
   isolation: isolate;
 }
-.canvas-guide-rail {
-  flex: 0 0 28px;
-  position: relative;
-  background: #fff;
-  border-right: 1px solid #d8e2ea;
-}
 #svg-main {
   position: relative;
   z-index: 1;
@@ -439,8 +433,8 @@ header h1 {
 .canvas-edit-guide {
   position: absolute;
   top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  left: 54px;
+  transform: translateY(-50%);
   z-index: 3000;
   writing-mode: vertical-rl;
   text-orientation: mixed;
@@ -466,8 +460,8 @@ body.template-selected .canvas-edit-guide {
   display: flex;
 }
 @keyframes canvasEditGuideBounce {
-  0%, 100% { transform: translate(-50%, -50%); }
-  50% { transform: translate(-50%, -50%) translateX(-5px); }
+  0%, 100% { transform: translateY(-50%) translateX(0); }
+  50% { transform: translateY(-50%) translateX(-5px); }
 }
 
 /* ── Legend ── */
@@ -626,14 +620,11 @@ body.template-selected .canvas-edit-guide {
     <div class="person-list" id="personList"></div>
   </div>
 
-  <div class="canvas-guide-rail">
-    <div class="canvas-edit-guide">こちらで編集👈</div>
-  </div>
-
   <!-- Canvas -->
   <div class="canvas-wrap" id="canvasWrap">
     <button onclick="exportPNG(false)" style="position:absolute;bottom:94px;left:50%;transform:translateX(-50%);z-index:20;padding:8px 20px;border:none;border-radius:999px;background:rgba(91,164,207,0.15);color:#2a6a9a;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.2s;letter-spacing:0.4px;" onmouseover="this.style.background='rgba(91,164,207,0.3)'" onmouseout="this.style.background='rgba(91,164,207,0.15)'">＋ フォルダ保存</button>
     <button onclick="saveTemplate()" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:20;padding:8px 20px;border:none;border-radius:999px;background:rgba(91,164,207,0.15);color:#2a6a9a;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.2s;letter-spacing:0.4px;" onmouseover="this.style.background='rgba(91,164,207,0.3)'" onmouseout="this.style.background='rgba(91,164,207,0.15)'">＋ テンプレートに追加</button>
+    <div class="canvas-edit-guide">こちらで編集👈</div>
     <div class="canvas-hint" id="canvasHint">
 <div class="txt">左パネルのテンプレート選択<br>または家族を追加で自動反映されます</div>
     </div>

@@ -259,8 +259,9 @@ h1 {
   outline: none;
   white-space: nowrap;
   pointer-events: auto;
-  cursor: move;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='white' stroke='%23555' stroke-width='1.5' stroke-linejoin='round' d='M9 3a1 1 0 0 1 1 1v4a1 1 0 0 1 2 0V7a1 1 0 0 1 2 0v1.5a1 1 0 0 1 2 0V9a1 1 0 0 1 2 0v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") 9 0, grab;
 }
+#text-overlay .canvas-text-editor:active { cursor: grabbing; }
 #text-overlay .canvas-text-editor.selected-draw { color: #247a8a; }
 #text-overlay .text-selection-controls {
   position: absolute;
@@ -940,10 +941,6 @@ function startTextResize(event, element, corner) {
 
 function startTextElementInteraction(event, element) {
   if (currentDrawMode || currentPlaceMode) return;
-  if (selectedDrawElement !== element) {
-    selectDrawElement(event, element, true);
-    return;
-  }
   event.preventDefault();
   event.stopPropagation();
   drawDragState = {
@@ -951,20 +948,25 @@ function startTextElementInteraction(event, element) {
     startX: event.clientX,
     startY: event.clientY,
     origX: element.offsetLeft,
-    origY: element.offsetTop
+    origY: element.offsetTop,
+    moved: false
   };
 }
 
-function selectDrawElement(event, element, keepFocus = false) {
-  if (currentDrawMode || currentPlaceMode) return;
-  if (!keepFocus) event.preventDefault();
-  event.stopPropagation();
+function activateDrawSelection(element) {
   selectedRoomId = null;
   clearDrawSelection();
   selectedDrawElement = element;
   element.classList.add("selected-draw");
   renderAll(false);
   if (element.classList.contains("canvas-text")) showTextHandles(element);
+}
+
+function selectDrawElement(event, element, keepFocus = false) {
+  if (currentDrawMode || currentPlaceMode) return;
+  if (!keepFocus) event.preventDefault();
+  event.stopPropagation();
+  activateDrawSelection(element);
 }
 
 function placeItemOnCanvas(event) {
@@ -1104,8 +1106,15 @@ window.addEventListener("pointermove", (event) => {
   if (!drawDragState) return;
   const overlay = document.getElementById("text-overlay");
   const element = drawDragState.element;
-  const x = drawDragState.origX + event.clientX - drawDragState.startX;
-  const y = drawDragState.origY + event.clientY - drawDragState.startY;
+  const dx = event.clientX - drawDragState.startX;
+  const dy = event.clientY - drawDragState.startY;
+  if (!drawDragState.moved && Math.hypot(dx, dy) < 4) return;
+  if (!drawDragState.moved) {
+    drawDragState.moved = true;
+    clearDrawSelection();
+  }
+  const x = drawDragState.origX + dx;
+  const y = drawDragState.origY + dy;
   element.style.left = `${Math.max(0, Math.min(overlay.clientWidth - element.offsetWidth, x))}px`;
   element.style.top = `${Math.max(0, Math.min(overlay.clientHeight - element.offsetHeight, y))}px`;
   showTextHandles(element);
@@ -1177,16 +1186,17 @@ window.addEventListener("pointerup", () => {
     }
   }
   if (drawDragState) {
-    const { element, origX, origY } = drawDragState;
+    const { element, origX, origY, moved } = drawDragState;
     const nextX = element.offsetLeft;
     const nextY = element.offsetTop;
-    if (nextX !== origX || nextY !== origY) {
+    if (moved && (nextX !== origX || nextY !== origY)) {
       actionHistory.push(() => {
         element.style.left = `${origX}px`;
         element.style.top = `${origY}px`;
         showTextHandles(element);
       });
     }
+    if (!moved) activateDrawSelection(element);
   }
   if (textResizeState) {
     const { element, bounds, fontSize } = textResizeState;

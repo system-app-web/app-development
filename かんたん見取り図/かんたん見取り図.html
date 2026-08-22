@@ -242,6 +242,16 @@ h1 {
 #layer-nodes g.selected > text { fill: #247a8a; }
 #layer-draw .selected-draw { stroke: #2daec0; }
 #layer-draw text.selected-draw { fill: #247a8a; stroke: none; }
+#layer-draw .canvas-text-editor {
+  color: #000;
+  font-family: "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+  font-weight: 700;
+  line-height: 1.25;
+  outline: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+#layer-draw .selected-draw .canvas-text-editor { outline: 1.5px solid #2daec0; }
 #layer-nodes g.selected.floorplan .floor-plan-outline {
   stroke: #f15f69;
   stroke-dasharray: 16 12;
@@ -444,8 +454,8 @@ h1 {
       <div style="font-size:10px;color:#6e8f94;font-weight:700;">文字サイズ</div>
       <input id="text-size-input" type="number" min="6" max="96" step="1" value="28" style="width:56px;text-align:center;border:1px solid #bcdfe4;border-radius:6px;padding:4px 5px;font-size:14px;font-weight:700;" oninput="setTextSize(parseInt(this.value)||28)">
       <div style="display:flex;gap:4px;">
-        <button id="text-dir-h" onclick="setTextDir('h')" class="dtool-btn active" style="width:auto;padding:0 10px;">横</button>
-        <button id="text-dir-v" onclick="setTextDir('v')" class="dtool-btn" style="width:auto;padding:0 10px;">縦</button>
+        <button id="text-dir-h" onclick="setTextDir('h')" class="dtool-btn" style="width:auto;padding:0 10px;">横</button>
+        <button id="text-dir-v" onclick="setTextDir('v')" class="dtool-btn active" style="width:auto;padding:0 10px;">縦</button>
       </div>
     </div>
 
@@ -523,7 +533,7 @@ const LINE_STROKE_WIDTH = 5;
 let currentDrawMode = "";
 let currentPlaceMode = "";
 let currentTextSize = 28;
-let currentTextDir = "h";
+let currentTextDir = "v";
 let selectedRoomId = null;
 let resizeState = null;
 let lineDrawState = null;
@@ -799,31 +809,47 @@ function startTextDraw(event) {
   if (currentDrawMode !== "text" || event.button !== 0) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  const value = window.prompt("文字を入力してください");
-  if (!value) return;
   const point = pointInSvg(event);
-  const text = svgEl("text", {
+  const text = svgEl("foreignObject", {
     x: point.x,
     y: point.y,
-    "font-size": currentTextSize,
-    "font-weight": 700,
-    fill: "#000",
-    "font-family": "Hiragino Sans, Yu Gothic UI, Meiryo, sans-serif",
-    "dominant-baseline": "hanging"
+    class: "canvas-draw canvas-text",
+    "data-font-size": currentTextSize,
+    "data-direction": currentTextDir
   });
-  text.textContent = value;
-  text.classList.add("canvas-draw");
-  text.style.cursor = "pointer";
-  text.style.writingMode = currentTextDir === "v" ? "vertical-rl" : "horizontal-tb";
-  text.addEventListener("pointerdown", (textEvent) => selectDrawElement(textEvent, text));
+  const editor = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
+  editor.className = "canvas-text-editor";
+  editor.contentEditable = "true";
+  editor.spellcheck = false;
+  text.appendChild(editor);
+  updateTextDrawElement(text);
+  text.addEventListener("pointerdown", (textEvent) => selectDrawElement(textEvent, text, true));
+  editor.addEventListener("pointerdown", (textEvent) => selectDrawElement(textEvent, text, true));
+  editor.addEventListener("blur", () => {
+    if (!editor.textContent.trim()) text.remove();
+  });
   document.getElementById("layer-draw").appendChild(text);
   actionHistory.push(() => {
     if (text.isConnected) text.remove();
     if (selectedDrawElement === text) clearDrawSelection();
   });
   setDrawMode("text");
-  selectDrawElement(event, text);
-  showToast("テキストを配置しました");
+  selectDrawElement(event, text, true);
+  requestAnimationFrame(() => editor.focus());
+  showToast("方眼上で文字を入力してください");
+}
+
+function updateTextDrawElement(element) {
+  const editor = element.querySelector(".canvas-text-editor");
+  if (!editor) return;
+  const size = Number(element.dataset.fontSize) || currentTextSize;
+  const vertical = element.dataset.direction === "v";
+  element.setAttribute("width", vertical ? size + 20 : 280);
+  element.setAttribute("height", vertical ? 320 : Math.max(size + 24, 60));
+  editor.style.fontSize = `${size}px`;
+  editor.style.width = vertical ? `${size + 20}px` : "280px";
+  editor.style.height = vertical ? "320px" : `${Math.max(size + 24, 60)}px`;
+  editor.style.writingMode = vertical ? "vertical-rl" : "horizontal-tb";
 }
 
 function clearDrawSelection() {
@@ -831,9 +857,9 @@ function clearDrawSelection() {
   selectedDrawElement = null;
 }
 
-function selectDrawElement(event, element) {
+function selectDrawElement(event, element, keepFocus = false) {
   if (currentDrawMode || currentPlaceMode) return;
-  event.preventDefault();
+  if (!keepFocus) event.preventDefault();
   event.stopPropagation();
   selectedRoomId = null;
   clearDrawSelection();
@@ -1129,8 +1155,9 @@ function undoAction() {
 
 function setTextSize(size) {
   currentTextSize = size;
-  if (selectedDrawElement?.tagName === "text") {
-    selectedDrawElement.setAttribute("font-size", size);
+  if (selectedDrawElement?.classList.contains("canvas-text")) {
+    selectedDrawElement.dataset.fontSize = size;
+    updateTextDrawElement(selectedDrawElement);
   }
 }
 
@@ -1138,8 +1165,9 @@ function setTextDir(dir) {
   currentTextDir = dir;
   document.getElementById("text-dir-h").classList.toggle("active", dir === "h");
   document.getElementById("text-dir-v").classList.toggle("active", dir === "v");
-  if (selectedDrawElement?.tagName === "text") {
-    selectedDrawElement.style.writingMode = dir === "v" ? "vertical-rl" : "horizontal-tb";
+  if (selectedDrawElement?.classList.contains("canvas-text")) {
+    selectedDrawElement.dataset.direction = dir;
+    updateTextDrawElement(selectedDrawElement);
   }
 }
 
@@ -1193,7 +1221,7 @@ canvas.addEventListener("pointerdown", startLineDraw);
 canvas.addEventListener("pointerdown", startTextDraw);
 canvas.addEventListener("pointerdown", placeItemOnCanvas);
 document.addEventListener("keydown", (event) => {
-  if (event.target instanceof HTMLInputElement) return;
+  if (event.target instanceof HTMLInputElement || event.target.isContentEditable) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
     event.preventDefault();
     undoAction();

@@ -200,10 +200,7 @@ h1 {
   width: 100%;
   height: 100%;
   display: block;
-  background-image:
-    linear-gradient(to right, rgba(0,0,0,0.07) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0,0,0,0.07) 1px, transparent 1px);
-  background-size: 28px 28px;
+  background: #fff;
 }
 .canvas-wrap.place-mode #svg-main {
   cursor: crosshair;
@@ -424,6 +421,12 @@ h1 {
     </div>
 
     <svg id="svg-main" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.09)" stroke-width="1" />
+        </pattern>
+      </defs>
+      <rect width="1200" height="800" fill="url(#grid-pattern)" pointer-events="none" />
       <g id="canvas-offset">
         <g id="layer-lines"></g>
         <g id="layer-nodes"></g>
@@ -499,6 +502,8 @@ let currentPlaceMode = "";
 let currentTextSize = 28;
 let currentTextDir = "h";
 let selectedRoomId = null;
+let resizeState = null;
+const GRID_SIZE = 40;
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -597,10 +602,20 @@ function renderBed(group, room) {
 }
 
 function renderFloorPlan(group, room) {
-  group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "#fff", stroke: "#000", "stroke-width": 6 }));
-  group.appendChild(svgEl("line", { x1: room.w * 0.55, y1: 0, x2: room.w * 0.55, y2: room.h, stroke: "#000", "stroke-width": 5 }));
-  group.appendChild(svgEl("line", { x1: room.w * 0.55, y1: room.h * 0.45, x2: room.w, y2: room.h * 0.45, stroke: "#000", "stroke-width": 5 }));
-  addLabel(group, room.name, room.w * 0.275, room.h / 2 + 8, 28);
+  group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "transparent", stroke: "#000", "stroke-width": 5 }));
+
+  if (room.id === selectedRoomId) {
+    const handle = svgEl("rect", {
+      x: room.w - 16,
+      y: room.h - 16,
+      width: 16,
+      height: 16,
+      fill: "#2daec0"
+    });
+    handle.style.cursor = "nwse-resize";
+    handle.addEventListener("pointerdown", (event) => startResize(event, room.id));
+    group.appendChild(handle);
+  }
 }
 
 function renderDoor(group, room) {
@@ -648,6 +663,19 @@ function startDrag(event, id) {
   dragState = { id, startX: event.clientX, startY: event.clientY, origX: room.x, origY: room.y };
 }
 
+function startResize(event, id) {
+  if (currentPlaceMode) return;
+  event.stopPropagation();
+  event.preventDefault();
+  const room = rooms.find((item) => item.id === id);
+  if (!room) return;
+  resizeState = { id, startX: event.clientX, startY: event.clientY, origW: room.w, origH: room.h };
+}
+
+function snapToGrid(value) {
+  return Math.round(value / GRID_SIZE) * GRID_SIZE;
+}
+
 function placeItemOnCanvas(event) {
   if (!currentPlaceMode) {
     if (selectedRoomId) {
@@ -683,15 +711,16 @@ function placeItemOnCanvas(event) {
 
 function addFloorPlan() {
   clearPlaceMode();
-  const existing = rooms.find((room) => room.type === "floorplan");
-  if (existing) {
-    selectedRoomId = existing.id;
-    renderAll(false);
-    showToast("配置済みの間取りを選択しました");
-    return;
-  }
-
-  const plan = createRoom({ name: "間取り", type: "floorplan", x: 360, y: 160, w: 480, h: 480 });
+  const count = rooms.filter((room) => room.type === "floorplan").length;
+  const offset = (count % 4) * GRID_SIZE * 2;
+  const plan = createRoom({
+    name: "間取り",
+    type: "floorplan",
+    x: Math.min(1200 - 320, 280 + offset),
+    y: Math.min(800 - 320, 160 + offset),
+    w: 320,
+    h: 320
+  });
   rooms.push(plan);
   selectedRoomId = plan.id;
   renderAll(false);
@@ -699,19 +728,38 @@ function addFloorPlan() {
 }
 
 window.addEventListener("pointermove", (event) => {
-  if (!dragState) return;
   const svg = document.getElementById("svg-main");
   const scaleX = 1200 / svg.clientWidth;
   const scaleY = 800 / svg.clientHeight;
+
+  if (resizeState) {
+    const room = rooms.find((item) => item.id === resizeState.id);
+    if (!room) return;
+    const maxW = 1200 - room.x;
+    const maxH = 800 - room.y;
+    room.w = Math.max(GRID_SIZE, Math.min(maxW, snapToGrid(resizeState.origW + (event.clientX - resizeState.startX) * scaleX)));
+    room.h = Math.max(GRID_SIZE, Math.min(maxH, snapToGrid(resizeState.origH + (event.clientY - resizeState.startY) * scaleY)));
+    renderAll(false);
+    return;
+  }
+
+  if (!dragState) return;
   const room = rooms.find((item) => item.id === dragState.id);
   if (!room) return;
-  room.x = Math.max(0, Math.round(dragState.origX + (event.clientX - dragState.startX) * scaleX));
-  room.y = Math.max(0, Math.round(dragState.origY + (event.clientY - dragState.startY) * scaleY));
+  const x = dragState.origX + (event.clientX - dragState.startX) * scaleX;
+  const y = dragState.origY + (event.clientY - dragState.startY) * scaleY;
+  room.x = room.type === "floorplan"
+    ? Math.max(0, Math.min(1200 - room.w, snapToGrid(x)))
+    : Math.max(0, Math.round(x));
+  room.y = room.type === "floorplan"
+    ? Math.max(0, Math.min(800 - room.h, snapToGrid(y)))
+    : Math.max(0, Math.round(y));
   renderAll(false);
 });
 
 window.addEventListener("pointerup", () => {
   dragState = null;
+  resizeState = null;
 });
 
 function clearAll() {

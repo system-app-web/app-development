@@ -156,6 +156,11 @@ h1 {
   line-height: 16px;
   letter-spacing: 0;
 }
+.item-control-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .template-panel-body {
   display: none;
   padding-top: 10px;
@@ -386,13 +391,15 @@ h1 {
     </div>
     <div class="item-control-slot">
       <div class="item-control-heading">アイコンを選択</div>
-      <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette">☰</button>
+      <div class="item-control-actions">
+        <button class="dtool-btn" type="button" onclick="addFloorPlan()" title="間取りを配置" aria-label="間取りを配置"><span class="floor-plan-icon" aria-hidden="true"></span></button>
+        <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette">☰</button>
+      </div>
       <div id="item-palette" class="item-palette">
         <button class="item-btn" onclick="setPlaceMode('bed', this)" title="ベッド">B</button>
         <button class="item-btn" onclick="setPlaceMode('tv', this)" title="TV">TV</button>
         <button class="item-btn" onclick="setPlaceMode('shelf', this)" title="棚">棚</button>
         <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
-        <button class="item-btn" onclick="addFloorPlan()" title="間取りを配置" aria-label="間取りを配置"><span class="floor-plan-icon" aria-hidden="true"></span></button>
       </div>
     </div>
   </div>

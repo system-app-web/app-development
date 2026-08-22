@@ -440,6 +440,12 @@
 
     <div class="notice"><strong>変換機能は白黒のみ対応です</strong><br>カラー・濃いグレースケールの書類は黒くなったり、影が出たりする場合があります。PDF結合は元のPDFをそのまま結合します。</div>
 
+    <div class="rotation-tools" aria-label="生成後の原稿向き補正">
+      <button id="rotateLeftBtn" class="rotation-btn" type="button" title="左向きの原稿として補正">左向き原稿</button>
+      <button id="rotateRightBtn" class="rotation-btn" type="button" title="右向きの原稿として補正">右向き原稿</button>
+      <button id="rotateUpsideDownBtn" class="rotation-btn" type="button" title="原稿の上下を反転">上下逆</button>
+    </div>
+
     <div class="control-row contrast">
       <span>黒の濃さ</span>
       <div class="contrast-options">
@@ -466,12 +472,6 @@
       <div id="placeholder" class="placeholder">
         白黒の写真またはPDFを<br>ここにドラッグ
       </div>
-    </div>
-
-    <div class="rotation-tools" aria-label="生成後の原稿向き補正">
-      <button id="rotateLeftBtn" class="rotation-btn" type="button" title="左向きの原稿として補正">左向き原稿</button>
-      <button id="rotateRightBtn" class="rotation-btn" type="button" title="右向きの原稿として補正">右向き原稿</button>
-      <button id="rotateUpsideDownBtn" class="rotation-btn" type="button" title="原稿の上下を反転">上下逆</button>
     </div>
 
     <div id="status" class="status">複数のPDFをドラッグすると、元のページをそのまま1つのPDFに結合します。</div>

@@ -242,27 +242,42 @@ h1 {
 #layer-nodes g.selected > text { fill: #247a8a; }
 #layer-draw .selected-draw { stroke: #2daec0; }
 #layer-draw text.selected-draw { fill: #247a8a; stroke: none; }
-#layer-draw .canvas-text-editor {
-  color: #000;
-  font-family: "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
-  font-weight: 400;
-  line-height: 1.25;
-  outline: none;
-  overflow: hidden;
-  white-space: pre-wrap;
-}
-#layer-draw .selected-draw .canvas-text-editor { color: #247a8a; outline: 1.5px solid #2daec0; }
-.text-selection-box {
-  fill: none;
-  stroke: #2daec0;
-  stroke-width: 2;
-  stroke-dasharray: 8 6;
+#text-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
   pointer-events: none;
 }
-.text-selection-handle {
+#text-overlay .canvas-text-editor {
+  position: absolute;
+  box-sizing: border-box;
+  min-width: 1ch;
+  color: #000;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+  font-weight: 400;
+  line-height: 1.15;
+  outline: none;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: move;
+}
+#text-overlay .canvas-text-editor.selected-draw { color: #247a8a; }
+#text-overlay .text-selection-controls {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed #2daec0;
+  pointer-events: none;
+}
+#text-overlay .text-selection-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
   fill: #fff;
-  stroke: #3972ad;
-  stroke-width: 3;
+  background: #fff;
+  border: 2px solid #3972ad;
+  border-radius: 2px;
+  pointer-events: auto;
 }
 #layer-nodes g.selected.floorplan .floor-plan-outline {
   stroke: #f15f69;
@@ -479,6 +494,7 @@ h1 {
         <g id="layer-handles"></g>
       </g>
     </svg>
+    <div id="text-overlay" aria-label="テキスト入力欄"></div>
     <div id="canvasHint" class="canvas-hint">
       <div class="txt">左のテンプレートから<br>一般的な見取り図を作成できます</div>
     </div>
@@ -823,68 +839,47 @@ function startTextDraw(event) {
   if (currentDrawMode !== "text" || event.button !== 0) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  const point = pointInSvg(event);
-  const text = svgEl("foreignObject", {
-    x: point.x,
-    y: point.y,
-    class: "canvas-draw canvas-text",
-    "data-font-size": currentTextSize,
-    "data-direction": currentTextDir
-  });
-  const editor = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
-  editor.className = "canvas-text-editor";
-  editor.contentEditable = "true";
-  editor.spellcheck = false;
-  text.appendChild(editor);
+  const canvasBounds = document.getElementById("svg-main").getBoundingClientRect();
+  const text = document.createElement("div");
+  text.className = "canvas-text-editor canvas-text";
+  text.style.left = `${event.clientX - canvasBounds.left}px`;
+  text.style.top = `${event.clientY - canvasBounds.top}px`;
+  text.dataset.fontSize = currentTextSize;
+  text.dataset.direction = currentTextDir;
+  text.contentEditable = "true";
+  text.spellcheck = false;
   updateTextDrawElement(text);
   text.addEventListener("pointerdown", (textEvent) => startTextElementInteraction(textEvent, text));
-  editor.addEventListener("pointerdown", (textEvent) => startTextElementInteraction(textEvent, text));
-  editor.addEventListener("blur", () => {
-    if (!editor.textContent.trim()) {
+  text.addEventListener("blur", () => {
+    if (!text.textContent.trim()) {
       if (selectedDrawElement === text) clearDrawSelection();
       text.remove();
     }
   });
-  editor.addEventListener("input", () => {
+  text.addEventListener("input", () => {
     updateTextDrawElement(text);
     if (selectedDrawElement === text) showTextHandles(text);
   });
-  document.getElementById("layer-draw").appendChild(text);
+  document.getElementById("text-overlay").appendChild(text);
   actionHistory.push(() => {
     if (text.isConnected) text.remove();
     if (selectedDrawElement === text) clearDrawSelection();
   });
   setDrawMode("text");
   selectDrawElement(event, text, true);
-  requestAnimationFrame(() => editor.focus());
+  requestAnimationFrame(() => text.focus());
   showToast("方眼上で文字を入力してください");
 }
 
 function updateTextDrawElement(element) {
-  const editor = element.querySelector(".canvas-text-editor");
-  if (!editor) return;
   const size = Number(element.dataset.fontSize) || currentTextSize;
   const vertical = element.dataset.direction === "v";
-  const svg = document.getElementById("svg-main");
-  const x = Number(element.getAttribute("x")) || 0;
-  const y = Number(element.getAttribute("y")) || 0;
-  const stretchRatio = svg.clientHeight && svg.clientWidth
-    ? (svg.clientHeight / 800) / (svg.clientWidth / 1200)
-    : 1;
-  const characterCount = Math.max(1, Array.from(editor.textContent || "").filter((character) => character !== "\n").length);
-  const width = vertical ? size + 20 : Math.max(size + 20, characterCount * size * 1.15 + 20);
-  const height = vertical ? Math.max(size + 20, characterCount * size * 1.25 + 20) : size * 1.45 + 20;
-  element.setAttribute("width", width);
-  element.setAttribute("height", height);
-  element.setAttribute("transform", `translate(${x} ${y}) scale(${stretchRatio} 1) translate(${-x} ${-y})`);
-  editor.style.fontSize = `${size}px`;
-  editor.style.width = `${width}px`;
-  editor.style.height = `${height}px`;
-  editor.style.writingMode = vertical ? "vertical-rl" : "horizontal-tb";
+  element.style.fontSize = `${size}px`;
+  element.style.writingMode = vertical ? "vertical-rl" : "horizontal-tb";
 }
 
 function updateAllTextDrawElements() {
-  document.querySelectorAll("#layer-draw .canvas-text").forEach(updateTextDrawElement);
+  document.querySelectorAll("#text-overlay .canvas-text").forEach(updateTextDrawElement);
   if (selectedDrawElement?.classList.contains("canvas-text")) showTextHandles(selectedDrawElement);
 }
 
@@ -895,18 +890,11 @@ function clearDrawSelection() {
 }
 
 function getTextBounds(element) {
-  const svg = document.getElementById("svg-main");
-  const stretchRatio = svg.clientHeight && svg.clientWidth
-    ? (svg.clientHeight / 800) / (svg.clientWidth / 1200)
-    : 1;
-  const x = Number(element.getAttribute("x")) || 0;
-  const y = Number(element.getAttribute("y")) || 0;
   return {
-    x,
-    y,
-    width: (Number(element.getAttribute("width")) || 0) * stretchRatio,
-    height: Number(element.getAttribute("height")) || 0,
-    stretchRatio
+    x: element.offsetLeft,
+    y: element.offsetTop,
+    width: element.offsetWidth,
+    height: element.offsetHeight
   };
 }
 
@@ -914,35 +902,28 @@ function showTextHandles(element) {
   document.querySelectorAll(".text-selection-controls").forEach((control) => control.remove());
   if (selectedDrawElement !== element || !element.isConnected) return;
   const bounds = getTextBounds(element);
-  const group = svgEl("g", { class: "text-selection-controls" });
-  group.appendChild(svgEl("rect", {
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    class: "text-selection-box"
-  }));
-  const handleSize = Math.min(gridStep("x"), gridStep("y")) * 0.28;
-  const half = handleSize / 2;
+  const group = document.createElement("div");
+  group.className = "text-selection-controls";
+  group.style.left = `${bounds.x}px`;
+  group.style.top = `${bounds.y}px`;
+  group.style.width = `${bounds.width}px`;
+  group.style.height = `${bounds.height}px`;
   [
-    { corner: "nw", x: bounds.x, y: bounds.y, cursor: "nwse-resize" },
-    { corner: "ne", x: bounds.x + bounds.width, y: bounds.y, cursor: "nesw-resize" },
-    { corner: "sw", x: bounds.x, y: bounds.y + bounds.height, cursor: "nesw-resize" },
-    { corner: "se", x: bounds.x + bounds.width, y: bounds.y + bounds.height, cursor: "nwse-resize" }
-  ].forEach(({ corner, x, y, cursor }) => {
-    const handle = svgEl("rect", {
-      x: x - half,
-      y: y - half,
-      width: handleSize,
-      height: handleSize,
-      rx: handleSize * 0.16,
-      class: "text-selection-handle"
-    });
+    { corner: "nw", left: "0%", top: "0%", cursor: "nwse-resize" },
+    { corner: "ne", left: "100%", top: "0%", cursor: "nesw-resize" },
+    { corner: "sw", left: "0%", top: "100%", cursor: "nesw-resize" },
+    { corner: "se", left: "100%", top: "100%", cursor: "nwse-resize" }
+  ].forEach(({ corner, left, top, cursor }) => {
+    const handle = document.createElement("div");
+    handle.className = "text-selection-handle";
+    handle.style.left = left;
+    handle.style.top = top;
+    handle.style.transform = "translate(-50%, -50%)";
     handle.style.cursor = cursor;
     handle.addEventListener("pointerdown", (event) => startTextResize(event, element, corner));
     group.appendChild(handle);
   });
-  document.getElementById("layer-handles").appendChild(group);
+  document.getElementById("text-overlay").appendChild(group);
 }
 
 function startTextResize(event, element, corner) {
@@ -969,8 +950,8 @@ function startTextElementInteraction(event, element) {
     element,
     startX: event.clientX,
     startY: event.clientY,
-    origX: Number(element.getAttribute("x")) || 0,
-    origY: Number(element.getAttribute("y")) || 0
+    origX: element.offsetLeft,
+    origY: element.offsetTop
   };
 }
 
@@ -1121,21 +1102,19 @@ window.addEventListener("pointermove", (event) => {
 
 window.addEventListener("pointermove", (event) => {
   if (!drawDragState) return;
-  const svg = document.getElementById("svg-main");
+  const overlay = document.getElementById("text-overlay");
   const element = drawDragState.element;
-  const width = Number(element.getAttribute("width")) || 0;
-  const height = Number(element.getAttribute("height")) || 0;
-  const x = drawDragState.origX + (event.clientX - drawDragState.startX) * (1200 / svg.clientWidth);
-  const y = drawDragState.origY + (event.clientY - drawDragState.startY) * (800 / svg.clientHeight);
-  element.setAttribute("x", Math.max(0, Math.min(1200 - width, x)));
-  element.setAttribute("y", Math.max(0, Math.min(800 - height, y)));
-  updateTextDrawElement(element);
+  const x = drawDragState.origX + event.clientX - drawDragState.startX;
+  const y = drawDragState.origY + event.clientY - drawDragState.startY;
+  element.style.left = `${Math.max(0, Math.min(overlay.clientWidth - element.offsetWidth, x))}px`;
+  element.style.top = `${Math.max(0, Math.min(overlay.clientHeight - element.offsetHeight, y))}px`;
   showTextHandles(element);
 });
 
 window.addEventListener("pointermove", (event) => {
   if (!textResizeState) return;
-  const point = pointInSvg(event);
+  const overlayBounds = document.getElementById("text-overlay").getBoundingClientRect();
+  const point = { x: event.clientX - overlayBounds.left, y: event.clientY - overlayBounds.top };
   const { element, corner, bounds, fontSize } = textResizeState;
   let left = bounds.x;
   let top = bounds.y;
@@ -1154,9 +1133,9 @@ window.addEventListener("pointermove", (event) => {
   const resized = getTextBounds(element);
   const nextX = corner.includes("w") ? right - resized.width : left;
   const nextY = corner.includes("n") ? bottom - resized.height : top;
-  element.setAttribute("x", Math.max(0, Math.min(1200 - resized.width, nextX)));
-  element.setAttribute("y", Math.max(0, Math.min(800 - resized.height, nextY)));
-  updateTextDrawElement(element);
+  const overlay = document.getElementById("text-overlay");
+  element.style.left = `${Math.max(0, Math.min(overlay.clientWidth - resized.width, nextX))}px`;
+  element.style.top = `${Math.max(0, Math.min(overlay.clientHeight - resized.height, nextY))}px`;
   showTextHandles(element);
 });
 
@@ -1199,25 +1178,25 @@ window.addEventListener("pointerup", () => {
   }
   if (drawDragState) {
     const { element, origX, origY } = drawDragState;
-    const nextX = Number(element.getAttribute("x")) || 0;
-    const nextY = Number(element.getAttribute("y")) || 0;
+    const nextX = element.offsetLeft;
+    const nextY = element.offsetTop;
     if (nextX !== origX || nextY !== origY) {
       actionHistory.push(() => {
-        element.setAttribute("x", origX);
-        element.setAttribute("y", origY);
-        updateTextDrawElement(element);
+        element.style.left = `${origX}px`;
+        element.style.top = `${origY}px`;
+        showTextHandles(element);
       });
     }
   }
   if (textResizeState) {
     const { element, bounds, fontSize } = textResizeState;
-    const nextX = Number(element.getAttribute("x")) || 0;
-    const nextY = Number(element.getAttribute("y")) || 0;
+    const nextX = element.offsetLeft;
+    const nextY = element.offsetTop;
     const nextSize = Number(element.dataset.fontSize) || currentTextSize;
     if (nextX !== bounds.x || nextY !== bounds.y || nextSize !== fontSize) {
       actionHistory.push(() => {
-        element.setAttribute("x", bounds.x);
-        element.setAttribute("y", bounds.y);
+        element.style.left = `${bounds.x}px`;
+        element.style.top = `${bounds.y}px`;
         element.dataset.fontSize = fontSize;
         updateTextDrawElement(element);
         showTextHandles(element);
@@ -1242,6 +1221,7 @@ function clearAll() {
     const layer = document.getElementById(id);
     if (layer) layer.innerHTML = "";
   });
+  document.getElementById("text-overlay").innerHTML = "";
   renderAll();
   showToast("見取り図をリセットしました");
 }

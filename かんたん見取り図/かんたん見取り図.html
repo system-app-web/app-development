@@ -98,6 +98,51 @@ h1 {
   overflow: hidden;
   box-shadow: 0 18px 36px rgba(70, 155, 168, 0.10);
 }
+.template-block {
+  padding: 12px 12px 0;
+  flex: 0 0 auto;
+}
+.template-hero-btn {
+  position: relative;
+  width: 100%;
+  min-height: 132px;
+  border: 2px solid #7ec7d8;
+  border-radius: 18px;
+  padding: 28px 56px 22px 20px;
+  background: linear-gradient(110deg, #369fc1, #61bdab);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 -3px 0 rgba(23, 103, 125, 0.18), 0 6px 14px rgba(39, 135, 158, 0.16);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.template-hero-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 -3px 0 rgba(23, 103, 125, 0.18), 0 9px 18px rgba(39, 135, 158, 0.22);
+}
+.template-hero-label {
+  display: block;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.template-hero-sub {
+  display: block;
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.94);
+}
+.template-chevron {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1;
+}
 .selection-menu {
   padding: 12px;
   display: flex;
@@ -105,7 +150,6 @@ h1 {
   flex-direction: column;
   gap: 12px;
 }
-.template-block,
 .item-control-slot {
   padding: 0;
   flex: 0 0 auto;
@@ -126,30 +170,9 @@ h1 {
   transition: background 0.15s, border-color 0.15s;
 }
 .selection-toggle:hover,
-.template-block.open .selection-toggle,
 .item-control-slot.open .selection-toggle {
   background: #e8f9fd;
   border-color: #7ac5cf;
-}
-.template-toggle-label {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-}
-.template-toggle-kicker {
-  display: inline-block;
-  padding: 1px 6px 2px;
-  border-radius: 999px;
-  background: #fff;
-  color: #2d7f8d;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 14px;
-}
-.template-toggle-title {
-  font-size: 15px;
-  line-height: 18px;
 }
 .template-panel-body {
   display: none;
@@ -316,6 +339,14 @@ h1 {
     overflow: visible;
     border-radius: 16px;
   }
+  .template-block { padding: 10px 10px 0; }
+  .template-hero-btn {
+    min-height: 116px;
+    padding: 24px 50px 18px 18px;
+  }
+  .template-hero-label { font-size: 21px; }
+  .template-hero-sub { margin-top: 6px; font-size: 13px; }
+  .template-chevron { right: 16px; font-size: 32px; }
   .selection-menu {
     padding: 10px;
     gap: 10px;
@@ -347,6 +378,16 @@ h1 {
 
 <div class="main">
   <div class="input-panel">
+    <div id="templateBlock" class="template-block">
+      <button id="template-toggle" class="template-hero-btn" type="button" onclick="toggleTemplatePanel()" aria-expanded="false" aria-controls="templateBtns">
+        <span class="template-hero-label">テンプレートを選ぶ</span>
+        <span class="template-hero-sub">選ぶだけで見取り図を作成</span>
+        <span class="template-chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div class="template-panel-body">
+        <div id="templateBtns" class="template-btns"></div>
+      </div>
+    </div>
     <div class="selection-menu">
       <div class="item-control-slot">
         <button id="palette-toggle" class="selection-toggle" type="button" onclick="togglePalette()" aria-expanded="false" aria-controls="item-palette">アイコン選択</button>
@@ -357,13 +398,8 @@ h1 {
           <button class="item-btn" onclick="setPlaceMode('door', this)" title="ドア">D</button>
         </div>
       </div>
-      <div id="templateBlock" class="template-block">
-        <button id="template-toggle" class="selection-toggle" type="button" onclick="toggleTemplatePanel()" aria-expanded="false" aria-controls="templateBtns">
-          <span class="template-toggle-label"><span class="template-toggle-kicker">テンプレート</span><span class="template-toggle-title">間取り選択</span></span>
-        </button>
-        <div class="template-panel-body">
-          <div id="templateBtns" class="template-btns"></div>
-        </div>
+      <div class="floor-plan-control">
+        <button class="selection-toggle" type="button" onclick="toggleTemplatePanel()" data-template-toggle aria-expanded="false" aria-controls="templateBtns">間取り選択</button>
       </div>
     </div>
   </div>
@@ -484,7 +520,9 @@ function createRoom(data = {}) {
 function toggleTemplatePanel() {
   const block = document.getElementById("templateBlock");
   const isOpen = block.classList.toggle("open");
-  document.getElementById("template-toggle").setAttribute("aria-expanded", String(isOpen));
+  document.querySelectorAll("[data-template-toggle], #template-toggle").forEach(button => {
+    button.setAttribute("aria-expanded", String(isOpen));
+  });
 }
 
 function renderTemplateButtons() {

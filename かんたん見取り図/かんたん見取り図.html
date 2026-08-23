@@ -1050,21 +1050,46 @@ function addCanvasItem(mode) {
   showToast(`${item.name}を配置しました`);
 }
 
+function findFloorPlanPosition(width, height) {
+  const stepX = gridStep("x");
+  const stepY = gridStep("y");
+  const maxX = Math.max(0, 1200 - width);
+  const maxY = Math.max(0, 800 - height);
+  const startX = Math.min(maxX, stepX * 5);
+  const startY = Math.min(maxY, stepY * 3);
+  const plans = rooms.filter((room) => room.type === "floorplan");
+  const overlaps = (x, y) => plans.some((room) => (
+    x < room.x + room.w + stepX &&
+    x + width + stepX > room.x &&
+    y < room.y + room.h + stepY &&
+    y + height + stepY > room.y
+  ));
+  const findOpenSpot = (fromX, fromY) => {
+    for (let y = fromY; y <= maxY; y += stepY) {
+      for (let x = fromX; x <= maxX; x += stepX) {
+        if (!overlaps(x, y)) return { x, y };
+      }
+    }
+    return null;
+  };
+  return findOpenSpot(startX, startY) || findOpenSpot(0, 0) || { x: startX, y: startY };
+}
+
 function addFloorPlan() {
   clearPlaceMode();
   currentDrawMode = "";
   document.getElementById("svg-main").style.cursor = "";
   document.getElementById("dtool-line").classList.remove("active");
-  const count = rooms.filter((room) => room.type === "floorplan").length;
   const stepX = gridStep("x");
   const stepY = gridStep("y");
-  const width = stepX * 4;
-  const height = stepY * 6;
+  const width = stepX * 6;
+  const height = stepY * 7;
+  const position = findFloorPlanPosition(width, height);
   const plan = createRoom({
     name: "間取り",
     type: "floorplan",
-    x: Math.min(1200 - width, stepX * (7 + (count % 4) * 2)),
-    y: Math.min(800 - height, stepY * (4 + (count % 4) * 2)),
+    x: position.x,
+    y: position.y,
     w: width,
     h: height
   });

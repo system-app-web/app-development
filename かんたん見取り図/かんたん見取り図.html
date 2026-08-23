@@ -622,7 +622,8 @@ function renderSVG(showHint = true) {
   layerNodes.innerHTML = "";
   rooms.forEach((room) => {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.setAttribute("transform", `translate(${room.x} ${room.y}) rotate(${room.rotation} ${room.w / 2} ${room.h / 2})`);
+    const visualRotation = room.type === "floorplan" ? 0 : room.rotation;
+    group.setAttribute("transform", `translate(${room.x} ${room.y}) rotate(${visualRotation} ${room.w / 2} ${room.h / 2})`);
     group.dataset.id = room.id;
     group.style.cursor = "grab";
     group.classList.toggle("selected", room.id === selectedRoomId);
@@ -681,9 +682,8 @@ function renderFloorPlan(group, room) {
   group.appendChild(outline);
 
   if (room.id === selectedRoomId) {
-    const isQuarterTurn = Math.abs(room.rotation % 180) === 90;
-    const handleW = (isQuarterTurn ? gridStep("y") : gridStep("x")) * 0.36;
-    const handleH = (isQuarterTurn ? gridStep("x") : gridStep("y")) * 0.36;
+    const handleW = gridStep("x") * 0.36;
+    const handleH = gridStep("y") * 0.36;
     const halfW = handleW / 2;
     const halfH = handleH / 2;
     const handles = [
@@ -1288,10 +1288,23 @@ function rotateSelectedItem() {
     showToast("回転するアイテムを選択してください");
     return;
   }
-  const previousRotation = room.rotation;
-  room.rotation = (room.rotation + 90) % 360;
+  const previous = { x: room.x, y: room.y, w: room.w, h: room.h, rotation: room.rotation };
+  if (room.type === "floorplan") {
+    const swapDimensions = () => {
+      const centerX = room.x + room.w / 2;
+      const centerY = room.y + room.h / 2;
+      [room.w, room.h] = [room.h, room.w];
+      room.x = Math.max(0, Math.min(1200 - room.w, snapToGrid(centerX - room.w / 2, "x")));
+      room.y = Math.max(0, Math.min(800 - room.h, snapToGrid(centerY - room.h / 2, "y")));
+    };
+    if (Math.abs(room.rotation % 180) === 90) swapDimensions();
+    room.rotation = (room.rotation + 90) % 360;
+    swapDimensions();
+  } else {
+    room.rotation = (room.rotation + 90) % 360;
+  }
   actionHistory.push(() => {
-    room.rotation = previousRotation;
+    Object.assign(room, previous);
     renderAll(false);
   });
   renderAll(false);

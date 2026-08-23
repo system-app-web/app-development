@@ -1293,7 +1293,10 @@ function rotateSelectedItem() {
     const swapDimensions = () => {
       const centerX = room.x + room.w / 2;
       const centerY = room.y + room.h / 2;
-      [room.w, room.h] = [room.h, room.w];
+      const widthInCells = room.w / gridStep("x");
+      const heightInCells = room.h / gridStep("y");
+      room.w = heightInCells * gridStep("x");
+      room.h = widthInCells * gridStep("y");
       room.x = Math.max(0, Math.min(1200 - room.w, snapToGrid(centerX - room.w / 2, "x")));
       room.y = Math.max(0, Math.min(800 - room.h, snapToGrid(centerY - room.h / 2, "y")));
     };

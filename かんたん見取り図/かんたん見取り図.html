@@ -595,6 +595,7 @@ function createRoom(data = {}) {
   const gridRows = Number(data.gridRows);
   const gridX = Number(data.gridX);
   const gridY = Number(data.gridY);
+  const layoutIndex = Number(data.layoutIndex);
   return {
     id: data.id || uid(),
     name: data.name || "部屋",
@@ -608,6 +609,7 @@ function createRoom(data = {}) {
     gridRows: Number.isFinite(gridRows) ? Math.max(1, Math.round(gridRows)) : null,
     gridX: Number.isFinite(gridX) ? Math.max(0, Math.round(gridX)) : null,
     gridY: Number.isFinite(gridY) ? Math.max(0, Math.round(gridY)) : null,
+    layoutIndex: Number.isFinite(layoutIndex) ? Math.max(0, Math.round(layoutIndex)) : null,
     autoCentered: data.autoCentered === true,
     autoPlaced: data.type === "floorplan" ? data.autoPlaced !== false : false
   };
@@ -1199,6 +1201,36 @@ function findOpenFloorPlanGridPosition(room, occupied, stepX, stepY) {
   return best;
 }
 
+function arrangeDefaultFloorPlanLayout(plans) {
+  const defaultPlans = plans.filter((room) => room.autoPlaced !== false);
+  defaultPlans.forEach((room, index) => {
+    room.layoutIndex ??= index;
+  });
+  const firstPlan = defaultPlans.find((room) => room.layoutIndex === 0);
+  if (!firstPlan) return;
+
+  centerFloorPlan(firstPlan);
+  const slots = {
+    0: { column: 0, row: 0 },
+    1: { column: 1, row: 0 },
+    2: { column: 0, row: 1 },
+    3: { column: 1, row: 1 }
+  };
+  const arrangedPlans = defaultPlans.filter((room) => slots[room.layoutIndex]);
+  const columns = Math.max(...arrangedPlans.map((room) => slots[room.layoutIndex].column)) + 1;
+  const rows = Math.max(...arrangedPlans.map((room) => slots[room.layoutIndex].row)) + 1;
+  const groupLeft = snapToGrid((1200 - firstPlan.w * columns) / 2, "x");
+  const groupTop = snapToGrid((800 - firstPlan.h * rows) / 2, "y");
+
+  arrangedPlans.forEach((room) => {
+    const slot = slots[room.layoutIndex];
+    room.x = groupLeft + firstPlan.w * slot.column;
+    room.y = groupTop + firstPlan.h * slot.row;
+    room.gridX = Math.round(room.x / gridStep("x"));
+    room.gridY = Math.round(room.y / gridStep("y"));
+  });
+}
+
 function syncFloorPlansToGrid() {
   const canvas = document.getElementById("svg-main");
   if (!canvas || !canvas.clientWidth || !canvas.clientHeight) return;
@@ -1229,6 +1261,8 @@ function syncFloorPlansToGrid() {
     room.x = Math.max(0, Math.min(1200 - room.w, room.gridX * stepX));
     room.y = Math.max(0, Math.min(800 - room.h, room.gridY * stepY));
   });
+
+  arrangeDefaultFloorPlanLayout(plans);
 
   const occupiedPlans = [];
   plans.forEach((room) => {
@@ -1265,7 +1299,8 @@ function addFloorPlan() {
   const stepY = gridStep("y");
   const width = stepX * 6;
   const height = stepY * 7;
-  const isFirstFloorPlan = !rooms.some((room) => room.type === "floorplan");
+  const floorPlanCount = rooms.filter((room) => room.type === "floorplan").length;
+  const isFirstFloorPlan = floorPlanCount === 0;
   const position = isFirstFloorPlan ? { x: 0, y: 0 } : findFloorPlanPosition(width, height);
   const plan = createRoom({
     name: "間取り",
@@ -1278,6 +1313,7 @@ function addFloorPlan() {
     gridRows: 7,
     gridX: Math.round(position.x / stepX),
     gridY: Math.round(position.y / stepY),
+    layoutIndex: floorPlanCount,
     autoCentered: isFirstFloorPlan,
     autoPlaced: true
   });

@@ -608,7 +608,8 @@ function createRoom(data = {}) {
     gridRows: Number.isFinite(gridRows) ? Math.max(1, Math.round(gridRows)) : null,
     gridX: Number.isFinite(gridX) ? Math.max(0, Math.round(gridX)) : null,
     gridY: Number.isFinite(gridY) ? Math.max(0, Math.round(gridY)) : null,
-    autoCentered: data.autoCentered === true
+    autoCentered: data.autoCentered === true,
+    autoPlaced: data.type === "floorplan" ? data.autoPlaced !== false : false
   };
 }
 
@@ -789,7 +790,8 @@ function startDrag(event, id) {
     origY: room.y,
     origGridX: room.gridX,
     origGridY: room.gridY,
-    origAutoCentered: room.autoCentered
+    origAutoCentered: room.autoCentered,
+    origAutoPlaced: room.autoPlaced
   };
 }
 
@@ -812,7 +814,8 @@ function startResize(event, id, corner) {
     origGridRows: room.gridRows,
     origGridX: room.gridX,
     origGridY: room.gridY,
-    origAutoCentered: room.autoCentered
+    origAutoCentered: room.autoCentered,
+    origAutoPlaced: room.autoPlaced
   };
 }
 
@@ -1125,6 +1128,28 @@ function captureFloorPlanGrid(room) {
   room.gridY = Math.max(0, Math.round(room.y / stepY));
 }
 
+function findOpenFloorPlanGridPosition(room, occupied, stepX, stepY) {
+  const maxX = Math.max(0, Math.floor((1200 - room.w) / stepX));
+  const maxY = Math.max(0, Math.floor((800 - room.h) / stepY));
+  let best = null;
+
+  for (let y = 0; y <= maxY; y += 1) {
+    for (let x = 0; x <= maxX; x += 1) {
+      const overlaps = occupied.some((other) => (
+        x < other.gridX + other.gridColumns &&
+        x + room.gridColumns > other.gridX &&
+        y < other.gridY + other.gridRows &&
+        y + room.gridRows > other.gridY
+      ));
+      if (overlaps) continue;
+
+      const distance = Math.abs(x - room.gridX) + Math.abs(y - room.gridY);
+      if (!best || distance < best.distance) best = { x, y, distance };
+    }
+  }
+  return best;
+}
+
 function syncFloorPlansToGrid() {
   const canvas = document.getElementById("svg-main");
   if (!canvas || !canvas.clientWidth || !canvas.clientHeight) return;
@@ -1155,6 +1180,28 @@ function syncFloorPlansToGrid() {
     room.x = Math.max(0, Math.min(1200 - room.w, room.gridX * stepX));
     room.y = Math.max(0, Math.min(800 - room.h, room.gridY * stepY));
   });
+
+  const occupiedPlans = [];
+  plans.forEach((room) => {
+    if (room.autoPlaced !== false) {
+      const overlaps = occupiedPlans.some((other) => (
+        room.gridX < other.gridX + other.gridColumns &&
+        room.gridX + room.gridColumns > other.gridX &&
+        room.gridY < other.gridY + other.gridRows &&
+        room.gridY + room.gridRows > other.gridY
+      ));
+      if (overlaps) {
+        const position = findOpenFloorPlanGridPosition(room, occupiedPlans, stepX, stepY);
+        if (position) {
+          room.gridX = position.x;
+          room.gridY = position.y;
+          room.x = position.x * stepX;
+          room.y = position.y * stepY;
+        }
+      }
+    }
+    occupiedPlans.push(room);
+  });
   previousGridStepX = stepX;
   previousGridStepY = stepY;
   renderAll(false);
@@ -1182,7 +1229,8 @@ function addFloorPlan() {
     gridRows: 7,
     gridX: Math.round(position.x / stepX),
     gridY: Math.round(position.y / stepY),
-    autoCentered: isFirstFloorPlan
+    autoCentered: isFirstFloorPlan,
+    autoPlaced: true
   });
   if (plan.autoCentered) centerFloorPlan(plan);
   rooms.push(plan);
@@ -1321,10 +1369,11 @@ window.addEventListener("pointerup", () => {
   }
   if (dragState) {
     const room = rooms.find((item) => item.id === dragState.id);
-    const { origX, origY, origGridX, origGridY, origAutoCentered } = dragState;
+    const { origX, origY, origGridX, origGridY, origAutoCentered, origAutoPlaced } = dragState;
     if (room && (room.x !== origX || room.y !== origY)) {
       if (room.type === "floorplan") {
         room.autoCentered = false;
+        room.autoPlaced = false;
         captureFloorPlanGrid(room);
       }
       actionHistory.push(() => {
@@ -1333,16 +1382,18 @@ window.addEventListener("pointerup", () => {
         room.gridX = origGridX;
         room.gridY = origGridY;
         room.autoCentered = origAutoCentered;
+        room.autoPlaced = origAutoPlaced;
         renderAll(false);
       });
     }
   }
   if (resizeState) {
     const room = rooms.find((item) => item.id === resizeState.id);
-    const { origX, origY, origW, origH, origGridColumns, origGridRows, origGridX, origGridY, origAutoCentered } = resizeState;
+    const { origX, origY, origW, origH, origGridColumns, origGridRows, origGridX, origGridY, origAutoCentered, origAutoPlaced } = resizeState;
     if (room && (room.x !== origX || room.y !== origY || room.w !== origW || room.h !== origH)) {
       if (room.type === "floorplan") {
         room.autoCentered = false;
+        room.autoPlaced = false;
         captureFloorPlanGrid(room);
       }
       actionHistory.push(() => {
@@ -1355,6 +1406,7 @@ window.addEventListener("pointerup", () => {
         room.gridX = origGridX;
         room.gridY = origGridY;
         room.autoCentered = origAutoCentered;
+        room.autoPlaced = origAutoPlaced;
         renderAll(false);
       });
     }
@@ -1474,7 +1526,8 @@ function rotateSelectedItem() {
     gridRows: room.gridRows,
     gridX: room.gridX,
     gridY: room.gridY,
-    autoCentered: room.autoCentered
+    autoCentered: room.autoCentered,
+    autoPlaced: room.autoPlaced
   };
   if (room.type === "floorplan") {
     const swapDimensions = () => {

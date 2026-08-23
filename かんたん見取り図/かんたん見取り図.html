@@ -589,6 +589,8 @@ function uid() {
 }
 
 function createRoom(data = {}) {
+  const gridColumns = Number(data.gridColumns);
+  const gridRows = Number(data.gridRows);
   return {
     id: data.id || uid(),
     name: data.name || "部屋",
@@ -597,7 +599,10 @@ function createRoom(data = {}) {
     y: Number(data.y ?? 90),
     w: Number(data.w ?? 180),
     h: Number(data.h ?? 120),
-    rotation: Number(data.rotation ?? 0)
+    rotation: Number(data.rotation ?? 0),
+    gridColumns: Number.isFinite(gridColumns) ? Math.max(1, Math.round(gridColumns)) : null,
+    gridRows: Number.isFinite(gridRows) ? Math.max(1, Math.round(gridRows)) : null,
+    autoCentered: data.autoCentered === true
   };
 }
 
@@ -770,7 +775,14 @@ function startDrag(event, id) {
   if (!room) return;
   selectedRoomId = id;
   renderAll(false);
-  dragState = { id, startX: event.clientX, startY: event.clientY, origX: room.x, origY: room.y };
+  dragState = {
+    id,
+    startX: event.clientX,
+    startY: event.clientY,
+    origX: room.x,
+    origY: room.y,
+    origAutoCentered: room.autoCentered
+  };
 }
 
 function startResize(event, id, corner) {
@@ -787,7 +799,8 @@ function startResize(event, id, corner) {
     origX: room.x,
     origY: room.y,
     origW: room.w,
-    origH: room.h
+    origH: room.h,
+    origAutoCentered: room.autoCentered
   };
 }
 
@@ -1075,6 +1088,29 @@ function findFloorPlanPosition(width, height) {
   return findOpenSpot(startX, startY) || findOpenSpot(0, 0) || { x: startX, y: startY };
 }
 
+function centerFloorPlan(room) {
+  const stepX = gridStep("x");
+  const stepY = gridStep("y");
+  const columns = room.gridColumns || Math.max(1, Math.round(room.w / stepX));
+  const rows = room.gridRows || Math.max(1, Math.round(room.h / stepY));
+
+  room.gridColumns = columns;
+  room.gridRows = rows;
+  room.w = columns * stepX;
+  room.h = rows * stepY;
+  room.x = Math.max(0, Math.min(1200 - room.w, snapToGrid((1200 - room.w) / 2, "x")));
+  room.y = Math.max(0, Math.min(800 - room.h, snapToGrid((800 - room.h) / 2, "y")));
+}
+
+function syncAutoCenteredFloorPlans() {
+  const canvas = document.getElementById("svg-main");
+  if (!canvas || !canvas.clientWidth || !canvas.clientHeight) return;
+  const centeredPlans = rooms.filter((room) => room.type === "floorplan" && room.autoCentered);
+  if (!centeredPlans.length) return;
+  centeredPlans.forEach(centerFloorPlan);
+  renderAll(false);
+}
+
 function addFloorPlan() {
   clearPlaceMode();
   currentDrawMode = "";
@@ -1084,15 +1120,20 @@ function addFloorPlan() {
   const stepY = gridStep("y");
   const width = stepX * 6;
   const height = stepY * 7;
-  const position = findFloorPlanPosition(width, height);
+  const isFirstFloorPlan = !rooms.some((room) => room.type === "floorplan");
+  const position = isFirstFloorPlan ? { x: 0, y: 0 } : findFloorPlanPosition(width, height);
   const plan = createRoom({
     name: "間取り",
     type: "floorplan",
     x: position.x,
     y: position.y,
     w: width,
-    h: height
+    h: height,
+    gridColumns: 6,
+    gridRows: 7,
+    autoCentered: isFirstFloorPlan
   });
+  if (plan.autoCentered) centerFloorPlan(plan);
   rooms.push(plan);
   actionHistory.push(() => {
     rooms = rooms.filter((room) => room.id !== plan.id);
@@ -1229,24 +1270,28 @@ window.addEventListener("pointerup", () => {
   }
   if (dragState) {
     const room = rooms.find((item) => item.id === dragState.id);
-    const { origX, origY } = dragState;
+    const { origX, origY, origAutoCentered } = dragState;
     if (room && (room.x !== origX || room.y !== origY)) {
+      if (room.type === "floorplan") room.autoCentered = false;
       actionHistory.push(() => {
         room.x = origX;
         room.y = origY;
+        room.autoCentered = origAutoCentered;
         renderAll(false);
       });
     }
   }
   if (resizeState) {
     const room = rooms.find((item) => item.id === resizeState.id);
-    const { origX, origY, origW, origH } = resizeState;
+    const { origX, origY, origW, origH, origAutoCentered } = resizeState;
     if (room && (room.x !== origX || room.y !== origY || room.w !== origW || room.h !== origH)) {
+      if (room.type === "floorplan") room.autoCentered = false;
       actionHistory.push(() => {
         room.x = origX;
         room.y = origY;
         room.w = origW;
         room.h = origH;
+        room.autoCentered = origAutoCentered;
         renderAll(false);
       });
     }
@@ -1285,7 +1330,10 @@ window.addEventListener("pointerup", () => {
   textResizeState = null;
 });
 
-window.addEventListener("resize", updateAllTextDrawElements);
+window.addEventListener("resize", () => {
+  updateAllTextDrawElements();
+  syncAutoCenteredFloorPlans();
+});
 
 function clearAll() {
   rooms = [];
@@ -1353,7 +1401,16 @@ function rotateSelectedItem() {
     showToast("回転するアイテムを選択してください");
     return;
   }
-  const previous = { x: room.x, y: room.y, w: room.w, h: room.h, rotation: room.rotation };
+  const previous = {
+    x: room.x,
+    y: room.y,
+    w: room.w,
+    h: room.h,
+    rotation: room.rotation,
+    gridColumns: room.gridColumns,
+    gridRows: room.gridRows,
+    autoCentered: room.autoCentered
+  };
   if (room.type === "floorplan") {
     const swapDimensions = () => {
       const centerX = room.x + room.w / 2;
@@ -1368,6 +1425,11 @@ function rotateSelectedItem() {
     if (Math.abs(room.rotation % 180) === 90) swapDimensions();
     room.rotation = (room.rotation + 90) % 360;
     swapDimensions();
+    if (room.autoCentered) {
+      room.gridColumns = Math.max(1, Math.round(room.w / gridStep("x")));
+      room.gridRows = Math.max(1, Math.round(room.h / gridStep("y")));
+      centerFloorPlan(room);
+    }
   } else {
     room.rotation = (room.rotation + 90) % 360;
   }
@@ -1479,6 +1541,8 @@ async function exportPNG() {
 renderTemplateButtons();
 renderAll();
 const canvas = document.getElementById("svg-main");
+const canvasResizeObserver = new ResizeObserver(() => syncAutoCenteredFloorPlans());
+canvasResizeObserver.observe(canvas);
 canvas.addEventListener("pointerdown", startLineDraw);
 canvas.addEventListener("pointerdown", startTextDraw);
 canvas.addEventListener("pointerdown", placeItemOnCanvas);

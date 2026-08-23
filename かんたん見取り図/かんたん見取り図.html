@@ -774,6 +774,32 @@ function renderAll(showHint = true) {
   renderSVG(showHint);
 }
 
+function floorPlansShareEdge(first, second) {
+  const epsilon = 0.01;
+  const overlapsVertically = first.y < second.y + second.h - epsilon && first.y + first.h > second.y + epsilon;
+  const overlapsHorizontally = first.x < second.x + second.w - epsilon && first.x + first.w > second.x + epsilon;
+  const sharesVerticalEdge = Math.abs(first.x + first.w - second.x) < epsilon || Math.abs(second.x + second.w - first.x) < epsilon;
+  const sharesHorizontalEdge = Math.abs(first.y + first.h - second.y) < epsilon || Math.abs(second.y + second.h - first.y) < epsilon;
+  return (sharesVerticalEdge && overlapsVertically) || (sharesHorizontalEdge && overlapsHorizontally);
+}
+
+function getConnectedFloorPlanIds(id) {
+  const selected = rooms.find((room) => room.id === id);
+  if (!selected || selected.type !== "floorplan") return [id];
+
+  const connected = new Set([id]);
+  const pending = [selected];
+  while (pending.length) {
+    const current = pending.pop();
+    rooms.filter((room) => room.type === "floorplan" && !connected.has(room.id)).forEach((candidate) => {
+      if (!floorPlansShareEdge(current, candidate)) return;
+      connected.add(candidate.id);
+      pending.push(candidate);
+    });
+  }
+  return [...connected];
+}
+
 function startDrag(event, id) {
   if (currentPlaceMode || currentDrawMode) return;
   event.stopPropagation();
@@ -782,16 +808,23 @@ function startDrag(event, id) {
   if (!room) return;
   selectedRoomId = id;
   renderAll(false);
+  const connectedRoomIds = getConnectedFloorPlanIds(id);
   dragState = {
     id,
     startX: event.clientX,
     startY: event.clientY,
-    origX: room.x,
-    origY: room.y,
-    origGridX: room.gridX,
-    origGridY: room.gridY,
-    origAutoCentered: room.autoCentered,
-    origAutoPlaced: room.autoPlaced
+    rooms: connectedRoomIds.map((roomId) => {
+      const item = rooms.find((candidate) => candidate.id === roomId);
+      return {
+        id: item.id,
+        x: item.x,
+        y: item.y,
+        gridX: item.gridX,
+        gridY: item.gridY,
+        autoCentered: item.autoCentered,
+        autoPlaced: item.autoPlaced
+      };
+    })
   };
 }
 
@@ -1277,14 +1310,35 @@ window.addEventListener("pointermove", (event) => {
   if (!dragState) return;
   const room = rooms.find((item) => item.id === dragState.id);
   if (!room) return;
-  const x = dragState.origX + (event.clientX - dragState.startX) * scaleX;
-  const y = dragState.origY + (event.clientY - dragState.startY) * scaleY;
-  room.x = room.type === "floorplan"
-    ? Math.max(0, Math.min(1200 - room.w, snapToGrid(x, "x")))
-    : Math.max(0, Math.round(x));
-  room.y = room.type === "floorplan"
-    ? Math.max(0, Math.min(800 - room.h, snapToGrid(y, "y")))
-    : Math.max(0, Math.round(y));
+  const origin = dragState.rooms.find((item) => item.id === room.id);
+  if (!origin) return;
+  const x = origin.x + (event.clientX - dragState.startX) * scaleX;
+  const y = origin.y + (event.clientY - dragState.startY) * scaleY;
+
+  if (room.type === "floorplan") {
+    let moveX = snapToGrid(x, "x") - origin.x;
+    let moveY = snapToGrid(y, "y") - origin.y;
+    const groupLeft = Math.min(...dragState.rooms.map((item) => item.x));
+    const groupTop = Math.min(...dragState.rooms.map((item) => item.y));
+    const groupRight = Math.max(...dragState.rooms.map((item) => {
+      const candidate = rooms.find((entry) => entry.id === item.id);
+      return item.x + candidate.w;
+    }));
+    const groupBottom = Math.max(...dragState.rooms.map((item) => {
+      const candidate = rooms.find((entry) => entry.id === item.id);
+      return item.y + candidate.h;
+    }));
+    moveX = Math.max(-groupLeft, Math.min(1200 - groupRight, moveX));
+    moveY = Math.max(-groupTop, Math.min(800 - groupBottom, moveY));
+    dragState.rooms.forEach((item) => {
+      const candidate = rooms.find((entry) => entry.id === item.id);
+      candidate.x = item.x + moveX;
+      candidate.y = item.y + moveY;
+    });
+  } else {
+    room.x = Math.max(0, Math.round(x));
+    room.y = Math.max(0, Math.round(y));
+  }
   renderAll(false);
 });
 
@@ -1368,21 +1422,30 @@ window.addEventListener("pointerup", () => {
     lineDrawState = null;
   }
   if (dragState) {
-    const room = rooms.find((item) => item.id === dragState.id);
-    const { origX, origY, origGridX, origGridY, origAutoCentered, origAutoPlaced } = dragState;
-    if (room && (room.x !== origX || room.y !== origY)) {
-      if (room.type === "floorplan") {
-        room.autoCentered = false;
-        room.autoPlaced = false;
-        captureFloorPlanGrid(room);
-      }
+    const originalRooms = dragState.rooms;
+    const movedRooms = originalRooms.filter((origin) => {
+      const room = rooms.find((item) => item.id === origin.id);
+      return room && (room.x !== origin.x || room.y !== origin.y);
+    });
+    if (movedRooms.length) {
+      movedRooms.forEach((origin) => {
+        const room = rooms.find((item) => item.id === origin.id);
+        if (room.type === "floorplan") {
+          room.autoCentered = false;
+          room.autoPlaced = false;
+          captureFloorPlanGrid(room);
+        }
+      });
       actionHistory.push(() => {
-        room.x = origX;
-        room.y = origY;
-        room.gridX = origGridX;
-        room.gridY = origGridY;
-        room.autoCentered = origAutoCentered;
-        room.autoPlaced = origAutoPlaced;
+        originalRooms.forEach((origin) => {
+          const room = rooms.find((item) => item.id === origin.id);
+          room.x = origin.x;
+          room.y = origin.y;
+          room.gridX = origin.gridX;
+          room.gridY = origin.gridY;
+          room.autoCentered = origin.autoCentered;
+          room.autoPlaced = origin.autoPlaced;
+        });
         renderAll(false);
       });
     }

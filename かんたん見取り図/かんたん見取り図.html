@@ -1125,6 +1125,22 @@ function findFloorPlanPosition(width, height) {
     y < room.y + room.h + stepY &&
     y + height + stepY > room.y
   ));
+  const overlapsArea = (x, y) => plans.some((room) => (
+    x < room.x + room.w &&
+    x + width > room.x &&
+    y < room.y + room.h &&
+    y + height > room.y
+  ));
+  const attachedCandidates = plans.flatMap((room) => [
+    { x: room.x + room.w, y: room.y },
+    { x: room.x - width, y: room.y },
+    { x: room.x, y: room.y + room.h },
+    { x: room.x, y: room.y - height }
+  ]);
+  const attachedPosition = attachedCandidates.find(({ x, y }) => (
+    x >= 0 && x <= maxX && y >= 0 && y <= maxY && !overlapsArea(x, y)
+  ));
+  if (attachedPosition) return attachedPosition;
   const findOpenSpot = (fromX, fromY) => {
     for (let y = fromY; y <= maxY; y += stepY) {
       for (let x = fromX; x <= maxX; x += stepX) {
@@ -1267,6 +1283,7 @@ function addFloorPlan() {
   });
   if (plan.autoCentered) centerFloorPlan(plan);
   rooms.push(plan);
+  syncFloorPlansToGrid();
   actionHistory.push(() => {
     rooms = rooms.filter((room) => room.id !== plan.id);
     if (selectedRoomId === plan.id) selectedRoomId = null;

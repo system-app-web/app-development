@@ -10,6 +10,17 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 const sleepFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 const sourceId = (index: number) => `source-${index}-${crypto.randomUUID()}`;
 
+/**
+ * PDF.js は Worker へデータを渡す際に、受け取った Uint8Array の ArrayBuffer を
+ * transfer して切り離すことがあります。保管用の source.bytes は絶対に渡さず、
+ * 毎回この関数で複製した一時データだけを PDF.js に渡します。
+ */
+function copyPdfData(bytes: ArrayBuffer): Uint8Array {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(new Uint8Array(bytes));
+  return copy;
+}
+
 async function digest(file: File) {
   const bytes = await file.arrayBuffer();
   const value = await crypto.subtle.digest('SHA-256', bytes);
@@ -25,9 +36,12 @@ export async function loadPdfFiles(files: File[], onProgress: (text: string) => 
     const { bytes, hash } = await digest(file);
     if (knownHashes.has(hash)) { duplicateFiles.push(file.name); continue; }
     knownHashes.add(hash);
-    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(bytes) });
+    // ここで PDF.js がデータを detach しても、保存する bytes は影響を受けない。
+    const loadingTask = pdfjsLib.getDocument({ data: copyPdfData(bytes) });
     const document = await loadingTask.promise;
-    sources.push({ id: sourceId(index), name: file.name, bytes, pageCount: document.numPages, hash });
+    const pageCount = document.numPages;
+    await document.destroy();
+    sources.push({ id: sourceId(index), name: file.name, bytes, pageCount, hash });
     await sleepFrame();
   }
   return { sources, duplicateFiles };
@@ -43,35 +57,39 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
   const totalPages = sources.reduce((sum, source) => sum + source.pageCount, 0);
 
   for (const source of sources) {
-    const document = await pdfjsLib.getDocument({ data: new Uint8Array(source.bytes) }).promise;
-    for (let pageIndex = 0; pageIndex < document.numPages; pageIndex++) {
-      serial++;
-      onProgress(`${serial} / ${totalPages} ページ解析中`);
-      const page = await document.getPage(pageIndex + 1);
-      const content = await page.getTextContent();
-      const items = content.items
-        .filter((item): item is typeof item & { str: string; transform: number[] } => 'str' in item && typeof item.str === 'string')
-        .map((item) => ({ text: item.str, x: item.transform[4], y: item.transform[5] }));
-      const facts = extractPageFacts(items);
-      if (facts.serviceMonth) months.add(facts.serviceMonth);
-      const pageRef: PageRef = { sourceId: source.id, sourceName: source.name, pageIndex, serial };
-      const start = lastSourceId !== source.id || shouldStartNewSlip(currentFacts, facts);
-      if (start) {
-        current = {
-          id: crypto.randomUUID(), clientName: facts.clientName ?? '', providerName: facts.providerName ?? '',
-          serviceMonth: facts.serviceMonth ?? '', pages: [], needsReview: false, reviewed: false, issues: [],
-        };
-        groups.push(current);
+    const document = await pdfjsLib.getDocument({ data: copyPdfData(source.bytes) }).promise;
+    try {
+      for (let pageIndex = 0; pageIndex < document.numPages; pageIndex++) {
+        serial++;
+        onProgress(`${serial} / ${totalPages} ページ解析中`);
+        const page = await document.getPage(pageIndex + 1);
+        const content = await page.getTextContent();
+        const items = content.items
+          .filter((item): item is typeof item & { str: string; transform: number[] } => 'str' in item && typeof item.str === 'string')
+          .map((item) => ({ text: item.str, x: item.transform[4], y: item.transform[5] }));
+        const facts = extractPageFacts(items);
+        if (facts.serviceMonth) months.add(facts.serviceMonth);
+        const pageRef: PageRef = { sourceId: source.id, sourceName: source.name, pageIndex, serial };
+        const start = lastSourceId !== source.id || shouldStartNewSlip(currentFacts, facts);
+        if (start) {
+          current = {
+            id: crypto.randomUUID(), clientName: facts.clientName ?? '', providerName: facts.providerName ?? '',
+            serviceMonth: facts.serviceMonth ?? '', pages: [], needsReview: false, reviewed: false, issues: [],
+          };
+          groups.push(current);
+        }
+        if (!current) continue;
+        current.pages.push(pageRef);
+        current.clientName ||= facts.clientName ?? '';
+        current.providerName ||= facts.providerName ?? '';
+        current.serviceMonth ||= facts.serviceMonth ?? '';
+        if (!facts.textFound) current.issues.push(`P${serial}: 文字情報を取得できませんでした`);
+        currentFacts = { ...currentFacts, ...Object.fromEntries(Object.entries(facts).filter(([, value]) => value)) } as PageFacts;
+        lastSourceId = source.id;
+        await sleepFrame();
       }
-      if (!current) continue;
-      current.pages.push(pageRef);
-      current.clientName ||= facts.clientName ?? '';
-      current.providerName ||= facts.providerName ?? '';
-      current.serviceMonth ||= facts.serviceMonth ?? '';
-      if (!facts.textFound) current.issues.push(`P${serial}: 文字情報を取得できませんでした`);
-      currentFacts = { ...currentFacts, ...Object.fromEntries(Object.entries(facts).filter(([, value]) => value)) } as PageFacts;
-      lastSourceId = source.id;
-      await sleepFrame();
+    } finally {
+      await document.destroy();
     }
     current = undefined;
     currentFacts = undefined;
@@ -95,13 +113,17 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
 }
 
 export async function renderPage(source: SourcePdf, pageIndex: number, canvas: HTMLCanvasElement) {
-  const document = await pdfjsLib.getDocument({ data: new Uint8Array(source.bytes) }).promise;
-  const page = await document.getPage(pageIndex + 1);
-  const viewport = page.getViewport({ scale: 1.35 });
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('プレビューを表示できません。');
-  canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
-  await page.render({ canvas, canvasContext: context, viewport }).promise;
+  const document = await pdfjsLib.getDocument({ data: copyPdfData(source.bytes) }).promise;
+  try {
+    const page = await document.getPage(pageIndex + 1);
+    const viewport = page.getViewport({ scale: 1.35 });
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('プレビューを表示できません。');
+    canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
+  } finally {
+    await document.destroy();
+  }
 }
 
 export const safeFilename = (name: string) => name.replace(/[\\/:*?"<>|]/g, '＿').replace(/\s+/g, ' ').trim() || '名称未設定';

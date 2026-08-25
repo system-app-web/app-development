@@ -1609,7 +1609,7 @@
       const y = bounds.y * canvas.height;
       const width = bounds.w * canvas.width;
       const height = bounds.h * canvas.height;
-      const handleSize = Math.max(16, Math.round(Math.min(canvas.width, canvas.height) * 0.024));
+      const handleSize = Math.max(6, Math.round(Math.min(canvas.width, canvas.height) * 0.006));
       ctx.save();
       ctx.strokeStyle = "#2563eb";
       ctx.lineWidth = Math.max(2, Math.round(canvas.width * 0.0018));
@@ -1676,7 +1676,7 @@
       const bounds = pencilAnnotationBounds(annotation);
       if (!bounds) return null;
       const displayBounds = canvas.getBoundingClientRect();
-      const threshold = Math.max(8 / displayBounds.width, 8 / displayBounds.height);
+      const threshold = Math.max(5 / displayBounds.width, 5 / displayBounds.height);
       const handles = {
         topLeft: { x: bounds.x, y: bounds.y },
         topRight: { x: bounds.x + bounds.w, y: bounds.y },
@@ -1717,11 +1717,12 @@
         annotation.y = targetBounds.y;
         annotation.fontScale = (annotation.fontScale || 1) * Math.max(targetBounds.w / startBounds.w, targetBounds.h / startBounds.h);
       } else if (annotation.type === "blackCircle") {
-        const size = Math.max(targetBounds.w, targetBounds.h);
-        annotation.x = Math.min(targetBounds.x, 1 - size);
-        annotation.y = Math.min(targetBounds.y, 1 - size);
-        annotation.w = size;
-        annotation.h = size;
+        const source = loadedCanvases[pencilCurrentPageIndex];
+        const diameter = Math.max(targetBounds.w * source.width, targetBounds.h * source.height);
+        annotation.w = diameter / source.width;
+        annotation.h = diameter / source.height;
+        annotation.x = Math.min(targetBounds.x, 1 - annotation.w);
+        annotation.y = Math.min(targetBounds.y, 1 - annotation.h);
       } else {
         annotation.x = targetBounds.x;
         annotation.y = targetBounds.y;
@@ -1781,13 +1782,14 @@
       pencilMove = null;
       repaintPencilCanvas(canvas);
       if (pencilTool === "blackCircle") {
-        const size = 0.06;
+        const diameter = 0.02;
+        const height = diameter * canvas.width / canvas.height;
         pencilAnnotations[pencilCurrentPageIndex].push({
           type: "blackCircle",
-          x: Math.max(0, Math.min(1 - size, point.x - size / 2)),
-          y: Math.max(0, Math.min(1 - size, point.y - size / 2)),
-          w: size,
-          h: size
+          x: Math.max(0, Math.min(1 - diameter, point.x - diameter / 2)),
+          y: Math.max(0, Math.min(1 - height, point.y - height / 2)),
+          w: diameter,
+          h: height
         });
         refreshPencilOutput();
         showPencilEditor();

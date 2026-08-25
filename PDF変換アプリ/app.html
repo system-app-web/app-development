@@ -1676,7 +1676,7 @@
       const bounds = pencilAnnotationBounds(annotation);
       if (!bounds) return null;
       const displayBounds = canvas.getBoundingClientRect();
-      const threshold = Math.max(14 / displayBounds.width, 14 / displayBounds.height);
+      const threshold = Math.max(8 / displayBounds.width, 8 / displayBounds.height);
       const handles = {
         topLeft: { x: bounds.x, y: bounds.y },
         topRight: { x: bounds.x + bounds.w, y: bounds.y },
@@ -1716,6 +1716,12 @@
         annotation.x = targetBounds.x;
         annotation.y = targetBounds.y;
         annotation.fontScale = (annotation.fontScale || 1) * Math.max(targetBounds.w / startBounds.w, targetBounds.h / startBounds.h);
+      } else if (annotation.type === "blackCircle") {
+        const size = Math.max(targetBounds.w, targetBounds.h);
+        annotation.x = Math.min(targetBounds.x, 1 - size);
+        annotation.y = Math.min(targetBounds.y, 1 - size);
+        annotation.w = size;
+        annotation.h = size;
       } else {
         annotation.x = targetBounds.x;
         annotation.y = targetBounds.y;
@@ -1774,6 +1780,20 @@
       pencilSelection = null;
       pencilMove = null;
       repaintPencilCanvas(canvas);
+      if (pencilTool === "blackCircle") {
+        const size = 0.06;
+        pencilAnnotations[pencilCurrentPageIndex].push({
+          type: "blackCircle",
+          x: Math.max(0, Math.min(1 - size, point.x - size / 2)),
+          y: Math.max(0, Math.min(1 - size, point.y - size / 2)),
+          w: size,
+          h: size
+        });
+        refreshPencilOutput();
+        showPencilEditor();
+        saveModeState(currentDocType);
+        return;
+      }
       if (pencilTool === "text") {
         const text = window.prompt("書き込む文字を入力してください。", "");
         if (!text) return;

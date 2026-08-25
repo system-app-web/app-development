@@ -361,14 +361,15 @@
       display: block;
       box-sizing: border-box;
       width: 100%;
-      min-height: 116px;
+      min-height: 150px;
       resize: vertical;
       padding: 10px;
       border: 1px solid #9aacb2;
       border-radius: 5px;
       color: #1f2937;
-      font: inherit;
-      line-height: 1.5;
+      font: 17px/1.65 "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
     .pencil-text-dialog-actions {
@@ -750,7 +751,7 @@
 
   <div id="pencilTextDialog" class="pencil-text-dialog hidden" role="dialog" aria-modal="true" aria-label="文字入力">
     <div class="pencil-text-dialog-panel">
-      <textarea id="pencilTextInput" class="pencil-text-input" rows="4" aria-label="入力する文字"></textarea>
+      <textarea id="pencilTextInput" class="pencil-text-input" rows="5" spellcheck="false" placeholder="1行目&#10;2行目" aria-label="入力する文字"></textarea>
       <div class="pencil-text-dialog-actions">
         <button id="pencilTextCancelBtn" class="pencil-text-dialog-button pencil-text-dialog-cancel" type="button">キャンセル</button>
         <button id="pencilTextSaveBtn" class="pencil-text-dialog-button" type="button">入力</button>
@@ -1621,7 +1622,11 @@
       canvas.height = source.height;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(source, 0, 0);
-      (pencilAnnotations[pageIndex] || []).forEach((annotation) => drawPencilAnnotation(ctx, canvas, annotation));
+      const annotations = pencilAnnotations[pageIndex] || [];
+      annotations.filter((annotation) => annotation.type !== "text")
+        .forEach((annotation) => drawPencilAnnotation(ctx, canvas, annotation));
+      annotations.filter((annotation) => annotation.type === "text")
+        .forEach((annotation) => drawPencilAnnotation(ctx, canvas, annotation));
       if (draft) drawPencilAnnotation(ctx, canvas, draft);
       return canvas;
     }
@@ -1768,12 +1773,16 @@
 
     function findPencilAnnotationAtPoint(point) {
       const annotations = pencilAnnotations[pencilCurrentPageIndex] || [];
-      for (let index = annotations.length - 1; index >= 0; index--) {
-        const bounds = pencilAnnotationBounds(annotations[index]);
-        if (!bounds) continue;
-        if (point.x >= bounds.x && point.x <= bounds.x + bounds.w
-          && point.y >= bounds.y && point.y <= bounds.y + bounds.h) {
-          return index;
+      for (const type of ["text", "other"]) {
+        for (let index = annotations.length - 1; index >= 0; index--) {
+          const annotation = annotations[index];
+          if ((type === "text") !== (annotation.type === "text")) continue;
+          const bounds = pencilAnnotationBounds(annotation);
+          if (!bounds) continue;
+          if (point.x >= bounds.x && point.x <= bounds.x + bounds.w
+            && point.y >= bounds.y && point.y <= bounds.y + bounds.h) {
+            return index;
+          }
         }
       }
       return null;
@@ -1856,6 +1865,22 @@
       if (!isPencilMode() || !loadedCanvases.length) return;
       const canvas = event.currentTarget;
       const point = pencilPoint(event, canvas);
+      const existingAnnotationIndex = findPencilAnnotationAtPoint(point);
+      const existingAnnotation = existingAnnotationIndex === null
+        ? null
+        : pencilAnnotations[pencilCurrentPageIndex][existingAnnotationIndex];
+      if (pencilTool === "text" && (!existingAnnotation || existingAnnotation.type !== "text")) {
+        pencilSelection = null;
+        pencilMove = null;
+        repaintPencilCanvas(canvas);
+        openPencilTextEditor("", (text) => {
+          pencilAnnotations[pencilCurrentPageIndex].push({ type: "text", ...point, color: pencilColor, text, fontScale: 1 });
+          refreshPencilOutput();
+          showPencilEditor();
+          saveModeState(currentDocType);
+        });
+        return;
+      }
       const handle = findPencilHandle(point, canvas);
       if (handle) {
         const annotation = pencilAnnotations[pencilCurrentPageIndex][pencilSelection.annotationIndex];
@@ -1868,9 +1893,7 @@
         canvas.setPointerCapture(event.pointerId);
         return;
       }
-      const existingAnnotationIndex = findPencilAnnotationAtPoint(point);
       if (existingAnnotationIndex !== null) {
-        const existingAnnotation = pencilAnnotations[pencilCurrentPageIndex][existingAnnotationIndex];
         if (event.detail === 2 && existingAnnotation.type === "text") {
           pencilSelection = { pageIndex: pencilCurrentPageIndex, annotationIndex: existingAnnotationIndex };
           openPencilTextEditor(existingAnnotation.text, (text) => {
@@ -1914,15 +1937,6 @@
         refreshPencilOutput();
         showPencilEditor();
         saveModeState(currentDocType);
-        return;
-      }
-      if (pencilTool === "text") {
-        openPencilTextEditor("", (text) => {
-          pencilAnnotations[pencilCurrentPageIndex].push({ type: "text", ...point, color: pencilColor, text, fontScale: 1 });
-          refreshPencilOutput();
-          showPencilEditor();
-          saveModeState(currentDocType);
-        });
         return;
       }
       pencilDraft = pencilTool === "pen"

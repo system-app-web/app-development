@@ -473,6 +473,19 @@
       line-height: 1.5;
     }
 
+    .print-stage {
+      display: none;
+    }
+
+    @media print {
+      body { display: block; padding: 0; background: #fff; }
+      body > .app { display: none; }
+      .print-stage { display: block; }
+      .print-stage .page { break-after: page; page-break-after: always; }
+      .print-stage .page:last-child { break-after: auto; page-break-after: auto; }
+      .print-stage canvas { display: block; width: 100%; height: 100%; }
+    }
+
     @media (max-width: 640px) {
       body { padding: 12px; }
       .app { border-radius: 7px; }
@@ -759,25 +772,18 @@
 
     printBtn.addEventListener("click", async () => {
       if (isMergeMode() ? !mergeFiles.length : !outputCanvases.length) return;
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        setStatus("印刷画面を開けませんでした。ポップアップを許可して、もう一度お試しください。");
-        return;
-      }
-      showPrintLoading(printWindow);
       setActionButtonsDisabled(true);
       try {
-        setStatus("印刷用PDFを準備中です。");
-        await nextFrame();
-        const printPdf = isMergeMode()
-          ? await buildMergedPdfBlob(mergeFiles)
-          : buildOutputPdfBlob(outputCanvases, PRINT_DPI);
-        openPdfForPrint(printWindow, printPdf);
-        setStatus("印刷用PDFを開きました。PDF画面の印刷ボタンからFAXを選択してください。");
+        if (isMergeMode()) {
+          const mergeCanvases = await renderMergedPagesForPrint(mergeFiles);
+          printCanvasesInCurrentWindow(mergeCanvases, buildMergedPageCanvas);
+        } else {
+          printCanvasesInCurrentWindow(outputCanvases, buildA4PageCanvas);
+        }
+        setStatus("印刷ダイアログを開いています。");
       } catch (error) {
         console.error(error);
-        printWindow.close();
-        setStatus("印刷用PDFの作成に失敗しました。");
+        setStatus("印刷画面を開けませんでした。");
       } finally {
         setActionButtonsDisabled(false);
       }
@@ -1087,6 +1093,28 @@
       return previews;
     }
 
+    async function renderMergedPagesForPrint(files) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+      const canvases = [];
+      let renderedPageCount = 0;
+      for (const file of files) {
+        const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+          renderedPageCount += 1;
+          setStatus(`印刷用ページを準備中です。${renderedPageCount}/${mergePageCount}`);
+          const sourcePage = await pdf.getPage(pageNumber);
+          const viewport = sourcePage.getViewport({ scale: PRINT_DPI / 72 });
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          await sourcePage.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+          canvases.push(canvas);
+          await nextFrame();
+        }
+      }
+      return canvases;
+    }
+
     function cropDocument(canvas) {
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       const { width, height } = canvas;
@@ -1246,23 +1274,36 @@
       return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageJpeg(canvas, dpi)));
     }
 
-    function showPrintLoading(printWindow) {
-      printWindow.document.open();
-      printWindow.document.write(`<!doctype html><html lang="ja"><head><title>印刷</title><style>
-        body { margin: 0; display: grid; min-height: 100vh; place-items: center; color: #475569; font-family: system-ui, sans-serif; font-weight: 700; }
-      </style></head><body>印刷を準備中です...</body></html>`);
-      printWindow.document.close();
-    }
+    function printCanvasesInCurrentWindow(canvases, pageBuilder) {
+      const pages = canvases.map((canvas) => pageBuilder(canvas, PRINT_DPI));
+      document.querySelector(".print-stage")?.remove();
+      document.getElementById("printStageStyle")?.remove();
 
-    function openPdfForPrint(printWindow, blob) {
-      const url = URL.createObjectURL(blob);
-      printWindow.document.open();
-      printWindow.document.write(`<!doctype html><html lang="ja"><head><title>印刷用PDF</title><style>
-        html, body, iframe { width: 100%; height: 100%; margin: 0; border: 0; }
-        body { background: #f3f4f6; }
-      </style></head><body><iframe src="${url}" title="印刷用PDF"></iframe></body></html>`);
-      printWindow.document.close();
-      setTimeout(() => URL.revokeObjectURL(url), 300_000);
+      const style = document.createElement("style");
+      style.id = "printStageStyle";
+      style.textContent = `@page portrait { size: 210mm 297mm; margin: 0; }
+        @page landscape { size: 297mm 210mm; margin: 0; }
+        @media print {
+          .print-stage .page.portrait { page: portrait; width: 210mm; height: 297mm; }
+          .print-stage .page.landscape { page: landscape; width: 297mm; height: 210mm; }
+        }`;
+      document.head.appendChild(style);
+
+      const stage = document.createElement("main");
+      stage.className = "print-stage";
+      pages.forEach(({ canvas, page }) => {
+        const section = document.createElement("section");
+        section.className = `page ${page.wMm > page.hMm ? "landscape" : "portrait"}`;
+        section.appendChild(canvas);
+        stage.appendChild(section);
+      });
+      document.body.appendChild(stage);
+
+      window.addEventListener("afterprint", () => {
+        stage.remove();
+        style.remove();
+      }, { once: true });
+      window.print();
     }
 
     async function buildMergedPdfBlob(files) {
@@ -1326,6 +1367,26 @@
       const y = Math.round((doc.height - targetH) / 2);
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(displayCanvas, x, y, targetW, targetH);
+      return { canvas: doc, page };
+    }
+
+    function buildMergedPageCanvas(canvas, dpi = DPI) {
+      const page = pageSizeForCanvas(canvas);
+      const pxPerMm = dpi / 25.4;
+      const doc = document.createElement("canvas");
+      doc.width = Math.round(page.wMm * pxPerMm);
+      doc.height = Math.round(page.hMm * pxPerMm);
+      const ctx = doc.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, doc.width, doc.height);
+      const box = { wMm: page.wMm - 10, hMm: page.hMm - 10 };
+      const fitted = fitWithin(canvas.width, canvas.height, box.wMm, box.hMm);
+      const targetW = Math.round(fitted.wMm * pxPerMm);
+      const targetH = Math.round(fitted.hMm * pxPerMm);
+      const x = Math.round((doc.width - targetW) / 2);
+      const y = Math.round((doc.height - targetH) / 2);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(canvas, x, y, targetW, targetH);
       return { canvas: doc, page };
     }
 

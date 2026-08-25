@@ -793,13 +793,10 @@
       showPrintLoading(printWindow);
       setActionButtonsDisabled(true);
       try {
-        setStatus("印刷用PDFを作成中です。");
+        setStatus("印刷用ページを準備中です。");
         await nextFrame();
-        if (isMergeMode()) {
-          openPdfPrintDialog(printWindow, await buildMergedPdfBlob(mergeFiles));
-        } else {
-          await openCanvasPrintDialog(printWindow, outputCanvases);
-        }
+        const mergeCanvases = await renderMergedPagesForPrint(mergeFiles);
+        await openCanvasPrintDialog(printWindow, mergeCanvases, buildMergedPageCanvas);
         setStatus("印刷ダイアログを開いています。");
       } catch (error) {
         console.error(error);
@@ -1114,6 +1111,28 @@
       return previews;
     }
 
+    async function renderMergedPagesForPrint(files) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+      const canvases = [];
+      let renderedPageCount = 0;
+      for (const file of files) {
+        const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+          renderedPageCount += 1;
+          setStatus(`印刷用ページを準備中です。${renderedPageCount}/${mergePageCount}`);
+          const sourcePage = await pdf.getPage(pageNumber);
+          const viewport = sourcePage.getViewport({ scale: PRINT_DPI / 72 });
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          await sourcePage.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+          canvases.push(canvas);
+          await nextFrame();
+        }
+      }
+      return canvases;
+    }
+
     function cropDocument(canvas) {
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       const { width, height } = canvas;
@@ -1304,31 +1323,33 @@
       window.print();
     }
 
-    async function openCanvasPrintDialog(printWindow, canvases) {
+    async function openCanvasPrintDialog(printWindow, canvases, pageBuilder = buildA4PageCanvas) {
       const pages = [];
       for (let index = 0; index < canvases.length; index++) {
         setStatus(`印刷用ページを準備中です。${index + 1}/${canvases.length}`);
-        pages.push(buildA4PageCanvas(canvases[index], PRINT_DPI));
+        pages.push(pageBuilder(canvases[index], PRINT_DPI));
         await nextFrame();
       }
 
-      const page = pages[0].page;
       printWindow.document.open();
       printWindow.document.write(`<!doctype html>
         <html lang="ja"><head><title>印刷</title><style>
-          @page { size: ${page.wMm}mm ${page.hMm}mm; margin: 0; }
+          @page portrait { size: 210mm 297mm; margin: 0; }
+          @page landscape { size: 297mm 210mm; margin: 0; }
           * { box-sizing: border-box; }
           html, body { margin: 0; padding: 0; background: #fff; }
-          .page { width: ${page.wMm}mm; height: ${page.hMm}mm; break-after: page; page-break-after: always; }
+          .page { break-after: page; page-break-after: always; }
+          .page.portrait { page: portrait; width: 210mm; height: 297mm; }
+          .page.landscape { page: landscape; width: 297mm; height: 210mm; }
           .page:last-child { break-after: auto; page-break-after: auto; }
           canvas { display: block; width: 100%; height: 100%; }
         </style></head><body><main id="printPages"></main></body></html>`);
       printWindow.document.close();
 
       const container = printWindow.document.getElementById("printPages");
-      pages.forEach(({ canvas }) => {
+      pages.forEach(({ canvas, page }) => {
         const section = printWindow.document.createElement("section");
-        section.className = "page";
+        section.className = `page ${page.wMm > page.hMm ? "landscape" : "portrait"}`;
         const printCanvas = printWindow.document.createElement("canvas");
         printCanvas.width = canvas.width;
         printCanvas.height = canvas.height;
@@ -1445,10 +1466,17 @@
     }
 
     function buildMergedPageJpeg(canvas) {
+      const { canvas: doc, page } = buildMergedPageCanvas(canvas, DPI);
+      const jpegData = atob(doc.toDataURL("image/jpeg", 0.92).split(",")[1]);
+      return { data: jpegData, width: doc.width, height: doc.height, page };
+    }
+
+    function buildMergedPageCanvas(canvas, dpi = DPI) {
       const page = pageSizeForCanvas(canvas);
       const doc = document.createElement("canvas");
-      doc.width = Math.round(page.wMm * MM_TO_PX);
-      doc.height = Math.round(page.hMm * MM_TO_PX);
+      const pxPerMm = dpi / 25.4;
+      doc.width = Math.round(page.wMm * pxPerMm);
+      doc.height = Math.round(page.hMm * pxPerMm);
       const ctx = doc.getContext("2d");
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, doc.width, doc.height);
@@ -1460,8 +1488,7 @@
       const y = Math.round((doc.height - targetH) / 2);
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(canvas, x, y, targetW, targetH);
-      const jpegData = atob(doc.toDataURL("image/jpeg", 0.92).split(",")[1]);
-      return { data: jpegData, width: doc.width, height: doc.height, page };
+      return { canvas: doc, page };
     }
 
     function rotateCanvas(canvas, rotation) {

@@ -772,7 +772,7 @@
         if (isMergeMode()) {
           openPdfPrintDialog(printWindow, await buildMergedPdfBlob(mergeFiles));
         } else {
-          openPdfPrintDialog(printWindow, buildOutputPdfBlob(outputCanvases, PRINT_DPI));
+          await openCanvasPrintDialog(printWindow, outputCanvases);
         }
         setStatus("印刷ダイアログを開いています。");
       } catch (error) {
@@ -1245,6 +1245,59 @@
 
     function buildOutputPdfBlob(canvases, dpi = DPI) {
       return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageJpeg(canvas, dpi)));
+    }
+
+    async function openCanvasPrintDialog(printWindow, canvases) {
+      const pages = [];
+      for (let index = 0; index < canvases.length; index++) {
+        setStatus(`印刷用ページを準備中です。${index + 1}/${canvases.length}`);
+        pages.push(buildA4PageCanvas(canvases[index], PRINT_DPI));
+        await nextFrame();
+      }
+
+      const page = pages[0].page;
+      printWindow.document.open();
+      printWindow.document.write(`<!doctype html>
+        <html lang="ja"><head><title>印刷</title><style>
+          @page { size: ${page.wMm}mm ${page.hMm}mm; margin: 0; }
+          * { box-sizing: border-box; }
+          html, body { margin: 0; padding: 0; background: #fff; }
+          .page { width: ${page.wMm}mm; height: ${page.hMm}mm; break-after: page; page-break-after: always; }
+          .page:last-child { break-after: auto; page-break-after: auto; }
+          canvas { display: block; width: 100%; height: 100%; }
+        </style></head><body><main id="printPages"></main></body></html>`);
+      printWindow.document.close();
+
+      const container = printWindow.document.getElementById("printPages");
+      pages.forEach(({ canvas }) => {
+        const section = printWindow.document.createElement("section");
+        section.className = "page";
+        const printCanvas = printWindow.document.createElement("canvas");
+        printCanvas.width = canvas.width;
+        printCanvas.height = canvas.height;
+        printCanvas.getContext("2d").drawImage(canvas, 0, 0);
+        section.appendChild(printCanvas);
+        container.appendChild(section);
+      });
+
+      await waitForPrintLayout(printWindow);
+      printWindow.focus();
+      printWindow.print();
+    }
+
+    function waitForPrintLayout(printWindow) {
+      return new Promise((resolve) => {
+        let resolved = false;
+        const done = () => {
+          if (resolved) return;
+          resolved = true;
+          resolve();
+        };
+        setTimeout(done, 250);
+        if (typeof printWindow.requestAnimationFrame === "function") {
+          printWindow.requestAnimationFrame(() => printWindow.requestAnimationFrame(done));
+        }
+      });
     }
 
     function showPrintLoading(printWindow) {

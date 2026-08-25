@@ -5,9 +5,8 @@ type AppCardProps = {
 };
 
 export function AppCard({ app }: AppCardProps) {
-  if (!app.url) {
-    return null;
-  }
+  const isAdjusting = app.availability === 'adjusting';
+  const isTrial = app.availability === 'trial';
 
   return (
     <article className="app-card">
@@ -23,10 +22,17 @@ export function AppCard({ app }: AppCardProps) {
       </div>
 
       <p className="app-description">{app.description}</p>
+      {isTrial ? <p className="app-availability trial">試作公開中</p> : null}
 
-      <a className="button primary" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}を新しいタブで開く`}>
-        このアプリを開く
-      </a>
+      {isAdjusting ? (
+        <button className="button disabled" type="button" aria-label={`${app.name}は調整中`} disabled>
+          調整中
+        </button>
+      ) : (
+        <a className="button primary" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}を新しいタブで開く`}>
+          このアプリを開く
+        </a>
+      )}
     </article>
   );
 }

@@ -1,4 +1,5 @@
 export type AppStatus = 'stable' | 'preview';
+export type AppAvailability = 'trial' | 'adjusting';
 
 export type PortalApp = {
   id: string;
@@ -10,9 +11,56 @@ export type PortalApp = {
   description: string;
   version: string;
   status: AppStatus;
+  availability?: AppAvailability;
 };
 
 export const appData: PortalApp[] = [
+  {
+    id: 'simple-genogram',
+    name: 'かんたんジェノグラム',
+    url: 'https://easy-genogram-app.vercel.app',
+    manualUrl: '',
+    icon: 'genogram',
+    iconImage: '/app-icons/genogram.png',
+    description: '家族関係を図で整理',
+    version: 'v1.0.0',
+    status: 'stable',
+  },
+  {
+    id: 'simple-floor-plan',
+    name: 'シンプル見取り図',
+    url: 'https://easy-floor-plan.vercel.app',
+    manualUrl: '',
+    icon: 'floorplan',
+    iconImage: '/app-icons/floor-plan.png',
+    description: '施設・住居の見取り図を作成',
+    version: 'v1.0.0',
+    status: 'preview',
+    availability: 'trial',
+  },
+  {
+    id: 'assessment-sheet',
+    name: 'アセスメントシート',
+    url: '',
+    manualUrl: '',
+    icon: 'assessment',
+    iconImage: '/app-icons/assessment.svg',
+    description: '利用者支援のアセスメントを整理',
+    version: 'v0.1.0',
+    status: 'preview',
+    availability: 'adjusting',
+  },
+  {
+    id: 'pdf-converter',
+    name: 'PDF変換アプリ',
+    url: 'https://pdf-converter-app-six.vercel.app',
+    manualUrl: '',
+    icon: 'pdf',
+    iconImage: '/app-icons/pdf-converter.png',
+    description: '証書PDFの変換・結合',
+    version: 'v1.0.0',
+    status: 'stable',
+  },
   {
     id: 'user-checklist',
     name: '利用者チェック表',
@@ -45,17 +93,7 @@ export const appData: PortalApp[] = [
     description: '文例管理',
     version: 'v0.8.0',
     status: 'preview',
-  },
-  {
-    id: 'pdf-converter',
-    name: 'PDF変換アプリ',
-    url: 'https://pdf-converter-app-six.vercel.app',
-    manualUrl: '',
-    icon: 'pdf',
-    iconImage: '/app-icons/pdf-converter.png',
-    description: '証書PDFの変換・結合',
-    version: 'v1.0.0',
-    status: 'stable',
+    availability: 'trial',
   },
   {
     id: 'shortcut-memo',
@@ -69,39 +107,6 @@ export const appData: PortalApp[] = [
     status: 'stable',
   },
   {
-    id: 'simple-floor-plan',
-    name: 'かんたん見取り図',
-    url: 'https://easy-floor-plan.vercel.app',
-    manualUrl: '',
-    icon: 'floorplan',
-    iconImage: '/app-icons/floor-plan.png',
-    description: '施設・住居の見取り図を作成',
-    version: 'v1.0.0',
-    status: 'stable',
-  },
-  {
-    id: 'simple-genogram',
-    name: 'かんたんジェノグラム',
-    url: 'https://easy-genogram-app.vercel.app',
-    manualUrl: '',
-    icon: 'genogram',
-    iconImage: '/app-icons/genogram.png',
-    description: '家族関係を図で整理',
-    version: 'v1.0.0',
-    status: 'stable',
-  },
-  {
-    id: 'assessment-sheet',
-    name: 'アセスメントシート',
-    url: '',
-    manualUrl: '',
-    icon: 'assessment',
-    iconImage: '/app-icons/assessment.svg',
-    description: '利用者支援のアセスメントを整理',
-    version: 'v0.1.0',
-    status: 'preview',
-  },
-  {
     id: 'service-slip-sorter',
     name: '提供票自動振り分け',
     url: 'https://service-slip-sorter.vercel.app',
@@ -110,6 +115,7 @@ export const appData: PortalApp[] = [
     description: '提供票PDFを事業所別に振り分け',
     version: 'v1.0.0',
     status: 'stable',
+    availability: 'adjusting',
   },
 ];
 

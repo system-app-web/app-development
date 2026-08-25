@@ -334,10 +334,20 @@ a {
 
 .app-description {
   flex: 1;
-  margin: 18px 0 20px;
+  margin: 18px 0 10px;
   color: #40516a;
   font-size: 1rem;
   line-height: 1.7;
+}
+
+.app-availability {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.app-availability.trial {
+  color: #c4541b;
 }
 
 .button {
@@ -505,9 +515,14 @@ a {
   }
 
   .app-description {
-    margin: 14px 0 16px;
+    margin: 14px 0 8px;
     font-size: 0.9rem;
     line-height: 1.55;
+  }
+
+  .app-availability {
+    margin-bottom: 12px;
+    font-size: 0.8rem;
   }
 
   .button {

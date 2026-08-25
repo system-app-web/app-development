@@ -12,7 +12,7 @@ export function AppList() {
       </div>
 
       <div className="app-grid">
-        {appData.filter((app) => app.url).map((app) => (
+        {appData.map((app) => (
           <MemoizedAppCard key={app.id} app={app} />
         ))}
       </div>

@@ -815,13 +815,12 @@
     });
 
     pencilUndoBtn.addEventListener("click", () => {
-      const annotations = pencilAnnotations[pencilCurrentPageIndex];
-      if (!annotations?.length) return;
-      annotations.pop();
-      pencilSelection = null;
-      refreshPencilOutput();
-      showPencilEditor();
-      saveModeState(currentDocType);
+      undoPencilAnnotation();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (!isPencilMode() || event.key.toLowerCase() !== "z" || (!event.ctrlKey && !event.metaKey)) return;
+      if (undoPencilAnnotation()) event.preventDefault();
     });
 
     pencilClearBtn.addEventListener("click", () => {
@@ -852,6 +851,19 @@
       showPencilEditor();
       saveModeState(currentDocType);
     });
+
+    function undoPencilAnnotation() {
+      const annotations = pencilAnnotations[pencilCurrentPageIndex];
+      if (!annotations?.length) return false;
+      annotations.pop();
+      pencilSelection = null;
+      pencilResize = null;
+      pencilMove = null;
+      refreshPencilOutput();
+      showPencilEditor();
+      saveModeState(currentDocType);
+      return true;
+    }
 
     async function updateContrastPreview() {
       if (isMergeMode() || isPencilMode()) return;

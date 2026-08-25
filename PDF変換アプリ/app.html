@@ -1861,6 +1861,12 @@
       }
     }
 
+    function releaseSingleUsePencilTool(tool) {
+      if (!["text", "blackout", "whiteout", "rect"].includes(tool)) return;
+      pencilTool = null;
+      updatePencilPalette();
+    }
+
     function startPencilDrawing(event) {
       if (!isPencilMode() || !loadedCanvases.length) return;
       const canvas = event.currentTarget;
@@ -1875,6 +1881,7 @@
         repaintPencilCanvas(canvas);
         openPencilTextEditor("", (text) => {
           pencilAnnotations[pencilCurrentPageIndex].push({ type: "text", ...point, color: pencilColor, text, fontScale: 1 });
+          releaseSingleUsePencilTool("text");
           refreshPencilOutput();
           showPencilEditor();
           saveModeState(currentDocType);
@@ -1939,6 +1946,7 @@
         saveModeState(currentDocType);
         return;
       }
+      if (!pencilTool) return;
       pencilDraft = pencilTool === "pen"
         ? { type: "pen", color: pencilColor, points: [point] }
         : { type: pencilTool, color: pencilColor, ...point, w: 0, h: 0 };
@@ -2021,9 +2029,11 @@
       const hasDrawing = pencilDraft.type === "pen"
         ? pencilDraft.points.length > 1
         : pencilDraft.w > 0.002 && pencilDraft.h > 0.002;
+      const completedTool = pencilDraft.type;
       if (hasDrawing) pencilAnnotations[pencilCurrentPageIndex].push(pencilDraft);
       pencilDraft = null;
       pencilSelection = null;
+      if (hasDrawing) releaseSingleUsePencilTool(completedTool);
       refreshPencilOutput();
       showPencilEditor();
       saveModeState(currentDocType);

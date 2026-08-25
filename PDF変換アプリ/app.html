@@ -473,6 +473,19 @@
       line-height: 1.5;
     }
 
+    .print-stage {
+      display: none;
+    }
+
+    @media print {
+      body { display: block; padding: 0; background: #fff; }
+      body > .app { display: none; }
+      .print-stage { display: block; }
+      .print-stage .page { break-after: page; page-break-after: always; }
+      .print-stage .page:last-child { break-after: auto; page-break-after: auto; }
+      .print-stage canvas { display: block; width: 100%; height: 100%; }
+    }
+
     @media (max-width: 640px) {
       body { padding: 12px; }
       .app { border-radius: 7px; }
@@ -759,6 +772,19 @@
 
     printBtn.addEventListener("click", async () => {
       if (isMergeMode() ? !mergeFiles.length : !outputCanvases.length) return;
+      if (!isMergeMode()) {
+        setActionButtonsDisabled(true);
+        try {
+          printCanvasesInCurrentWindow(outputCanvases);
+          setStatus("印刷ダイアログを開いています。");
+        } catch (error) {
+          console.error(error);
+          setStatus("印刷画面を開けませんでした。");
+        } finally {
+          setActionButtonsDisabled(false);
+        }
+        return;
+      }
       const printWindow = window.open("", "_blank");
       if (!printWindow) {
         setStatus("印刷画面を開けませんでした。ポップアップを許可して、もう一度お試しください。");
@@ -1245,6 +1271,37 @@
 
     function buildOutputPdfBlob(canvases, dpi = DPI) {
       return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageJpeg(canvas, dpi)));
+    }
+
+    function printCanvasesInCurrentWindow(canvases) {
+      const pages = canvases.map((canvas) => buildA4PageCanvas(canvas, PRINT_DPI));
+      const page = pages[0].page;
+      const existingStage = document.querySelector(".print-stage");
+      const existingStyle = document.getElementById("printStageStyle");
+      existingStage?.remove();
+      existingStyle?.remove();
+
+      const style = document.createElement("style");
+      style.id = "printStageStyle";
+      style.textContent = `@page { size: ${page.wMm}mm ${page.hMm}mm; margin: 0; }
+        @media print { .print-stage .page { width: ${page.wMm}mm; height: ${page.hMm}mm; } }`;
+      document.head.appendChild(style);
+
+      const stage = document.createElement("main");
+      stage.className = "print-stage";
+      pages.forEach(({ canvas }) => {
+        const section = document.createElement("section");
+        section.className = "page";
+        section.appendChild(canvas);
+        stage.appendChild(section);
+      });
+      document.body.appendChild(stage);
+
+      window.addEventListener("afterprint", () => {
+        stage.remove();
+        style.remove();
+      }, { once: true });
+      window.print();
     }
 
     async function openCanvasPrintDialog(printWindow, canvases) {

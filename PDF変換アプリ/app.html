@@ -92,7 +92,7 @@
 
     .doc-type {
       display: inline-grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: repeat(4, 1fr);
       gap: 6px;
       width: auto;
       margin: 0 30px;
@@ -230,6 +230,94 @@
 
     .control-row.hidden {
       display: none;
+    }
+
+    .pencil-palette {
+      margin: 18px 30px 0;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+      border: 1px solid #bcd5d1;
+      border-radius: 7px;
+      background: #f0f8f7;
+    }
+
+    .pencil-palette.hidden {
+      display: none;
+    }
+
+    .pencil-palette-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pencil-palette-label {
+      min-width: 46px;
+      color: #40505d;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .pencil-tool,
+    .pencil-action,
+    .pencil-page-btn {
+      width: auto;
+      min-height: 32px;
+      padding: 6px 10px;
+      border: 1px solid #b9c8cd;
+      border-radius: 5px;
+      background: #fff;
+      color: #40505d;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .pencil-tool.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .pencil-color {
+      width: 28px;
+      min-width: 28px;
+      height: 28px;
+      min-height: 28px;
+      padding: 0;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px #9aacb2;
+    }
+
+    .pencil-color.active {
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    .pencil-page-label {
+      min-width: 58px;
+      text-align: center;
+      color: #40505d;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .pencil-editor {
+      width: 100%;
+      display: grid;
+      place-items: center;
+    }
+
+    .pencil-canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 640px;
+      border: 1px solid #9cacb2;
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(24, 39, 49, .16);
+      touch-action: none;
+      cursor: crosshair;
     }
 
     .contrast-options {
@@ -491,9 +579,9 @@
       .app { border-radius: 7px; }
       .header { padding: 24px 20px 22px; }
       .doc-type-toolbar { margin: 20px 20px 8px; }
-      .doc-type { margin: 0 20px; gap: 4px; }
-      .doc-type label { min-height: 50px; font-size: 13px; line-height: 1.3; text-align: center; }
-      .notice, .rotation-tools, .control-row, .drop, .status, #saveBtn, #printBtn { margin-left: 20px; margin-right: 20px; }
+      .doc-type { margin: 0 20px; gap: 4px; grid-template-columns: 1fr 1fr; }
+      .doc-type label { min-height: 46px; font-size: 13px; line-height: 1.3; text-align: center; }
+      .notice, .rotation-tools, .control-row, .pencil-palette, .drop, .status, #saveBtn, #printBtn { margin-left: 20px; margin-right: 20px; }
       .drop { min-height: 340px; padding: 12px; }
     }
   </style>
@@ -515,6 +603,7 @@
       <label><input type="radio" name="docType" value="merge" checked><span>PDF結合</span></label>
       <label><input type="radio" name="docType" value="care"><span>介護保険証（横印刷）</span></label>
       <label><input type="radio" name="docType" value="burden"><span>負担割合証（縦印刷）</span></label>
+      <label><input type="radio" name="docType" value="pencil"><span>PDFペンシル</span></label>
     </div>
 
     <div class="notice"><strong>変換機能は白黒のみ対応です</strong><br>カラー・濃いグレースケールの書類は黒くなったり、影が出たりする場合があります。PDF結合は元のPDFをそのまま結合します。</div>
@@ -541,6 +630,32 @@
         <button class="size-btn" type="button" data-scale="0.9">小</button>
         <button class="size-btn active" type="button" data-scale="1">標準</button>
         <button class="size-btn" type="button" data-scale="1.12">大</button>
+      </div>
+    </div>
+
+    <div id="pencilPalette" class="pencil-palette hidden" aria-label="PDFペンシルのパレット">
+      <div class="pencil-palette-row">
+        <span class="pencil-palette-label">ツール</span>
+        <button class="pencil-tool active" type="button" data-pencil-tool="pen">ペン</button>
+        <button class="pencil-tool" type="button" data-pencil-tool="rect">四角形</button>
+        <button class="pencil-tool" type="button" data-pencil-tool="whiteout">白塗り</button>
+        <button class="pencil-tool" type="button" data-pencil-tool="blackout">黒塗り</button>
+        <button class="pencil-tool" type="button" data-pencil-tool="text">文字</button>
+      </div>
+      <div class="pencil-palette-row">
+        <span class="pencil-palette-label">色</span>
+        <button class="pencil-color active" type="button" data-pencil-color="#111827" style="background:#111827" title="黒"></button>
+        <button class="pencil-color" type="button" data-pencil-color="#b91c1c" style="background:#b91c1c" title="赤"></button>
+        <button class="pencil-color" type="button" data-pencil-color="#1d4ed8" style="background:#1d4ed8" title="青"></button>
+        <button class="pencil-color" type="button" data-pencil-color="#ffffff" style="background:#ffffff" title="白"></button>
+        <button id="pencilUndoBtn" class="pencil-action" type="button">元に戻す</button>
+        <button id="pencilClearBtn" class="pencil-action" type="button">このページを消去</button>
+      </div>
+      <div class="pencil-palette-row">
+        <span class="pencil-palette-label">ページ</span>
+        <button id="pencilPreviousBtn" class="pencil-page-btn" type="button">前へ</button>
+        <span id="pencilPageLabel" class="pencil-page-label">1 / 1</span>
+        <button id="pencilNextBtn" class="pencil-page-btn" type="button">次へ</button>
       </div>
     </div>
 
@@ -577,6 +692,14 @@
     const resetBtn = document.getElementById("resetBtn");
     const rotateLeftBtn = document.getElementById("rotateLeftBtn");
     const rotateRightBtn = document.getElementById("rotateRightBtn");
+    const pencilPalette = document.getElementById("pencilPalette");
+    const pencilToolButtons = Array.from(document.querySelectorAll(".pencil-tool"));
+    const pencilColorButtons = Array.from(document.querySelectorAll(".pencil-color"));
+    const pencilUndoBtn = document.getElementById("pencilUndoBtn");
+    const pencilClearBtn = document.getElementById("pencilClearBtn");
+    const pencilPreviousBtn = document.getElementById("pencilPreviousBtn");
+    const pencilNextBtn = document.getElementById("pencilNextBtn");
+    const pencilPageLabel = document.getElementById("pencilPageLabel");
     const contrastButtons = Array.from(document.querySelectorAll(".contrast-btn"));
     const sizeButtons = Array.from(document.querySelectorAll(".size-btn"));
     const statusEl = document.getElementById("status");
@@ -588,17 +711,23 @@
     let mergeFiles = [];
     let mergePageCount = 0;
     let mergePreviewCanvases = [];
+    let pencilAnnotations = [];
+    let pencilCurrentPageIndex = 0;
+    let pencilTool = "pen";
+    let pencilColor = "#111827";
+    let pencilDraft = null;
     let outputDirectory = null;
     let blackThreshold = 172;
     let sizeScale = 1;
     let orientationWorkerPromise = null;
-    const manualOrientationDirections = { merge: 0, care: 0, burden: 0 };
-    const manualOrientationEnabled = { merge: false, care: false, burden: false };
-    const manualUpsideDown = { merge: false, care: false, burden: false };
+    const manualOrientationDirections = { merge: 0, care: 0, burden: 0, pencil: 0 };
+    const manualOrientationEnabled = { merge: false, care: false, burden: false, pencil: false };
+    const manualUpsideDown = { merge: false, care: false, burden: false, pencil: false };
     const modeStates = {
       merge: emptyModeState(),
       care: emptyModeState(),
-      burden: emptyModeState()
+      burden: emptyModeState(),
+      pencil: emptyModeState()
     };
     let currentDocType = "merge";
 
@@ -606,6 +735,7 @@
     const selectedDocType = () => document.querySelector("input[name='docType']:checked").value;
     const selectedOrientation = () => selectedDocType() === "care" ? "landscape" : "portrait";
     const isMergeMode = () => selectedDocType() === "merge";
+    const isPencilMode = () => selectedDocType() === "pencil";
 
     document.querySelectorAll("input[name='docType']").forEach((input) => {
       input.addEventListener("change", () => {
@@ -647,8 +777,53 @@
       });
     });
 
+    pencilToolButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        pencilTool = button.dataset.pencilTool;
+        updatePencilPalette();
+      });
+    });
+
+    pencilColorButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        pencilColor = button.dataset.pencilColor;
+        updatePencilPalette();
+      });
+    });
+
+    pencilUndoBtn.addEventListener("click", () => {
+      const annotations = pencilAnnotations[pencilCurrentPageIndex];
+      if (!annotations?.length) return;
+      annotations.pop();
+      refreshPencilOutput();
+      showPencilEditor();
+      saveModeState(currentDocType);
+    });
+
+    pencilClearBtn.addEventListener("click", () => {
+      if (!pencilAnnotations[pencilCurrentPageIndex]?.length) return;
+      pencilAnnotations[pencilCurrentPageIndex] = [];
+      refreshPencilOutput();
+      showPencilEditor();
+      saveModeState(currentDocType);
+    });
+
+    pencilPreviousBtn.addEventListener("click", () => {
+      if (pencilCurrentPageIndex <= 0) return;
+      pencilCurrentPageIndex -= 1;
+      showPencilEditor();
+      saveModeState(currentDocType);
+    });
+
+    pencilNextBtn.addEventListener("click", () => {
+      if (pencilCurrentPageIndex >= loadedCanvases.length - 1) return;
+      pencilCurrentPageIndex += 1;
+      showPencilEditor();
+      saveModeState(currentDocType);
+    });
+
     async function updateContrastPreview() {
-      if (isMergeMode()) return;
+      if (isMergeMode() || isPencilMode()) return;
       showLoading();
       await nextFrame();
       if (!sourceCanvases.length && loadedCanvases.length) rebuildForCurrentMode();
@@ -730,6 +905,11 @@
           setStatus("PDFを結合して保存しました。");
           return;
         }
+        if (isPencilMode()) {
+          await saveSingleBlob(buildPencilPdfBlob(outputCanvases), "PDFペンシル.pdf");
+          setStatus("書き込み済みPDFを保存しました。");
+          return;
+        }
         if (outputCanvases.length > 1 && window.showDirectoryPicker) {
           if (!outputDirectory || !(await canWriteToDirectory(outputDirectory))) {
             outputDirectory = await window.showDirectoryPicker({
@@ -777,6 +957,8 @@
         if (isMergeMode()) {
           const mergeCanvases = await renderMergedPagesForPrint(mergeFiles);
           printCanvasesInCurrentWindow(mergeCanvases, buildMergedPageCanvas);
+        } else if (isPencilMode()) {
+          printCanvasesInCurrentWindow(outputCanvases, buildMergedPageCanvas);
         } else {
           printCanvasesInCurrentWindow(outputCanvases, buildA4PageCanvas);
         }
@@ -790,6 +972,7 @@
     });
 
     function buildSuggestedName(index) {
+      if (isPencilMode()) return "PDFペンシル.pdf";
       return outputCanvases.length === 1 ? "PDF変換.pdf" : `PDF変換_${index + 1}.pdf`;
     }
 
@@ -819,13 +1002,16 @@
     }
 
     function updateControlsVisibility() {
-      document.querySelector(".contrast").classList.toggle("hidden", isMergeMode());
-      document.querySelector(".size-control").classList.toggle("hidden", isMergeMode());
+      const hideConversionControls = isMergeMode() || isPencilMode();
+      document.querySelector(".contrast").classList.toggle("hidden", hideConversionControls);
+      document.querySelector(".size-control").classList.toggle("hidden", hideConversionControls);
+      pencilPalette.classList.toggle("hidden", !isPencilMode());
+      if (isPencilMode()) updatePencilPalette();
     }
 
     function updateRotationButtons() {
       const type = selectedDocType();
-      document.querySelector(".rotation-tools").classList.toggle("hidden", isMergeMode());
+      document.querySelector(".rotation-tools").classList.toggle("hidden", isMergeMode() || isPencilMode());
       rotateLeftBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === 270);
       rotateRightBtn.classList.toggle("active", manualOrientationEnabled[type] && manualOrientationDirections[type] === 90);
     }
@@ -840,7 +1026,7 @@
 
     function rebuildForManualOrientation() {
       updateRotationButtons();
-      if (!loadedCanvases.length || isMergeMode()) return;
+      if (!loadedCanvases.length || isMergeMode() || isPencilMode()) return;
       setActionButtonsDisabled(true);
       showLoading();
       requestAnimationFrame(() => {
@@ -874,12 +1060,16 @@
       mergeFiles = [];
       mergePageCount = 0;
       mergePreviewCanvases = [];
+      pencilAnnotations = [];
+      pencilCurrentPageIndex = 0;
+      pencilDraft = null;
       manualOrientationDirections[type] = 0;
       manualOrientationEnabled[type] = false;
       manualUpsideDown[type] = false;
       setActionButtonsDisabled(true);
       showPlaceholder();
       updateRotationButtons();
+      updateControlsVisibility();
       setStatus(modeStatusText());
       saveModeState(currentDocType);
     }
@@ -894,6 +1084,8 @@
         mergeFiles: [],
         mergePageCount: 0,
         mergePreviewCanvases: [],
+        pencilAnnotations: [],
+        pencilCurrentPageIndex: 0,
         blackThreshold: 172,
         sizeScale: 1
       };
@@ -909,6 +1101,8 @@
         mergeFiles: [...mergeFiles],
         mergePageCount,
         mergePreviewCanvases: [...mergePreviewCanvases],
+        pencilAnnotations: clonePencilAnnotations(pencilAnnotations),
+        pencilCurrentPageIndex,
         blackThreshold,
         sizeScale
       };
@@ -924,6 +1118,9 @@
       mergeFiles = [...state.mergeFiles];
       mergePageCount = state.mergePageCount;
       mergePreviewCanvases = [...(state.mergePreviewCanvases || [])];
+      pencilAnnotations = clonePencilAnnotations(state.pencilAnnotations || []);
+      pencilCurrentPageIndex = Math.min(state.pencilCurrentPageIndex || 0, Math.max(0, loadedCanvases.length - 1));
+      pencilDraft = null;
       blackThreshold = state.blackThreshold;
       sizeScale = state.sizeScale;
       updateContrastButtons();
@@ -933,9 +1130,12 @@
       setActionButtonsDisabled(!hasOutput);
       if (hasOutput) {
         if (isMergeMode()) showMergeSummary();
+        else if (isPencilMode()) showPencilEditor();
         else showPreview();
         setStatus(isMergeMode()
           ? `${mergeFiles.length}件・${mergePageCount}ページ分のPDF結合準備が完了しました。`
+          : isPencilMode()
+            ? `${outputCanvases.length}ページ分のPDFを編集できます。`
           : `${outputCanvases.length}ページ分の切り抜きと白黒変換が完了しました。`);
       } else {
         showPlaceholder();
@@ -945,6 +1145,7 @@
 
     function modeStatusText() {
       if (isMergeMode()) return "複数のPDFをドラッグすると、1つのPDFに結合します。";
+      if (isPencilMode()) return "PDFをドラッグすると、文字や図形を書き込めます。";
       return "A4白背景の中央に配置します。出力は白黒PDFのみです。";
     }
 
@@ -987,6 +1188,22 @@
           showMergeSummary();
           setActionButtonsDisabled(false);
           setStatus(`${mergeFiles.length}件・${mergePageCount}ページ分のPDF結合準備が完了しました。`);
+          return;
+        }
+        if (isPencilMode()) {
+          for (const file of files) {
+            if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
+              throw new Error("pencil mode accepts only PDF files");
+            }
+            loadedCanvases.push(...await renderPdfPages(file));
+          }
+          pencilAnnotations = loadedCanvases.map(() => []);
+          pencilCurrentPageIndex = 0;
+          refreshPencilOutput();
+          saveModeState(currentDocType);
+          showPencilEditor();
+          setActionButtonsDisabled(false);
+          setStatus(`${outputCanvases.length}ページ分のPDFを編集できます。`);
           return;
         }
         for (const file of files) {
@@ -1183,6 +1400,10 @@
         outputCanvases = [...loadedCanvases];
         return;
       }
+      if (isPencilMode()) {
+        refreshPencilOutput();
+        return;
+      }
       for (let index = 0; index < loadedCanvases.length; index++) {
         const type = selectedDocType();
         const correction = pageRotationCorrections[index] ?? 0;
@@ -1215,9 +1436,196 @@
     }
 
     function showPreview(canvas = outputCanvases[0]) {
+      if (isPencilMode()) {
+        showPencilEditor();
+        return;
+      }
       drop.innerHTML = "";
       drop.classList.toggle("merge-preview", isMergeMode());
       drop.appendChild(buildPreviewSheet(canvas));
+    }
+
+    function clonePencilAnnotations(annotations) {
+      return annotations.map((page) => page.map((annotation) => ({
+        ...annotation,
+        points: annotation.points ? annotation.points.map((point) => ({ ...point })) : undefined
+      })));
+    }
+
+    function refreshPencilOutput() {
+      outputCanvases = loadedCanvases.map((_, index) => renderPencilPage(index));
+    }
+
+    function renderPencilPage(pageIndex, draft = null) {
+      const source = loadedCanvases[pageIndex];
+      const canvas = document.createElement("canvas");
+      canvas.width = source.width;
+      canvas.height = source.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(source, 0, 0);
+      (pencilAnnotations[pageIndex] || []).forEach((annotation) => drawPencilAnnotation(ctx, canvas, annotation));
+      if (draft) drawPencilAnnotation(ctx, canvas, draft);
+      return canvas;
+    }
+
+    function drawPencilAnnotation(ctx, canvas, annotation) {
+      const pointX = (point) => point.x * canvas.width;
+      const pointY = (point) => point.y * canvas.height;
+      const lineWidth = Math.max(3, Math.round(canvas.width * 0.003));
+      ctx.save();
+      if (annotation.type === "pen") {
+        const points = annotation.points || [];
+        if (!points.length) {
+          ctx.restore();
+          return;
+        }
+        ctx.strokeStyle = annotation.color;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(pointX(points[0]), pointY(points[0]));
+        points.slice(1).forEach((point) => ctx.lineTo(pointX(point), pointY(point)));
+        ctx.stroke();
+        if (points.length === 1) {
+          ctx.fillStyle = annotation.color;
+          ctx.beginPath();
+          ctx.arc(pointX(points[0]), pointY(points[0]), lineWidth / 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (annotation.type === "text") {
+        ctx.fillStyle = annotation.color;
+        ctx.font = `${Math.max(20, Math.round(canvas.width * 0.035))}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
+        ctx.textBaseline = "top";
+        ctx.fillText(annotation.text, pointX(annotation), pointY(annotation));
+      } else {
+        const x = pointX(annotation);
+        const y = pointY(annotation);
+        const width = annotation.w * canvas.width;
+        const height = annotation.h * canvas.height;
+        if (annotation.type === "whiteout" || annotation.type === "blackout") {
+          ctx.fillStyle = annotation.type === "whiteout" ? "#ffffff" : "#111827";
+          ctx.fillRect(x, y, width, height);
+        } else {
+          ctx.strokeStyle = annotation.color;
+          ctx.lineWidth = lineWidth;
+          ctx.strokeRect(x, y, width, height);
+        }
+      }
+      ctx.restore();
+    }
+
+    function showPencilEditor() {
+      drop.classList.remove("merge-preview");
+      drop.innerHTML = "";
+      if (!loadedCanvases.length) {
+        showPlaceholder();
+        updatePencilPalette();
+        return;
+      }
+      const editor = document.createElement("div");
+      editor.className = "pencil-editor";
+      const canvas = renderPencilPage(pencilCurrentPageIndex);
+      canvas.className = "pencil-canvas";
+      canvas.setAttribute("aria-label", `PDF ${pencilCurrentPageIndex + 1}ページ目の編集画面`);
+      canvas.addEventListener("pointerdown", startPencilDrawing);
+      canvas.addEventListener("pointermove", continuePencilDrawing);
+      canvas.addEventListener("pointerup", finishPencilDrawing);
+      canvas.addEventListener("pointercancel", finishPencilDrawing);
+      editor.appendChild(canvas);
+      drop.appendChild(editor);
+      updatePencilPalette();
+    }
+
+    function pencilPoint(event, canvas) {
+      const bounds = canvas.getBoundingClientRect();
+      return {
+        x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
+        y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height))
+      };
+    }
+
+    function startPencilDrawing(event) {
+      if (!isPencilMode() || !loadedCanvases.length) return;
+      const canvas = event.currentTarget;
+      const point = pencilPoint(event, canvas);
+      if (pencilTool === "text") {
+        const text = window.prompt("書き込む文字を入力してください。", "");
+        if (!text) return;
+        pencilAnnotations[pencilCurrentPageIndex].push({ type: "text", ...point, color: pencilColor, text });
+        refreshPencilOutput();
+        showPencilEditor();
+        saveModeState(currentDocType);
+        return;
+      }
+      pencilDraft = pencilTool === "pen"
+        ? { type: "pen", color: pencilColor, points: [point] }
+        : { type: pencilTool, color: pencilColor, ...point, w: 0, h: 0 };
+      canvas.setPointerCapture(event.pointerId);
+      repaintPencilCanvas(canvas);
+    }
+
+    function continuePencilDrawing(event) {
+      if (!pencilDraft) return;
+      const point = pencilPoint(event, event.currentTarget);
+      if (pencilDraft.type === "pen") {
+        pencilDraft.points.push(point);
+      } else {
+        pencilDraft.w = point.x - pencilDraft.x;
+        pencilDraft.h = point.y - pencilDraft.y;
+      }
+      repaintPencilCanvas(event.currentTarget);
+    }
+
+    function finishPencilDrawing(event) {
+      if (!pencilDraft) return;
+      const canvas = event.currentTarget;
+      const point = pencilPoint(event, canvas);
+      if (pencilDraft.type === "pen") {
+        pencilDraft.points.push(point);
+      } else {
+        pencilDraft.w = point.x - pencilDraft.x;
+        pencilDraft.h = point.y - pencilDraft.y;
+        if (pencilDraft.w < 0) {
+          pencilDraft.x += pencilDraft.w;
+          pencilDraft.w = Math.abs(pencilDraft.w);
+        }
+        if (pencilDraft.h < 0) {
+          pencilDraft.y += pencilDraft.h;
+          pencilDraft.h = Math.abs(pencilDraft.h);
+        }
+      }
+      const hasDrawing = pencilDraft.type === "pen"
+        ? pencilDraft.points.length > 1
+        : pencilDraft.w > 0.002 && pencilDraft.h > 0.002;
+      if (hasDrawing) pencilAnnotations[pencilCurrentPageIndex].push(pencilDraft);
+      pencilDraft = null;
+      refreshPencilOutput();
+      showPencilEditor();
+      saveModeState(currentDocType);
+    }
+
+    function repaintPencilCanvas(canvas) {
+      const page = renderPencilPage(pencilCurrentPageIndex, pencilDraft);
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(page, 0, 0);
+    }
+
+    function updatePencilPalette() {
+      const pageCount = loadedCanvases.length;
+      pencilToolButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.pencilTool === pencilTool);
+      });
+      pencilColorButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.pencilColor === pencilColor);
+      });
+      pencilPageLabel.textContent = pageCount ? `${pencilCurrentPageIndex + 1} / ${pageCount}` : "1 / 1";
+      pencilPreviousBtn.disabled = pencilCurrentPageIndex <= 0;
+      pencilNextBtn.disabled = !pageCount || pencilCurrentPageIndex >= pageCount - 1;
+      const hasAnnotations = Boolean(pencilAnnotations[pencilCurrentPageIndex]?.length);
+      pencilUndoBtn.disabled = !hasAnnotations;
+      pencilClearBtn.disabled = !hasAnnotations;
     }
 
     function showMergeSummary() {
@@ -1268,6 +1676,16 @@
     function buildPdfBlob(canvas) {
       const pageImages = [buildA4PageJpeg(canvas)];
       return objectsToPdfBlobFromPageImages(pageImages);
+    }
+
+    function buildPencilPdfBlob(canvases) {
+      return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildPencilPageJpeg(canvas)));
+    }
+
+    function buildPencilPageJpeg(canvas, dpi = DPI) {
+      const { canvas: doc, page } = buildMergedPageCanvas(canvas, dpi);
+      const jpegData = atob(doc.toDataURL("image/jpeg", 0.92).split(",")[1]);
+      return { data: jpegData, width: doc.width, height: doc.height, page };
     }
 
     function buildOutputPdfBlob(canvases, dpi = DPI) {

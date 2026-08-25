@@ -1724,7 +1724,9 @@
       const y = bounds.y * canvas.height;
       const width = bounds.w * canvas.width;
       const height = bounds.h * canvas.height;
-      const handleSize = Math.max(6, Math.round(Math.min(canvas.width, canvas.height) * 0.006));
+      const handleSize = annotation.type === "blackCircle"
+        ? Math.max(6, Math.round(Math.min(canvas.width, canvas.height) * 0.006))
+        : Math.max(10, Math.round(Math.min(canvas.width, canvas.height) * 0.014));
       ctx.save();
       ctx.strokeStyle = "#2563eb";
       ctx.lineWidth = Math.max(2, Math.round(canvas.width * 0.0018));
@@ -1795,7 +1797,8 @@
       const bounds = pencilAnnotationBounds(annotation);
       if (!bounds) return null;
       const displayBounds = canvas.getBoundingClientRect();
-      const threshold = Math.max(5 / displayBounds.width, 5 / displayBounds.height);
+      const handleReach = annotation.type === "blackCircle" ? 5 : 10;
+      const threshold = Math.max(handleReach / displayBounds.width, handleReach / displayBounds.height);
       const handles = {
         topLeft: { x: bounds.x, y: bounds.y },
         topRight: { x: bounds.x + bounds.w, y: bounds.y },

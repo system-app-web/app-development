@@ -651,11 +651,12 @@
     <div id="pencilPalette" class="pencil-palette hidden" aria-label="PDFペンシルのパレット">
       <div class="pencil-palette-row">
         <span class="pencil-palette-label">ツール</span>
+        <button class="pencil-tool" type="button" data-pencil-tool="text">文字入力</button>
         <button class="pencil-tool active" type="button" data-pencil-tool="pen">ペン</button>
-        <button class="pencil-tool" type="button" data-pencil-tool="rect">四角形</button>
-        <button class="pencil-tool" type="button" data-pencil-tool="whiteout">白塗り</button>
-        <button class="pencil-tool" type="button" data-pencil-tool="blackout">黒塗り</button>
-        <button class="pencil-tool" type="button" data-pencil-tool="text">文字</button>
+        <button class="pencil-tool" type="button" data-pencil-tool="blackCircle">見え消し（黒丸）</button>
+        <button class="pencil-tool" type="button" data-pencil-tool="blackout">黒塗り四角</button>
+        <button class="pencil-tool" type="button" data-pencil-tool="whiteout">白塗り四角</button>
+        <button class="pencil-tool" type="button" data-pencil-tool="rect">四角枠</button>
       </div>
       <div class="pencil-palette-row">
         <span class="pencil-palette-label">色</span>
@@ -731,6 +732,8 @@
     let pencilTool = "pen";
     let pencilColor = "#111827";
     let pencilDraft = null;
+    let pencilSelection = null;
+    let pencilResize = null;
     let outputDirectory = null;
     let blackThreshold = 172;
     let sizeScale = 1;
@@ -810,6 +813,7 @@
       const annotations = pencilAnnotations[pencilCurrentPageIndex];
       if (!annotations?.length) return;
       annotations.pop();
+      pencilSelection = null;
       refreshPencilOutput();
       showPencilEditor();
       saveModeState(currentDocType);
@@ -818,6 +822,7 @@
     pencilClearBtn.addEventListener("click", () => {
       if (!pencilAnnotations[pencilCurrentPageIndex]?.length) return;
       pencilAnnotations[pencilCurrentPageIndex] = [];
+      pencilSelection = null;
       refreshPencilOutput();
       showPencilEditor();
       saveModeState(currentDocType);
@@ -826,6 +831,8 @@
     pencilPreviousBtn.addEventListener("click", () => {
       if (pencilCurrentPageIndex <= 0) return;
       pencilCurrentPageIndex -= 1;
+      pencilSelection = null;
+      pencilResize = null;
       showPencilEditor();
       saveModeState(currentDocType);
     });
@@ -833,6 +840,8 @@
     pencilNextBtn.addEventListener("click", () => {
       if (pencilCurrentPageIndex >= loadedCanvases.length - 1) return;
       pencilCurrentPageIndex += 1;
+      pencilSelection = null;
+      pencilResize = null;
       showPencilEditor();
       saveModeState(currentDocType);
     });
@@ -1079,6 +1088,8 @@
       pencilAnnotations = [];
       pencilCurrentPageIndex = 0;
       pencilDraft = null;
+      pencilSelection = null;
+      pencilResize = null;
       manualOrientationDirections[type] = 0;
       manualOrientationEnabled[type] = false;
       manualUpsideDown[type] = false;
@@ -1137,6 +1148,8 @@
       pencilAnnotations = clonePencilAnnotations(state.pencilAnnotations || []);
       pencilCurrentPageIndex = Math.min(state.pencilCurrentPageIndex || 0, Math.max(0, loadedCanvases.length - 1));
       pencilDraft = null;
+      pencilSelection = null;
+      pencilResize = null;
       blackThreshold = state.blackThreshold;
       sizeScale = state.sizeScale;
       updateContrastButtons();
@@ -1215,6 +1228,8 @@
           }
           pencilAnnotations = loadedCanvases.map(() => []);
           pencilCurrentPageIndex = 0;
+          pencilSelection = null;
+          pencilResize = null;
           refreshPencilOutput();
           saveModeState(currentDocType);
           showPencilEditor();
@@ -1511,7 +1526,8 @@
         }
       } else if (annotation.type === "text") {
         ctx.fillStyle = annotation.color;
-        ctx.font = `${Math.max(20, Math.round(canvas.width * 0.035))}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
+        const fontScale = annotation.fontScale || 1;
+        ctx.font = `${Math.max(20, Math.round(canvas.width * 0.035 * fontScale))}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
         ctx.textBaseline = "top";
         ctx.fillText(annotation.text, pointX(annotation), pointY(annotation));
       } else {
@@ -1522,12 +1538,68 @@
         if (annotation.type === "whiteout" || annotation.type === "blackout") {
           ctx.fillStyle = annotation.type === "whiteout" ? "#ffffff" : "#111827";
           ctx.fillRect(x, y, width, height);
+        } else if (annotation.type === "blackCircle") {
+          ctx.fillStyle = "#111827";
+          ctx.beginPath();
+          ctx.ellipse(x + width / 2, y + height / 2, Math.abs(width) / 2, Math.abs(height) / 2, 0, 0, Math.PI * 2);
+          ctx.fill();
         } else {
           ctx.strokeStyle = annotation.color;
           ctx.lineWidth = lineWidth;
           ctx.strokeRect(x, y, width, height);
         }
       }
+      ctx.restore();
+    }
+
+    function pencilAnnotationBounds(annotation) {
+      if (annotation.type === "pen") {
+        const points = annotation.points || [];
+        if (!points.length) return null;
+        const xs = points.map((point) => point.x);
+        const ys = points.map((point) => point.y);
+        const padding = 0.01;
+        const minX = Math.max(0, Math.min(...xs) - padding);
+        const minY = Math.max(0, Math.min(...ys) - padding);
+        const maxX = Math.min(1, Math.max(...xs) + padding);
+        const maxY = Math.min(1, Math.max(...ys) + padding);
+        return { x: minX, y: minY, w: Math.max(0.02, maxX - minX), h: Math.max(0.02, maxY - minY) };
+      }
+      if (annotation.type === "text") {
+        const fontScale = annotation.fontScale || 1;
+        return {
+          x: annotation.x,
+          y: annotation.y,
+          w: Math.max(0.06, annotation.text.length * 0.037 * fontScale),
+          h: 0.055 * fontScale
+        };
+      }
+      return { x: annotation.x, y: annotation.y, w: annotation.w, h: annotation.h };
+    }
+
+    function drawPencilSelection(ctx, canvas) {
+      if (!pencilSelection || pencilSelection.pageIndex !== pencilCurrentPageIndex) return;
+      const annotation = pencilAnnotations[pencilSelection.pageIndex]?.[pencilSelection.annotationIndex];
+      if (!annotation) return;
+      const bounds = pencilAnnotationBounds(annotation);
+      if (!bounds) return;
+      const x = bounds.x * canvas.width;
+      const y = bounds.y * canvas.height;
+      const width = bounds.w * canvas.width;
+      const height = bounds.h * canvas.height;
+      const handleSize = Math.max(16, Math.round(Math.min(canvas.width, canvas.height) * 0.024));
+      ctx.save();
+      ctx.strokeStyle = "#2563eb";
+      ctx.lineWidth = Math.max(2, Math.round(canvas.width * 0.0018));
+      ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 2]);
+      ctx.strokeRect(x, y, width, height);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#2563eb";
+      [[x, y], [x + width, y], [x, y + height], [x + width, y + height]].forEach(([handleX, handleY]) => {
+        ctx.fillRect(handleX - handleSize / 2, handleY - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(handleX - handleSize / 2, handleY - handleSize / 2, handleSize, handleSize);
+      });
       ctx.restore();
     }
 
@@ -1542,6 +1614,7 @@
       const editor = document.createElement("div");
       editor.className = "pencil-editor";
       const canvas = renderPencilPage(pencilCurrentPageIndex);
+      drawPencilSelection(canvas.getContext("2d"), canvas);
       canvas.className = "pencil-canvas";
       canvas.setAttribute("aria-label", `PDF ${pencilCurrentPageIndex + 1}ページ目の編集画面`);
       canvas.addEventListener("pointerdown", startPencilDrawing);
@@ -1561,14 +1634,103 @@
       };
     }
 
+    function findPencilAnnotationAtPoint(point) {
+      const annotations = pencilAnnotations[pencilCurrentPageIndex] || [];
+      for (let index = annotations.length - 1; index >= 0; index--) {
+        const bounds = pencilAnnotationBounds(annotations[index]);
+        if (!bounds) continue;
+        if (point.x >= bounds.x && point.x <= bounds.x + bounds.w
+          && point.y >= bounds.y && point.y <= bounds.y + bounds.h) {
+          return index;
+        }
+      }
+      return null;
+    }
+
+    function findPencilHandle(point, canvas) {
+      if (!pencilSelection || pencilSelection.pageIndex !== pencilCurrentPageIndex) return null;
+      const annotation = pencilAnnotations[pencilSelection.pageIndex]?.[pencilSelection.annotationIndex];
+      if (!annotation) return null;
+      const bounds = pencilAnnotationBounds(annotation);
+      if (!bounds) return null;
+      const displayBounds = canvas.getBoundingClientRect();
+      const threshold = Math.max(14 / displayBounds.width, 14 / displayBounds.height);
+      const handles = {
+        topLeft: { x: bounds.x, y: bounds.y },
+        topRight: { x: bounds.x + bounds.w, y: bounds.y },
+        bottomLeft: { x: bounds.x, y: bounds.y + bounds.h },
+        bottomRight: { x: bounds.x + bounds.w, y: bounds.y + bounds.h }
+      };
+      return Object.entries(handles).find(([, handle]) => (
+        Math.abs(point.x - handle.x) <= threshold && Math.abs(point.y - handle.y) <= threshold
+      ))?.[0] || null;
+    }
+
+    function resizedPencilBounds(bounds, handle, point) {
+      let left = bounds.x;
+      let top = bounds.y;
+      let right = bounds.x + bounds.w;
+      let bottom = bounds.y + bounds.h;
+      if (handle.includes("Left")) left = point.x;
+      if (handle.includes("Right")) right = point.x;
+      if (handle.includes("top")) top = point.y;
+      if (handle.includes("bottom")) bottom = point.y;
+      const x = Math.max(0, Math.min(left, right));
+      const y = Math.max(0, Math.min(top, bottom));
+      const maxX = Math.min(1, Math.max(left, right));
+      const maxY = Math.min(1, Math.max(top, bottom));
+      return { x, y, w: Math.max(0.01, maxX - x), h: Math.max(0.01, maxY - y) };
+    }
+
+    function applyPencilResize(annotation, startBounds, targetBounds) {
+      if (annotation.type === "pen") {
+        const scaleX = targetBounds.w / startBounds.w;
+        const scaleY = targetBounds.h / startBounds.h;
+        annotation.points = annotation.points.map((point) => ({
+          x: targetBounds.x + (point.x - startBounds.x) * scaleX,
+          y: targetBounds.y + (point.y - startBounds.y) * scaleY
+        }));
+      } else if (annotation.type === "text") {
+        annotation.x = targetBounds.x;
+        annotation.y = targetBounds.y;
+        annotation.fontScale = (annotation.fontScale || 1) * Math.max(targetBounds.w / startBounds.w, targetBounds.h / startBounds.h);
+      } else {
+        annotation.x = targetBounds.x;
+        annotation.y = targetBounds.y;
+        annotation.w = targetBounds.w;
+        annotation.h = targetBounds.h;
+      }
+    }
+
     function startPencilDrawing(event) {
       if (!isPencilMode() || !loadedCanvases.length) return;
       const canvas = event.currentTarget;
       const point = pencilPoint(event, canvas);
+      const handle = findPencilHandle(point, canvas);
+      if (handle) {
+        const annotation = pencilAnnotations[pencilCurrentPageIndex][pencilSelection.annotationIndex];
+        pencilResize = {
+          handle,
+          annotationIndex: pencilSelection.annotationIndex,
+          startBounds: pencilAnnotationBounds(annotation),
+          annotation: clonePencilAnnotations([[annotation]])[0][0]
+        };
+        canvas.setPointerCapture(event.pointerId);
+        return;
+      }
+      const existingAnnotationIndex = findPencilAnnotationAtPoint(point);
+      if (existingAnnotationIndex !== null) {
+        pencilSelection = { pageIndex: pencilCurrentPageIndex, annotationIndex: existingAnnotationIndex };
+        pencilDraft = null;
+        repaintPencilCanvas(canvas);
+        return;
+      }
+      pencilSelection = null;
+      repaintPencilCanvas(canvas);
       if (pencilTool === "text") {
         const text = window.prompt("書き込む文字を入力してください。", "");
         if (!text) return;
-        pencilAnnotations[pencilCurrentPageIndex].push({ type: "text", ...point, color: pencilColor, text });
+        pencilAnnotations[pencilCurrentPageIndex].push({ type: "text", ...point, color: pencilColor, text, fontScale: 1 });
         refreshPencilOutput();
         showPencilEditor();
         saveModeState(currentDocType);
@@ -1582,6 +1744,13 @@
     }
 
     function continuePencilDrawing(event) {
+      if (pencilResize) {
+        const annotation = pencilAnnotations[pencilCurrentPageIndex][pencilResize.annotationIndex];
+        Object.assign(annotation, clonePencilAnnotations([[pencilResize.annotation]])[0][0]);
+        applyPencilResize(annotation, pencilResize.startBounds, resizedPencilBounds(pencilResize.startBounds, pencilResize.handle, pencilPoint(event, event.currentTarget)));
+        repaintPencilCanvas(event.currentTarget);
+        return;
+      }
       if (!pencilDraft) return;
       const point = pencilPoint(event, event.currentTarget);
       if (pencilDraft.type === "pen") {
@@ -1594,6 +1763,16 @@
     }
 
     function finishPencilDrawing(event) {
+      if (pencilResize) {
+        const annotation = pencilAnnotations[pencilCurrentPageIndex][pencilResize.annotationIndex];
+        Object.assign(annotation, clonePencilAnnotations([[pencilResize.annotation]])[0][0]);
+        applyPencilResize(annotation, pencilResize.startBounds, resizedPencilBounds(pencilResize.startBounds, pencilResize.handle, pencilPoint(event, event.currentTarget)));
+        pencilResize = null;
+        refreshPencilOutput();
+        showPencilEditor();
+        saveModeState(currentDocType);
+        return;
+      }
       if (!pencilDraft) return;
       const canvas = event.currentTarget;
       const point = pencilPoint(event, canvas);
@@ -1616,6 +1795,7 @@
         : pencilDraft.w > 0.002 && pencilDraft.h > 0.002;
       if (hasDrawing) pencilAnnotations[pencilCurrentPageIndex].push(pencilDraft);
       pencilDraft = null;
+      pencilSelection = null;
       refreshPencilOutput();
       showPencilEditor();
       saveModeState(currentDocType);
@@ -1626,6 +1806,7 @@
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(page, 0, 0);
+      drawPencilSelection(ctx, canvas);
     }
 
     function updatePencilPalette() {

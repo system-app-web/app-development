@@ -1128,6 +1128,7 @@
     async function saveSingleBlob(blob, suggestedName) {
       if (window.showSaveFilePicker) {
         const handle = await window.showSaveFilePicker({
+          id: "pdf-converter-output",
           suggestedName,
           startIn: "desktop",
           types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }]

@@ -288,8 +288,8 @@ function renderContent(){
     let h=`<div class="action-bar"><h2>${escHtml(title)} <span class="count-label">${f.length}件</span></h2></div>`;
     if(!f.length){h+='<div class="empty-msg">該当なし</div>';}
     else{
-      h+=`<table class="facility-table"><thead><tr><th>利用者</th><th>事業所名（担当者名）</th><th>FAX番号</th><th>カテゴリ</th><th></th></tr></thead><tbody>`;
-      f.forEach(r=>{h+=`<tr><td style="white-space:nowrap">${escHtml(getDisplayName(r.name))}</td><td>${escHtml(r.facility)}</td><td><span class="fax-number">${escHtml(r.fax)}</span></td><td><span class="cat-badge ${catClass(r.category)}">${escHtml(r.category)}</span></td><td><button class="copy-btn" onclick="copyFax(this,'${escHtml(r.fax)}')">コピー</button></td></tr>`;});
+      h+=`<table class="facility-table"><thead><tr><th>利用者</th><th>事業所名（担当者名）</th><th>FAX番号</th><th>カテゴリ</th><th>操作</th></tr></thead><tbody>`;
+      f.forEach(r=>{const gi=allData.indexOf(r);h+=`<tr><td style="white-space:nowrap">${escHtml(getDisplayName(r.name))}</td><td>${escHtml(r.facility)}</td><td><span class="fax-number">${escHtml(r.fax)}</span></td><td><span class="cat-badge ${catClass(r.category)}">${escHtml(r.category)}</span></td><td style="white-space:nowrap;display:flex;gap:6px;align-items:center"><button class="copy-btn" onclick="copyFax(this,'${escHtml(r.fax)}')">コピー</button><button class="btn-edit" onclick="openModal('edit',${gi})">事業所を編集</button><button class="btn-danger" onclick="deleteRecord(${gi})">事業所ごと削除</button></td></tr>`;});
       h+='</tbody></table>';
     }
     content.innerHTML=h;
@@ -446,9 +446,11 @@ function deletePerson(){
 }
 function deleteRecord(idx){
   const r=allData[idx];
-  if(!confirm('「'+(r.facility||r.name)+'」を削除しますか？'))return;
+  const facility=r.facility||r.name;
+  const person=r.facility&&r.name?getDisplayName(r.name)+'さんの関係事業所から':'';
+  if(!confirm('「'+facility+'」を'+person+'削除しますか？\n他の利用者の登録は削除されません。'))return;
   lastDeleted={record:Object.assign({},r),idx};
-  allData.splice(idx,1);saveData();render();showToastWithUndo('削除しました：'+(r.facility||r.name));
+  allData.splice(idx,1);saveData();render();showToastWithUndo('削除しました：'+facility);
 }
 function undoDelete(){
   if(!lastDeleted)return;

@@ -256,9 +256,10 @@ function initDrag(){
 }
 function renderCategoryBar(){
   const cats=getCategories();
-  let h=`<button class="cat-btn${!selectedCategory?' active':''}" onclick="selectCategory(null)">すべて</button>`;
+  let h='';
   cats.forEach(c=>{h+=`<button class="cat-btn${selectedCategory===c?' active':''}" onclick="selectCategory('${escHtml(c)}')">${escHtml(c)}</button>`;});
-  document.getElementById('categoryBar').innerHTML=h;
+  const bar=document.getElementById('categoryBar');
+  bar.innerHTML=h;bar.style.display=cats.length?'flex':'none';
 }
 function renderContent(){
   const content=document.getElementById('content');
@@ -269,7 +270,7 @@ function renderContent(){
   if(q&&!selectedName)rows=rows.filter(r=>(r.name&&r.name.includes(q))||(r.facility&&r.facility.includes(q))||(r.fax&&r.fax.includes(q)));
   if(selectedName){
     const nl=getDisplayName(selectedName);
-    let h=`<div class="action-bar"><h2>${escHtml(nl)} 様の関係事業所</h2><button class="btn-primary" onclick="openModal('add-facility')">＋ 事業所追加</button><button class="btn-danger" onclick="deletePerson()">利用者ごと削除</button></div>`;
+    let h=`<div class="action-bar"><h2>${escHtml(nl)} 様の関係事業所</h2><button class="btn-primary" onclick="openModal('add-facility')">＋ 事業所追加</button><button class="btn-edit" onclick="openModal('edit-person')">利用者名を編集</button><button class="btn-danger" onclick="deletePerson()">利用者ごと削除</button></div>`;
     const f=rows.filter(r=>r.facility);
     if(!f.length){h+='<div class="empty-msg">事業所が登録されていません</div>';}
     else{
@@ -301,7 +302,7 @@ function render(){
   renderSidebar(names);renderCategoryBar();renderContent();
 }
 function selectName(name){selectedName=selectedName===name?null:name;selectedCategory=null;document.getElementById('searchBox').value='';render();}
-function selectCategory(c){selectedCategory=c;selectedName=null;render();}
+function selectCategory(c){selectedCategory=selectedCategory===c?null:c;selectedName=null;render();}
 function applyFilters(){selectedName=null;selectedCategory=null;render();}
 function copyFax(btn,fax){navigator.clipboard.writeText(fax).then(()=>{btn.textContent='✓ コピー済';btn.classList.add('copied');setTimeout(()=>{btn.textContent='コピー';btn.classList.remove('copied');},2000);showToast('FAX番号 '+fax+' をコピーしました');});}
 
@@ -321,6 +322,11 @@ function openModal(mode,idx){
     document.getElementById('fName').value=r.name||'';document.getElementById('fFacility').value=r.facility||'';
     document.getElementById('fFax').value=r.fax||'';document.getElementById('fCategory').value=r.category||'';
     document.getElementById('fName').disabled=false;
+  }else if(mode==='edit-person'){
+    document.getElementById('modalTitle').textContent='利用者名を編集';
+    document.getElementById('fName').value=selectedName||'';
+    document.getElementById('fName').disabled=false;
+    document.getElementById('rowFacilityFields').style.display='none';
   }else if(mode==='add-facility'){
     document.getElementById('modalTitle').textContent='事業所を追加';
     document.getElementById('fName').value=selectedName||'';document.getElementById('fFacility').value='';
@@ -397,6 +403,16 @@ function saveEntry(){
     if(cbs.length>0){cbs.forEach(cb=>allData.push({name,facility:cb.dataset.facility,fax:cb.dataset.fax,category:cb.dataset.category}));}
     else{allData.push({name,facility:null,fax:null,category:null});}
     saveData();closeModal();selectedName=name;render();showToast('「'+getDisplayName(name)+'」さんを登録しました');return;
+  }
+  if(modalMode==='edit-person'){
+    const name=document.getElementById('fName').value.trim();
+    if(!name){alert('利用者名を入力してください');return;}
+    if(name!==selectedName&&allData.some(r=>r.name===name)){alert('同じ名前の利用者がすでに登録されています');return;}
+    const previousName=selectedName;
+    allData.forEach(r=>{if(r.name===previousName)r.name=name;});
+    const order=loadOrder();
+    if(order)saveOrder(order.map(n=>n===previousName?name:n));
+    selectedName=name;saveData();closeModal();render();showToast('利用者名を更新しました');return;
   }
   const nameEl=document.getElementById('rowName');
   const name=nameEl.style.display==='none'?(selectedName||''):document.getElementById('fName').value.trim();

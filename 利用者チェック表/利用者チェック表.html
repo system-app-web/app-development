@@ -293,35 +293,39 @@ input, textarea, select, option {
 .office-check-list {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
+  width: 100%;
   gap: 6px;
   max-height: 300px;
   overflow-y: auto;
   margin: 8px 0 14px;
 }
 .office-check-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name mark"
+    "actions actions";
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
   border: 1.5px solid #b3e89a;
   border-radius: 10px;
   background: #f9fef5;
-  width: min(100%, 228px);
+  width: 100%;
   box-sizing: border-box;
 }
 .office-check-name {
-  flex: 1;
+  grid-area: name;
   min-width: 0;
   color: #1a4d0e;
   font-size: 12px;
   font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .office-check-mark {
+  grid-area: mark;
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -342,8 +346,10 @@ input, textarea, select, option {
   box-shadow: 0 2px 8px rgba(58,158,32,0.25);
 }
 .office-check-actions {
+  grid-area: actions;
   display: flex;
   gap: 4px;
+  justify-content: flex-end;
   flex: none;
 }
 .office-mini-btn {

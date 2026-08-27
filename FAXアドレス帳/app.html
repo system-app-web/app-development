@@ -270,7 +270,7 @@ function renderContent(){
   if(q&&!selectedName)rows=rows.filter(r=>(r.name&&r.name.includes(q))||(r.facility&&r.facility.includes(q))||(r.fax&&r.fax.includes(q)));
   if(selectedName){
     const nl=getDisplayName(selectedName);
-    let h=`<div class="action-bar"><h2>${escHtml(nl)} 様の関係事業所</h2><button class="btn-primary" onclick="openModal('add-facility')">＋ 事業所追加</button><button class="btn-edit" onclick="openModal('edit-person')">利用者名を編集</button><button class="btn-danger" onclick="deletePerson()">利用者ごと削除</button></div>`;
+    let h=`<div class="action-bar"><h2>${escHtml(nl)} 様の関係事業所</h2><button class="btn-primary" onclick="openModal('add-facility')">＋ 事業所追加</button><button class="btn-edit" onclick="openModal('edit-person')">利用者を編集</button><button class="btn-danger" onclick="deletePerson()">利用者ごと削除</button></div>`;
     const f=rows.filter(r=>r.facility);
     if(!f.length){h+='<div class="empty-msg">事業所が登録されていません</div>';}
     else{
@@ -323,10 +323,13 @@ function openModal(mode,idx){
     document.getElementById('fFax').value=r.fax||'';document.getElementById('fCategory').value=r.category||'';
     document.getElementById('fName').disabled=false;
   }else if(mode==='edit-person'){
-    document.getElementById('modalTitle').textContent='利用者名を編集';
+    document.getElementById('modalTitle').textContent='利用者を編集';
     document.getElementById('fName').value=selectedName||'';
     document.getElementById('fName').disabled=false;
     document.getElementById('rowFacilityFields').style.display='none';
+    document.getElementById('rowFacilitySelect').style.display='block';
+    personCatSelected=null;personSelectedFacilities=new Set(allData.filter(r=>r.name===selectedName&&r.facility).map(r=>r.facility));
+    document.getElementById('personFacilitySearch').value='';renderPersonCatFilter();renderPersonFacilityList('');
   }else if(mode==='add-facility'){
     document.getElementById('modalTitle').textContent='事業所を追加';
     document.getElementById('fName').value=selectedName||'';document.getElementById('fFacility').value='';
@@ -344,7 +347,7 @@ function openModal(mode,idx){
     document.getElementById('fName').value='';document.getElementById('fName').disabled=false;
     document.getElementById('rowFacilityFields').style.display='none';
     document.getElementById('rowFacilitySelect').style.display='block';
-    personCatSelected=null;document.getElementById('personFacilitySearch').value='';renderPersonCatFilter();renderPersonFacilityList('');
+    personCatSelected=null;personSelectedFacilities=new Set();document.getElementById('personFacilitySearch').value='';renderPersonCatFilter();renderPersonFacilityList('');
   }
   document.getElementById('modalOverlay').classList.add('open');
 }
@@ -369,7 +372,7 @@ function renderFacilityCheckList(q){
 }
 function updateSelectedCount(){const n=document.querySelectorAll('.fc-checkbox:checked').length;document.getElementById('selectedCount').textContent=n>0?n+'件を選択中':'';}
 function filterFacilityList(){renderFacilityCheckList(document.getElementById('facilitySearch').value.trim());}
-let personCatSelected=null;
+let personCatSelected=null,personSelectedFacilities=new Set();
 function renderPersonCatFilter(){
   const cats=Array.from(new Set(getUniqueFacilities().map(f=>f.category).filter(Boolean))).sort();
   let h='<button class="pcat-btn'+(personCatSelected===null?' pcat-active':'')+'" onclick="selectPersonCat(null)">すべて</button>';
@@ -383,11 +386,13 @@ function renderPersonFacilityList(q){
   if(personCatSelected)items=items.filter(f=>f.category===personCatSelected);
   if(q)items=items.filter(f=>(f.facility&&f.facility.includes(q))||(f.fax&&f.fax.includes(q)));
   if(!items.length){list.innerHTML='<div class="no-result">該当なし</div>';updatePersonSelectedCount();return;}
-  list.innerHTML=items.map(f=>`<label class="facility-check-item"><input type="checkbox" class="pfc-checkbox" data-facility="${escHtml(f.facility)}" data-fax="${escHtml(f.fax)}" data-category="${escHtml(f.category||'')}" onchange="updatePersonSelectedCount()"><div><div class="fc-name">${escHtml(f.facility)}</div><div class="fc-fax">${escHtml(f.fax)}</div><div class="fc-cat">${escHtml(f.category||'')}</div></div></label>`).join('');
+  list.innerHTML=items.map(f=>`<label class="facility-check-item"><input type="checkbox" class="pfc-checkbox" data-facility="${escHtml(f.facility)}"${personSelectedFacilities.has(f.facility)?' checked':''} onchange="togglePersonFacility(this)"><div><div class="fc-name">${escHtml(f.facility)}</div><div class="fc-fax">${escHtml(f.fax)}</div><div class="fc-cat">${escHtml(f.category||'')}</div></div></label>`).join('');
   updatePersonSelectedCount();
 }
 function filterPersonFacilityList(){renderPersonFacilityList(document.getElementById('personFacilitySearch').value.trim());}
-function updatePersonSelectedCount(){const n=document.querySelectorAll('.pfc-checkbox:checked').length;document.getElementById('personSelectedCount').textContent=n>0?n+'件選択中':'';}
+function togglePersonFacility(cb){if(cb.checked)personSelectedFacilities.add(cb.dataset.facility);else personSelectedFacilities.delete(cb.dataset.facility);updatePersonSelectedCount();}
+function updatePersonSelectedCount(){const n=personSelectedFacilities.size;document.getElementById('personSelectedCount').textContent=n>0?n+'件選択中':'';}
+function getPersonSelectedFacilities(){const facilities=new Map(getUniqueFacilities().map(f=>[f.facility,f]));return Array.from(personSelectedFacilities).map(f=>facilities.get(f)).filter(Boolean);}
 function saveExistingFacilities(){
   const cbs=document.querySelectorAll('.fc-checkbox:checked');
   if(!cbs.length){alert('事業所を1件以上選択してください');return;}
@@ -399,8 +404,8 @@ function saveEntry(){
   if(modalMode==='add-person'){
     const name=document.getElementById('fName').value.trim();
     if(!name){alert('利用者名を入力してください');return;}
-    const cbs=document.querySelectorAll('.pfc-checkbox:checked');
-    if(cbs.length>0){cbs.forEach(cb=>allData.push({name,facility:cb.dataset.facility,fax:cb.dataset.fax,category:cb.dataset.category}));}
+    const facilities=getPersonSelectedFacilities();
+    if(facilities.length>0){facilities.forEach(f=>allData.push({name,facility:f.facility,fax:f.fax,category:f.category}));}
     else{allData.push({name,facility:null,fax:null,category:null});}
     saveData();closeModal();selectedName=name;render();showToast('「'+getDisplayName(name)+'」さんを登録しました');return;
   }
@@ -409,10 +414,14 @@ function saveEntry(){
     if(!name){alert('利用者名を入力してください');return;}
     if(name!==selectedName&&allData.some(r=>r.name===name)){alert('同じ名前の利用者がすでに登録されています');return;}
     const previousName=selectedName;
-    allData.forEach(r=>{if(r.name===previousName)r.name=name;});
+    const existingByFacility=new Map(allData.filter(r=>r.name===previousName&&r.facility).map(r=>[r.facility,r]));
+    const updatedRecords=getPersonSelectedFacilities().map(f=>Object.assign({},existingByFacility.get(f.facility)||f,{name}));
+    if(!updatedRecords.length)updatedRecords.push({name,facility:null,fax:null,category:null});
+    let inserted=false;
+    allData=allData.reduce((records,r)=>{if(r.name!==previousName){records.push(r);return records;}if(!inserted){records.push(...updatedRecords);inserted=true;}return records;},[]);
     const order=loadOrder();
     if(order)saveOrder(order.map(n=>n===previousName?name:n));
-    selectedName=name;saveData();closeModal();render();showToast('利用者名を更新しました');return;
+    selectedName=name;saveData();closeModal();render();showToast('利用者を更新しました');return;
   }
   const nameEl=document.getElementById('rowName');
   const name=nameEl.style.display==='none'?(selectedName||''):document.getElementById('fName').value.trim();

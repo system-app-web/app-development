@@ -1568,7 +1568,7 @@ function selectRelLine(relId, visEl) {
   clearDrawElSelection();
   clearNodeSelection();
   if (selectedEl) { selectedEl.removeAttribute('stroke-dasharray'); clearSelection(); }
-  if (selectedRelId === relId) { clearRelSelection(); return; }
+  if (selectedRelId === relId) return;
   clearRelSelection();
   selectedRelId = relId;
   visEl.setAttribute('stroke', '#e06060');
@@ -1740,7 +1740,7 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
       e.stopPropagation();
       clearDrawElSelection(); clearNodeSelection();
       if (selectedEl) { selectedEl.removeAttribute('stroke-dasharray'); clearSelection(); }
-      if (selectedRelId === relId && selectedSegmentEls?.segIdx === segIdx) { clearRelSelection(); return; }
+      if (selectedRelId === relId && selectedSegmentEls?.segIdx === segIdx) return;
       clearRelSelection();
       selectedRelId = relId;
       selectedSegmentEls = { vis: visLine, hit: hitLine, relId, segIdx };
@@ -2316,21 +2316,7 @@ function addEraseListener(elem) {
     if (drawMode || placeMode) return;
     e.stopPropagation();
     if (selectedDrawEl === elem) {
-      if (elem.tagName === 'path') {
-        const { nearIdx, pts } = nearestPathSeg(elem, e.clientX, e.clientY);
-        if (pts.length >= 2 && nearIdx >= 0) {
-          if (selectedPathSeg?.pathEl === elem && selectedPathSeg?.segIdx === nearIdx) {
-            clearPathSegSelection();
-          } else {
-            clearPathSegSelection();
-            const over = updateSegOverlay(elem, nearIdx);
-            selectedPathSeg = { pathEl: elem, segIdx: nearIdx, overEl: over };
-          }
-          return;
-        }
-      }
-      clearPathSegSelection();
-      restore(); selectedDrawEl = null; _clearDrawElFn = null;
+      return;
     } else {
       if (_clearDrawElFn) _clearDrawElFn();
       clearNodeSelection();

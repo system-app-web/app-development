@@ -526,7 +526,7 @@ const templates = [
       { name: "洗面", type: "wet", x: 820, y: 500, w: 260, h: 120 },
       { name: "収納", type: "storage", x: 820, y: 370, w: 260, h: 120 },
       { name: "ドア", type: "door", x: 480, y: 748, w: 260, h: 26 },
-      { name: "ベッド", type: "bed", x: 150, y: 105, w: 260, h: 380 },
+      { name: "ベッド", type: "bed", x: 150, y: 105, w: 140, h: 210 },
       { name: "TV", type: "furniture", x: 890, y: 120, w: 90, h: 260 }
     ]
   },
@@ -690,10 +690,48 @@ function renderSpace(group, room) {
 }
 
 function renderBed(group, room) {
-  group.appendChild(svgEl("rect", { width: room.w, height: room.h, rx: 14, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
-  group.appendChild(svgEl("rect", { x: 28, y: 20, width: room.w - 56, height: 70, rx: 14, fill: "#fff", stroke: "#000", "stroke-width": 5 }));
-  group.appendChild(svgEl("line", { x1: 0, y1: 110, x2: room.w, y2: 110, stroke: "#000", "stroke-width": 5 }));
-  addLabel(group, room.name, room.w / 2, room.h / 2 + 20, 42);
+  const inset = Math.max(8, Math.min(room.w, room.h) * 0.08);
+  const headHeight = Math.max(26, room.h * 0.23);
+  const pillowGap = Math.max(4, inset * 0.6);
+  const pillowWidth = (room.w - inset * 2 - pillowGap) / 2;
+  const strokeWidth = Math.max(2, Math.min(room.w, room.h) * 0.025);
+  group.appendChild(svgEl("rect", {
+    width: room.w,
+    height: room.h,
+    rx: Math.max(6, room.w * 0.08),
+    fill: "#ffffff",
+    stroke: "#4f666b",
+    "stroke-width": strokeWidth
+  }));
+  group.appendChild(svgEl("rect", {
+    x: inset,
+    y: inset,
+    width: room.w - inset * 2,
+    height: headHeight,
+    rx: Math.max(4, inset * 0.65),
+    fill: "#eef4f3",
+    stroke: "none"
+  }));
+  [0, 1].forEach((index) => {
+    group.appendChild(svgEl("rect", {
+      x: inset + index * (pillowWidth + pillowGap),
+      y: inset + pillowGap,
+      width: pillowWidth,
+      height: Math.max(16, headHeight - pillowGap * 2),
+      rx: Math.max(4, inset * 0.55),
+      fill: "#dce9e7",
+      stroke: "#b8cfcb",
+      "stroke-width": Math.max(1, strokeWidth * 0.55)
+    }));
+  });
+  group.appendChild(svgEl("line", {
+    x1: inset,
+    y1: inset + headHeight + inset * 0.45,
+    x2: room.w - inset,
+    y2: inset + headHeight + inset * 0.45,
+    stroke: "#9bb9b4",
+    "stroke-width": Math.max(1, strokeWidth * 0.65)
+  }));
 }
 
 function renderFloorPlan(group, room) {
@@ -1057,7 +1095,7 @@ function placeItemOnCanvas(event) {
   }
 
   const item = {
-    bed: { name: "ベッド", type: "bed", w: 260, h: 380 },
+    bed: { name: "ベッド", type: "bed", w: 140, h: 210 },
     tv: { name: "TV", type: "furniture", w: 90, h: 260 },
     shelf: { name: "棚", type: "furniture", w: 120, h: 260 },
     door: { name: "ドア", type: "door", w: 260, h: 26 }
@@ -1087,7 +1125,7 @@ function placeItemOnCanvas(event) {
 
 function addCanvasItem(mode) {
   const item = {
-    bed: { name: "ベッド", type: "bed", w: 260, h: 380 },
+    bed: { name: "ベッド", type: "bed", w: 140, h: 210 },
     tv: { name: "TV", type: "furniture", w: 90, h: 260 },
     shelf: { name: "棚", type: "furniture", w: 120, h: 260 },
     door: { name: "ドア", type: "door", w: 260, h: 26 }

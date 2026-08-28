@@ -196,7 +196,7 @@ header h1{font-size:19px;font-weight:800;white-space:nowrap}
   </div>
 </div>
 
-<div class="modal-overlay" id="kagamiOverlay" onclick="closeKagamiOnOverlay(event)">
+<div class="modal-overlay" id="kagamiOverlay">
   <div class="kagami-modal">
     <div class="kagami-header">
       <h3>📄 FAXかがみ テンプレート</h3>
@@ -472,7 +472,6 @@ let templates=loadTemplates();
 let selectedTplId=null;
 function openKagami(){document.getElementById('kagamiOverlay').classList.add('open');renderKagamiList();if(templates.length&&!selectedTplId)selectTemplate(templates[0].id);else renderKagamiEditor();}
 function closeKagami(){document.getElementById('kagamiOverlay').classList.remove('open');}
-function closeKagamiOnOverlay(e){if(e.target===document.getElementById('kagamiOverlay'))closeKagami();}
 function renderKagamiList(){
   let h='';
   templates.forEach(t=>{h+='<div class="kagami-list-item'+(t.id===selectedTplId?' active':'')+'" onclick="selectTemplate(\''+t.id+'\')">'+escHtml(t.name)+'</div>';});

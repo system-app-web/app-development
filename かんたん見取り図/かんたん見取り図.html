@@ -300,11 +300,14 @@ h1 {
 #layer-nodes g.selected.floorplan .floor-plan-handle { stroke: #3972ad; }
 .item-palette {
   display: none;
-  flex-wrap: wrap;
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px 4px;
   margin-top: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 2px 0 6px;
 }
-.item-control-slot.open .item-palette { display: flex; }
+.item-control-slot.open .item-palette { display: grid; }
 .dtool-btn, .size-btn, .item-btn {
   width: 36px;
   height: 36px;
@@ -327,6 +330,26 @@ h1 {
   background: #dff5f8;
   border-color: #2daec0;
   box-shadow: 0 0 0 2px rgba(45, 174, 192, 0.18);
+}
+.item-btn.item-preview {
+  width: 42px;
+  height: 42px;
+  justify-self: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: #4f666b;
+}
+.item-btn.item-preview:hover {
+  background: #edfafd;
+  border-color: transparent;
+}
+.item-btn.item-preview svg {
+  width: 38px;
+  height: 38px;
+  overflow: visible;
 }
 .floor-plan-icon {
   position: relative;
@@ -472,12 +495,7 @@ h1 {
         <button class="dtool-btn" type="button" onclick="addFloorPlan()" title="間取りを配置" aria-label="間取りを配置"><span class="floor-plan-icon" aria-hidden="true"></span></button>
         <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette">☰</button>
       </div>
-      <div id="item-palette" class="item-palette">
-        <button class="item-btn" onclick="addCanvasItem('bed')" title="ベッド">B</button>
-        <button class="item-btn" onclick="addCanvasItem('tv')" title="TV">TV</button>
-        <button class="item-btn" onclick="addCanvasItem('shelf')" title="棚">棚</button>
-        <button class="item-btn" onclick="addCanvasItem('door')" title="ドア">D</button>
-      </div>
+      <div id="item-palette" class="item-palette" aria-label="アイテム一覧"></div>
     </div>
   </div>
 
@@ -568,6 +586,27 @@ const templates = [
   }
 ];
 
+const itemCatalog = {
+  bed: { name: "ベッド", type: "bed", w: 140, h: 210 },
+  table: { name: "テーブル", type: "table", w: 150, h: 96 },
+  chair: { name: "椅子", type: "chair", w: 64, h: 72 },
+  sofa: { name: "ソファ", type: "sofa", w: 180, h: 96 },
+  tv: { name: "テレビ", type: "tv", w: 108, h: 52 },
+  shelf: { name: "本棚", type: "shelf", w: 90, h: 150 },
+  desk: { name: "机", type: "desk", w: 160, h: 78 },
+  cabinet: { name: "収納", type: "cabinet", w: 118, h: 68 },
+  wardrobe: { name: "クローゼット", type: "wardrobe", w: 120, h: 176 },
+  fridge: { name: "冷蔵庫", type: "fridge", w: 72, h: 148 },
+  washer: { name: "洗濯機", type: "washer", w: 76, h: 92 },
+  toiletItem: { name: "トイレ", type: "toiletItem", w: 72, h: 112 },
+  bath: { name: "浴槽", type: "bath", w: 160, h: 78 },
+  sink: { name: "洗面台", type: "sink", w: 118, h: 62 },
+  stove: { name: "コンロ", type: "stove", w: 100, h: 62 },
+  door: { name: "ドア", type: "door", w: 120, h: 22 },
+  plant: { name: "観葉植物", type: "plant", w: 58, h: 72 },
+  rug: { name: "ラグ", type: "rug", w: 150, h: 94 }
+};
+
 let rooms = [];
 let dragState = null;
 const LINE_STROKE_WIDTH = 5;
@@ -635,6 +674,33 @@ function renderTemplateButtons() {
   });
 }
 
+function getCanvasItem(mode) {
+  return itemCatalog[mode] || null;
+}
+
+function renderItemPalette() {
+  const palette = document.getElementById("item-palette");
+  palette.innerHTML = "";
+  Object.entries(itemCatalog).forEach(([mode, item]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "item-btn item-preview";
+    button.title = item.name;
+    button.setAttribute("aria-label", item.name);
+    button.addEventListener("click", () => addCanvasItem(mode));
+
+    const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
+    preview.setAttribute("aria-hidden", "true");
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    if (item.type === "bed") renderBed(group, item);
+    else renderCatalogItem(group, item);
+    preview.appendChild(group);
+    button.appendChild(preview);
+    palette.appendChild(button);
+  });
+}
+
 function applyTemplate(template) {
   rooms = template.rooms.map((room) => createRoom(room));
   selectedRoomId = null;
@@ -657,7 +723,7 @@ function renderSVG(showHint = true) {
 
     if (room.type === "floorplan") renderFloorPlan(group, room);
     else if (room.type === "bed") renderBed(group, room);
-    else if (room.type === "door") renderDoor(group, room);
+    else if (Object.values(itemCatalog).some((item) => item.type === room.type)) renderCatalogItem(group, room);
     else if (room.type === "furniture") renderFurniture(group, room);
     else renderSpace(group, room);
 
@@ -732,6 +798,103 @@ function renderBed(group, room) {
     stroke: "#9bb9b4",
     "stroke-width": Math.max(1, strokeWidth * 0.65)
   }));
+}
+
+function renderCatalogItem(group, room) {
+  const stroke = "#4f666b";
+  const accent = "#dce9e7";
+  const line = Math.max(2, Math.min(room.w, room.h) * 0.035);
+  const rect = (attrs) => group.appendChild(svgEl("rect", { fill: "#fff", stroke, "stroke-width": line, ...attrs }));
+  const lineEl = (attrs) => group.appendChild(svgEl("line", { stroke, "stroke-width": line, "stroke-linecap": "round", ...attrs }));
+  const circle = (attrs) => group.appendChild(svgEl("circle", { fill: "#fff", stroke, "stroke-width": line, ...attrs }));
+
+  if (room.type === "table") {
+    rect({ x: room.w * 0.1, y: room.h * 0.12, width: room.w * 0.8, height: room.h * 0.76, rx: room.h * 0.08, fill: "#f8fbfb" });
+    [0.18, 0.82].forEach((x) => [0.18, 0.82].forEach((y) => circle({ cx: room.w * x, cy: room.h * y, r: Math.min(room.w, room.h) * 0.05, fill: accent, stroke: "none" })));
+    return;
+  }
+  if (room.type === "chair") {
+    rect({ x: room.w * 0.2, y: room.h * 0.08, width: room.w * 0.6, height: room.h * 0.36, rx: room.w * 0.1, fill: accent });
+    rect({ x: room.w * 0.16, y: room.h * 0.43, width: room.w * 0.68, height: room.h * 0.34, rx: room.w * 0.08, fill: "#f8fbfb" });
+    [0.25, 0.75].forEach((x) => lineEl({ x1: room.w * x, y1: room.h * 0.77, x2: room.w * x, y2: room.h * 0.94 }));
+    return;
+  }
+  if (room.type === "sofa") {
+    rect({ x: room.w * 0.05, y: room.h * 0.32, width: room.w * 0.9, height: room.h * 0.58, rx: room.h * 0.14, fill: "#f8fbfb" });
+    rect({ x: room.w * 0.15, y: room.h * 0.1, width: room.w * 0.7, height: room.h * 0.38, rx: room.h * 0.12, fill: accent });
+    lineEl({ x1: room.w * 0.5, y1: room.h * 0.39, x2: room.w * 0.5, y2: room.h * 0.88, stroke: "#b8cfcb", "stroke-width": Math.max(1, line * 0.65) });
+    return;
+  }
+  if (room.type === "tv") {
+    rect({ x: room.w * 0.05, y: room.h * 0.06, width: room.w * 0.9, height: room.h * 0.7, rx: room.h * 0.08, fill: "#f1f6f5" });
+    lineEl({ x1: room.w * 0.38, y1: room.h * 0.78, x2: room.w * 0.28, y2: room.h * 0.96 });
+    lineEl({ x1: room.w * 0.62, y1: room.h * 0.78, x2: room.w * 0.72, y2: room.h * 0.96 });
+    lineEl({ x1: room.w * 0.22, y1: room.h * 0.96, x2: room.w * 0.78, y2: room.h * 0.96 });
+    return;
+  }
+  if (room.type === "shelf" || room.type === "cabinet" || room.type === "wardrobe") {
+    rect({ x: room.w * 0.06, y: room.h * 0.04, width: room.w * 0.88, height: room.h * 0.9, rx: room.w * 0.04, fill: "#f8fbfb" });
+    if (room.type === "shelf") {
+      [0.28, 0.51, 0.74].forEach((y) => lineEl({ x1: room.w * 0.12, y1: room.h * y, x2: room.w * 0.88, y2: room.h * y }));
+    } else {
+      lineEl({ x1: room.w * 0.5, y1: room.h * 0.08, x2: room.w * 0.5, y2: room.h * 0.9 });
+      [0.42, 0.58].forEach((x) => lineEl({ x1: room.w * x, y1: room.h * 0.48, x2: room.w * x, y2: room.h * 0.56, "stroke-width": Math.max(1, line * 0.6) }));
+    }
+    return;
+  }
+  if (room.type === "desk") {
+    rect({ x: room.w * 0.05, y: room.h * 0.08, width: room.w * 0.9, height: room.h * 0.24, rx: room.h * 0.05, fill: accent });
+    [0.13, 0.87].forEach((x) => lineEl({ x1: room.w * x, y1: room.h * 0.31, x2: room.w * x, y2: room.h * 0.94 }));
+    rect({ x: room.w * 0.64, y: room.h * 0.34, width: room.w * 0.24, height: room.h * 0.46, rx: room.h * 0.03, fill: "#f8fbfb" });
+    return;
+  }
+  if (room.type === "fridge") {
+    rect({ x: room.w * 0.12, y: room.h * 0.04, width: room.w * 0.76, height: room.h * 0.92, rx: room.w * 0.08, fill: "#f8fbfb" });
+    lineEl({ x1: room.w * 0.16, y1: room.h * 0.35, x2: room.w * 0.84, y2: room.h * 0.35 });
+    lineEl({ x1: room.w * 0.72, y1: room.h * 0.13, x2: room.w * 0.72, y2: room.h * 0.27, "stroke-width": Math.max(1, line * 0.6) });
+    lineEl({ x1: room.w * 0.72, y1: room.h * 0.47, x2: room.w * 0.72, y2: room.h * 0.8, "stroke-width": Math.max(1, line * 0.6) });
+    return;
+  }
+  if (room.type === "washer") {
+    rect({ x: room.w * 0.06, y: room.h * 0.04, width: room.w * 0.88, height: room.h * 0.92, rx: room.w * 0.06, fill: "#f8fbfb" });
+    circle({ cx: room.w * 0.5, cy: room.h * 0.6, r: room.w * 0.27, fill: accent });
+    circle({ cx: room.w * 0.5, cy: room.h * 0.6, r: room.w * 0.16, fill: "#fff", stroke: "#b8cfcb", "stroke-width": Math.max(1, line * 0.6) });
+    return;
+  }
+  if (room.type === "toiletItem") {
+    rect({ x: room.w * 0.24, y: room.h * 0.04, width: room.w * 0.52, height: room.h * 0.26, rx: room.w * 0.07, fill: accent });
+    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.64, rx: room.w * 0.34, ry: room.h * 0.31, fill: "#f8fbfb", stroke, "stroke-width": line }));
+    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.64, rx: room.w * 0.19, ry: room.h * 0.18, fill: "#fff", stroke: "#b8cfcb", "stroke-width": Math.max(1, line * 0.6) }));
+    return;
+  }
+  if (room.type === "bath") {
+    rect({ x: room.w * 0.04, y: room.h * 0.12, width: room.w * 0.92, height: room.h * 0.76, rx: room.h * 0.24, fill: "#f8fbfb" });
+    rect({ x: room.w * 0.16, y: room.h * 0.28, width: room.w * 0.68, height: room.h * 0.42, rx: room.h * 0.2, fill: accent, stroke: "#b8cfcb", "stroke-width": Math.max(1, line * 0.6) });
+    return;
+  }
+  if (room.type === "sink" || room.type === "stove") {
+    rect({ x: room.w * 0.04, y: room.h * 0.08, width: room.w * 0.92, height: room.h * 0.82, rx: room.h * 0.08, fill: "#f8fbfb" });
+    if (room.type === "sink") {
+      group.appendChild(svgEl("ellipse", { cx: room.w * 0.43, cy: room.h * 0.53, rx: room.w * 0.24, ry: room.h * 0.23, fill: accent, stroke, "stroke-width": Math.max(1, line * 0.7) }));
+      lineEl({ x1: room.w * 0.7, y1: room.h * 0.22, x2: room.w * 0.7, y2: room.h * 0.42, "stroke-width": Math.max(1, line * 0.65) });
+    } else {
+      [[0.31, 0.35], [0.69, 0.35], [0.31, 0.67], [0.69, 0.67]].forEach(([x, y]) => circle({ cx: room.w * x, cy: room.h * y, r: room.h * 0.12, fill: accent, stroke: "#9bb9b4", "stroke-width": Math.max(1, line * 0.55) }));
+    }
+    return;
+  }
+  if (room.type === "door") {
+    rect({ x: room.w * 0.03, y: room.h * 0.15, width: room.w * 0.94, height: room.h * 0.7, rx: room.h * 0.12, fill: "#f8fbfb" });
+    lineEl({ x1: room.w * 0.12, y1: room.h * 0.5, x2: room.w * 0.88, y2: room.h * 0.5, "stroke-width": Math.max(1, line * 0.6) });
+    return;
+  }
+  if (room.type === "plant") {
+    group.appendChild(svgEl("path", { d: `M ${room.w * 0.5} ${room.h * 0.57} C ${room.w * 0.1} ${room.h * 0.38}, ${room.w * 0.18} ${room.h * 0.04}, ${room.w * 0.5} ${room.h * 0.38} C ${room.w * 0.82} ${room.h * 0.04}, ${room.w * 0.9} ${room.h * 0.38}, ${room.w * 0.5} ${room.h * 0.57}`, fill: "#dce9e7", stroke, "stroke-width": line, "stroke-linejoin": "round" }));
+    rect({ x: room.w * 0.23, y: room.h * 0.55, width: room.w * 0.54, height: room.h * 0.35, rx: room.w * 0.08, fill: "#f8fbfb" });
+    return;
+  }
+  if (room.type === "rug") {
+    rect({ x: room.w * 0.04, y: room.h * 0.08, width: room.w * 0.92, height: room.h * 0.84, rx: room.h * 0.35, fill: "#eef4f3", stroke: "#9bb9b4", "stroke-width": Math.max(1, line * 0.7) });
+  }
 }
 
 function renderFloorPlan(group, room) {
@@ -1094,12 +1257,7 @@ function placeItemOnCanvas(event) {
     return;
   }
 
-  const item = {
-    bed: { name: "ベッド", type: "bed", w: 140, h: 210 },
-    tv: { name: "TV", type: "furniture", w: 90, h: 260 },
-    shelf: { name: "棚", type: "furniture", w: 120, h: 260 },
-    door: { name: "ドア", type: "door", w: 260, h: 26 }
-  }[currentPlaceMode];
+  const item = getCanvasItem(currentPlaceMode);
   if (!item) return;
 
   const svg = event.currentTarget;
@@ -1124,15 +1282,11 @@ function placeItemOnCanvas(event) {
 }
 
 function addCanvasItem(mode) {
-  const item = {
-    bed: { name: "ベッド", type: "bed", w: 140, h: 210 },
-    tv: { name: "TV", type: "furniture", w: 90, h: 260 },
-    shelf: { name: "棚", type: "furniture", w: 120, h: 260 },
-    door: { name: "ドア", type: "door", w: 260, h: 26 }
-  }[mode];
+  const item = getCanvasItem(mode);
   if (!item) return;
   clearPlaceMode();
-  const itemCount = rooms.filter((room) => ["bed", "furniture", "door"].includes(room.type)).length;
+  const itemTypes = new Set(Object.values(itemCatalog).map((entry) => entry.type));
+  const itemCount = rooms.filter((room) => itemTypes.has(room.type)).length;
   const offsetX = (itemCount % 3) * gridStep("x");
   const offsetY = (Math.floor(itemCount / 3) % 3) * gridStep("y");
   const room = createRoom({
@@ -1808,6 +1962,7 @@ async function exportPNG() {
 }
 
 renderTemplateButtons();
+renderItemPalette();
 renderAll();
 const canvas = document.getElementById("svg-main");
 previousGridStepX = gridStep("x");

@@ -544,7 +544,7 @@ const templates = [
       { name: "洗面", type: "wet", x: 820, y: 500, w: 260, h: 120 },
       { name: "収納", type: "storage", x: 820, y: 370, w: 260, h: 120 },
       { name: "ドア", type: "door", x: 480, y: 748, w: 260, h: 26 },
-      { name: "ベッド", type: "bed", x: 150, y: 105, w: 140, h: 210 },
+      { name: "ベッド", type: "bed", x: 150, y: 105, w: 84, h: 168, itemCols: 3, itemRows: 6 },
       { name: "TV", type: "furniture", x: 890, y: 120, w: 90, h: 260 }
     ]
   },
@@ -587,24 +587,24 @@ const templates = [
 ];
 
 const itemCatalog = {
-  bed: { name: "ベッド", type: "bed", w: 140, h: 210 },
-  table: { name: "テーブル", type: "table", w: 150, h: 96 },
-  chair: { name: "椅子", type: "chair", w: 64, h: 72 },
-  sofa: { name: "ソファ", type: "sofa", w: 180, h: 96 },
-  tv: { name: "テレビ", type: "tv", w: 108, h: 52 },
-  shelf: { name: "本棚", type: "shelf", w: 90, h: 150 },
-  desk: { name: "机", type: "desk", w: 160, h: 78 },
-  cabinet: { name: "収納", type: "cabinet", w: 118, h: 68 },
-  wardrobe: { name: "クローゼット", type: "wardrobe", w: 120, h: 176 },
-  fridge: { name: "冷蔵庫", type: "fridge", w: 72, h: 148 },
-  washer: { name: "洗濯機", type: "washer", w: 76, h: 92 },
-  toiletItem: { name: "トイレ", type: "toiletItem", w: 72, h: 112 },
-  bath: { name: "浴槽", type: "bath", w: 160, h: 78 },
-  sink: { name: "洗面台", type: "sink", w: 118, h: 62 },
-  stove: { name: "コンロ", type: "stove", w: 100, h: 62 },
-  door: { name: "ドア", type: "door", w: 120, h: 22 },
-  plant: { name: "観葉植物", type: "plant", w: 58, h: 72 },
-  rug: { name: "ラグ", type: "rug", w: 150, h: 94 }
+  bed: { name: "ベッド", type: "bed", w: 84, h: 168, cols: 3, rows: 6 },
+  table: { name: "テーブル", type: "table", w: 168, h: 112, cols: 6, rows: 4 },
+  chair: { name: "椅子", type: "chair", w: 84, h: 84, cols: 3, rows: 3 },
+  sofa: { name: "ソファ", type: "sofa", w: 168, h: 84, cols: 6, rows: 3 },
+  tv: { name: "テレビ", type: "tv", w: 112, h: 56, cols: 4, rows: 2 },
+  shelf: { name: "本棚", type: "shelf", w: 84, h: 112, cols: 3, rows: 4 },
+  desk: { name: "机", type: "desk", w: 168, h: 84, cols: 6, rows: 3 },
+  cabinet: { name: "収納", type: "cabinet", w: 112, h: 56, cols: 4, rows: 2 },
+  wardrobe: { name: "クローゼット", type: "wardrobe", w: 112, h: 140, cols: 4, rows: 5 },
+  fridge: { name: "冷蔵庫", type: "fridge", w: 56, h: 112, cols: 2, rows: 4 },
+  washer: { name: "洗濯機", type: "washer", w: 84, h: 84, cols: 3, rows: 3 },
+  toiletItem: { name: "トイレ", type: "toiletItem", w: 56, h: 112, cols: 2, rows: 4 },
+  bath: { name: "浴槽", type: "bath", w: 168, h: 84, cols: 6, rows: 3 },
+  sink: { name: "洗面台", type: "sink", w: 140, h: 56, cols: 5, rows: 2 },
+  stove: { name: "コンロ", type: "stove", w: 112, h: 56, cols: 4, rows: 2 },
+  door: { name: "ドア", type: "door", w: 112, h: 28, cols: 4, rows: 1 },
+  plant: { name: "観葉植物", type: "plant", w: 56, h: 56, cols: 2, rows: 2 },
+  rug: { name: "ラグ", type: "rug", w: 168, h: 112, cols: 6, rows: 4 }
 };
 
 let rooms = [];
@@ -634,6 +634,10 @@ function createRoom(data = {}) {
   const gridRows = Number(data.gridRows);
   const gridX = Number(data.gridX);
   const gridY = Number(data.gridY);
+  const itemCols = Number(data.itemCols);
+  const itemRows = Number(data.itemRows);
+  const itemGridX = Number(data.itemGridX);
+  const itemGridY = Number(data.itemGridY);
   const layoutIndex = Number(data.layoutIndex);
   return {
     id: data.id || uid(),
@@ -648,6 +652,10 @@ function createRoom(data = {}) {
     gridRows: Number.isFinite(gridRows) ? Math.max(1, Math.round(gridRows)) : null,
     gridX: Number.isFinite(gridX) ? Math.max(0, Math.round(gridX)) : null,
     gridY: Number.isFinite(gridY) ? Math.max(0, Math.round(gridY)) : null,
+    itemCols: Number.isFinite(itemCols) ? Math.max(1, Math.round(itemCols)) : null,
+    itemRows: Number.isFinite(itemRows) ? Math.max(1, Math.round(itemRows)) : null,
+    itemGridX: Number.isFinite(itemGridX) ? Math.max(0, Math.round(itemGridX)) : null,
+    itemGridY: Number.isFinite(itemGridY) ? Math.max(0, Math.round(itemGridY)) : null,
     layoutIndex: Number.isFinite(layoutIndex) ? Math.max(0, Math.round(layoutIndex)) : null,
     autoCentered: data.autoCentered === true,
     autoPlaced: data.type === "floorplan" ? data.autoPlaced !== false : false
@@ -704,6 +712,7 @@ function renderItemPalette() {
 function applyTemplate(template) {
   rooms = template.rooms.map((room) => createRoom(room));
   selectedRoomId = null;
+  syncCanvasItemsToGrid();
   renderAll();
   showToast(`${template.name} を読み込みました`);
 }
@@ -756,17 +765,17 @@ function renderSpace(group, room) {
 }
 
 function renderBed(group, room) {
-  const inset = Math.max(8, Math.min(room.w, room.h) * 0.08);
-  const headHeight = Math.max(26, room.h * 0.23);
-  const pillowGap = Math.max(4, inset * 0.6);
+  const inset = Math.max(5, Math.min(room.w, room.h) * 0.08);
+  const headHeight = Math.max(18, room.h * 0.22);
+  const pillowGap = Math.max(3, inset * 0.55);
   const pillowWidth = (room.w - inset * 2 - pillowGap) / 2;
-  const strokeWidth = Math.max(2, Math.min(room.w, room.h) * 0.025);
+  const strokeWidth = Math.max(1.4, Math.min(room.w, room.h) * 0.025);
   group.appendChild(svgEl("rect", {
     width: room.w,
     height: room.h,
-    rx: Math.max(6, room.w * 0.08),
+    rx: 1,
     fill: "#ffffff",
-    stroke: "#4f666b",
+    stroke: "#111",
     "stroke-width": strokeWidth
   }));
   group.appendChild(svgEl("rect", {
@@ -774,9 +783,10 @@ function renderBed(group, room) {
     y: inset,
     width: room.w - inset * 2,
     height: headHeight,
-    rx: Math.max(4, inset * 0.65),
-    fill: "#eef4f3",
-    stroke: "none"
+    rx: 1,
+    fill: "#fff",
+    stroke: "#111",
+    "stroke-width": Math.max(1, strokeWidth * 0.7)
   }));
   [0, 1].forEach((index) => {
     group.appendChild(svgEl("rect", {
@@ -784,9 +794,9 @@ function renderBed(group, room) {
       y: inset + pillowGap,
       width: pillowWidth,
       height: Math.max(16, headHeight - pillowGap * 2),
-      rx: Math.max(4, inset * 0.55),
-      fill: "#dce9e7",
-      stroke: "#b8cfcb",
+      rx: 1,
+      fill: "#fff",
+      stroke: "#111",
       "stroke-width": Math.max(1, strokeWidth * 0.55)
     }));
   });
@@ -795,18 +805,32 @@ function renderBed(group, room) {
     y1: inset + headHeight + inset * 0.45,
     x2: room.w - inset,
     y2: inset + headHeight + inset * 0.45,
-    stroke: "#9bb9b4",
+    stroke: "#111",
+    "stroke-width": Math.max(1, strokeWidth * 0.65)
+  }));
+  group.appendChild(svgEl("line", {
+    x1: room.w - inset,
+    y1: room.h - inset,
+    x2: room.w - inset - room.w * 0.2,
+    y2: room.h - inset - room.h * 0.13,
+    stroke: "#111",
     "stroke-width": Math.max(1, strokeWidth * 0.65)
   }));
 }
 
 function renderCatalogItem(group, room) {
-  const stroke = "#4f666b";
-  const accent = "#dce9e7";
-  const line = Math.max(2, Math.min(room.w, room.h) * 0.035);
-  const rect = (attrs) => group.appendChild(svgEl("rect", { fill: "#fff", stroke, "stroke-width": line, ...attrs }));
-  const lineEl = (attrs) => group.appendChild(svgEl("line", { stroke, "stroke-width": line, "stroke-linecap": "round", ...attrs }));
-  const circle = (attrs) => group.appendChild(svgEl("circle", { fill: "#fff", stroke, "stroke-width": line, ...attrs }));
+  const stroke = "#111";
+  const accent = "#fff";
+  const line = Math.max(1.4, Math.min(room.w, room.h) * 0.028);
+  const rect = ({ fill: _fill, stroke: requestedStroke, ...attrs }) => group.appendChild(svgEl("rect", {
+    fill: "#fff", stroke: requestedStroke === "none" ? "none" : stroke, "stroke-width": line, ...attrs
+  }));
+  const lineEl = ({ stroke: _stroke, ...attrs }) => group.appendChild(svgEl("line", {
+    stroke, "stroke-width": line, "stroke-linecap": "round", ...attrs
+  }));
+  const circle = ({ fill: _fill, stroke: _stroke, ...attrs }) => group.appendChild(svgEl("circle", {
+    fill: "#fff", stroke, "stroke-width": line, ...attrs
+  }));
 
   if (room.type === "table") {
     rect({ x: room.w * 0.1, y: room.h * 0.12, width: room.w * 0.8, height: room.h * 0.76, rx: room.h * 0.08, fill: "#f8fbfb" });
@@ -863,8 +887,8 @@ function renderCatalogItem(group, room) {
   }
   if (room.type === "toiletItem") {
     rect({ x: room.w * 0.24, y: room.h * 0.04, width: room.w * 0.52, height: room.h * 0.26, rx: room.w * 0.07, fill: accent });
-    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.64, rx: room.w * 0.34, ry: room.h * 0.31, fill: "#f8fbfb", stroke, "stroke-width": line }));
-    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.64, rx: room.w * 0.19, ry: room.h * 0.18, fill: "#fff", stroke: "#b8cfcb", "stroke-width": Math.max(1, line * 0.6) }));
+    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.64, rx: room.w * 0.34, ry: room.h * 0.31, fill: "#fff", stroke, "stroke-width": line }));
+    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.64, rx: room.w * 0.19, ry: room.h * 0.18, fill: "#fff", stroke, "stroke-width": Math.max(1, line * 0.6) }));
     return;
   }
   if (room.type === "bath") {
@@ -875,7 +899,7 @@ function renderCatalogItem(group, room) {
   if (room.type === "sink" || room.type === "stove") {
     rect({ x: room.w * 0.04, y: room.h * 0.08, width: room.w * 0.92, height: room.h * 0.82, rx: room.h * 0.08, fill: "#f8fbfb" });
     if (room.type === "sink") {
-      group.appendChild(svgEl("ellipse", { cx: room.w * 0.43, cy: room.h * 0.53, rx: room.w * 0.24, ry: room.h * 0.23, fill: accent, stroke, "stroke-width": Math.max(1, line * 0.7) }));
+      group.appendChild(svgEl("ellipse", { cx: room.w * 0.43, cy: room.h * 0.53, rx: room.w * 0.24, ry: room.h * 0.23, fill: "#fff", stroke, "stroke-width": Math.max(1, line * 0.7) }));
       lineEl({ x1: room.w * 0.7, y1: room.h * 0.22, x2: room.w * 0.7, y2: room.h * 0.42, "stroke-width": Math.max(1, line * 0.65) });
     } else {
       [[0.31, 0.35], [0.69, 0.35], [0.31, 0.67], [0.69, 0.67]].forEach(([x, y]) => circle({ cx: room.w * x, cy: room.h * y, r: room.h * 0.12, fill: accent, stroke: "#9bb9b4", "stroke-width": Math.max(1, line * 0.55) }));
@@ -888,12 +912,12 @@ function renderCatalogItem(group, room) {
     return;
   }
   if (room.type === "plant") {
-    group.appendChild(svgEl("path", { d: `M ${room.w * 0.5} ${room.h * 0.57} C ${room.w * 0.1} ${room.h * 0.38}, ${room.w * 0.18} ${room.h * 0.04}, ${room.w * 0.5} ${room.h * 0.38} C ${room.w * 0.82} ${room.h * 0.04}, ${room.w * 0.9} ${room.h * 0.38}, ${room.w * 0.5} ${room.h * 0.57}`, fill: "#dce9e7", stroke, "stroke-width": line, "stroke-linejoin": "round" }));
+    group.appendChild(svgEl("path", { d: `M ${room.w * 0.5} ${room.h * 0.57} C ${room.w * 0.1} ${room.h * 0.38}, ${room.w * 0.18} ${room.h * 0.04}, ${room.w * 0.5} ${room.h * 0.38} C ${room.w * 0.82} ${room.h * 0.04}, ${room.w * 0.9} ${room.h * 0.38}, ${room.w * 0.5} ${room.h * 0.57}`, fill: "#fff", stroke, "stroke-width": line, "stroke-linejoin": "round" }));
     rect({ x: room.w * 0.23, y: room.h * 0.55, width: room.w * 0.54, height: room.h * 0.35, rx: room.w * 0.08, fill: "#f8fbfb" });
     return;
   }
   if (room.type === "rug") {
-    rect({ x: room.w * 0.04, y: room.h * 0.08, width: room.w * 0.92, height: room.h * 0.84, rx: room.h * 0.35, fill: "#eef4f3", stroke: "#9bb9b4", "stroke-width": Math.max(1, line * 0.7) });
+    rect({ x: room.w * 0.04, y: room.h * 0.08, width: room.w * 0.92, height: room.h * 0.84, rx: room.h * 0.35, fill: "#fff", "stroke-width": Math.max(1, line * 0.7) });
   }
 }
 
@@ -1024,6 +1048,8 @@ function startDrag(event, id) {
         y: item.y,
         gridX: item.gridX,
         gridY: item.gridY,
+        itemGridX: item.itemGridX,
+        itemGridY: item.itemGridY,
         autoCentered: item.autoCentered,
         autoPlaced: item.autoPlaced
       };
@@ -1066,6 +1092,60 @@ function gridStep(axis) {
 function snapToGrid(value, axis) {
   const step = gridStep(axis);
   return Math.round(value / step) * step;
+}
+
+function getItemDimensions(item) {
+  return {
+    w: item.cols * gridStep("x"),
+    h: item.rows * gridStep("y")
+  };
+}
+
+function createCanvasItem(item, x, y) {
+  const { w, h } = getItemDimensions(item);
+  const clampedX = Math.max(0, Math.min(1200 - w, snapToGrid(x, "x")));
+  const clampedY = Math.max(0, Math.min(800 - h, snapToGrid(y, "y")));
+  return createRoom({
+    ...item,
+    x: clampedX,
+    y: clampedY,
+    w,
+    h,
+    itemCols: item.cols,
+    itemRows: item.rows,
+    itemGridX: Math.round(clampedX / gridStep("x")),
+    itemGridY: Math.round(clampedY / gridStep("y"))
+  });
+}
+
+function captureCanvasItemGrid(room) {
+  const stepX = gridStep("x");
+  const stepY = gridStep("y");
+  room.itemGridX = Math.max(0, Math.round(room.x / stepX));
+  room.itemGridY = Math.max(0, Math.round(room.y / stepY));
+}
+
+function syncCanvasItemsToGrid() {
+  const canvas = document.getElementById("svg-main");
+  if (!canvas || !canvas.clientWidth || !canvas.clientHeight) return;
+  const stepX = gridStep("x");
+  const stepY = gridStep("y");
+  const fallbackStepX = previousGridStepX || stepX;
+  const fallbackStepY = previousGridStepY || stepY;
+  const catalog = Object.values(itemCatalog);
+
+  rooms.forEach((room) => {
+    const definition = catalog.find((item) => item.type === room.type);
+    if (!definition) return;
+    room.itemCols ||= definition.cols;
+    room.itemRows ||= definition.rows;
+    room.itemGridX ??= Math.max(0, Math.round(room.x / fallbackStepX));
+    room.itemGridY ??= Math.max(0, Math.round(room.y / fallbackStepY));
+    room.w = room.itemCols * stepX;
+    room.h = room.itemRows * stepY;
+    room.x = Math.max(0, Math.min(1200 - room.w, room.itemGridX * stepX));
+    room.y = Math.max(0, Math.min(800 - room.h, room.itemGridY * stepY));
+  });
 }
 
 function pointInSvg(event) {
@@ -1264,11 +1344,8 @@ function placeItemOnCanvas(event) {
   const bounds = svg.getBoundingClientRect();
   const x = (event.clientX - bounds.left) * (1200 / bounds.width);
   const y = (event.clientY - bounds.top) * (800 / bounds.height);
-  const room = createRoom({
-    ...item,
-    x: Math.round(Math.max(0, Math.min(1200 - item.w, x - item.w / 2))),
-    y: Math.round(Math.max(0, Math.min(800 - item.h, y - item.h / 2)))
-  });
+  const { w, h } = getItemDimensions(item);
+  const room = createCanvasItem(item, x - w / 2, y - h / 2);
 
   rooms.push(room);
   actionHistory.push(() => {
@@ -1289,11 +1366,8 @@ function addCanvasItem(mode) {
   const itemCount = rooms.filter((room) => itemTypes.has(room.type)).length;
   const offsetX = (itemCount % 3) * gridStep("x");
   const offsetY = (Math.floor(itemCount / 3) % 3) * gridStep("y");
-  const room = createRoom({
-    ...item,
-    x: Math.max(0, Math.min(1200 - item.w, snapToGrid((1200 - item.w) / 2 + offsetX, "x"))),
-    y: Math.max(0, Math.min(800 - item.h, snapToGrid((800 - item.h) / 2 + offsetY, "y")))
-  });
+  const { w, h } = getItemDimensions(item);
+  const room = createCanvasItem(item, (1200 - w) / 2 + offsetX, (800 - h) / 2 + offsetY);
   rooms.push(room);
   selectedRoomId = room.id;
   actionHistory.push(() => {
@@ -1679,6 +1753,8 @@ window.addEventListener("pointerup", () => {
           room.autoCentered = false;
           room.autoPlaced = false;
           captureFloorPlanGrid(room);
+        } else if (Object.values(itemCatalog).some((item) => item.type === room.type)) {
+          captureCanvasItemGrid(room);
         }
       });
       actionHistory.push(() => {
@@ -1688,6 +1764,8 @@ window.addEventListener("pointerup", () => {
           room.y = origin.y;
           room.gridX = origin.gridX;
           room.gridY = origin.gridY;
+          room.itemGridX = origin.itemGridX;
+          room.itemGridY = origin.itemGridY;
           room.autoCentered = origin.autoCentered;
           room.autoPlaced = origin.autoPlaced;
         });
@@ -1755,6 +1833,7 @@ window.addEventListener("pointerup", () => {
 
 window.addEventListener("resize", () => {
   updateAllTextDrawElements();
+  syncCanvasItemsToGrid();
   syncFloorPlansToGrid();
 });
 
@@ -1967,7 +2046,10 @@ renderAll();
 const canvas = document.getElementById("svg-main");
 previousGridStepX = gridStep("x");
 previousGridStepY = gridStep("y");
-const canvasResizeObserver = new ResizeObserver(() => syncFloorPlansToGrid());
+const canvasResizeObserver = new ResizeObserver(() => {
+  syncCanvasItemsToGrid();
+  syncFloorPlansToGrid();
+});
 canvasResizeObserver.observe(canvas);
 canvas.addEventListener("pointerdown", startLineDraw);
 canvas.addEventListener("pointerdown", startTextDraw);

@@ -1631,6 +1631,11 @@ function drawMarriage(layer, fp, tp, rel) {
     selectRelLine(rel.id, visLine);
   });
   hitLine.addEventListener('mousedown', e => {
+    if (drawMode === 'line' || drawMode === 'dash-line') {
+      e.preventDefault(); e.stopPropagation();
+      setDrawMode(null);
+      return;
+    }
     if (drawMode || placeMode) return;
     if (selectedRelId !== rel.id) return; // 選択済みのみドラッグ
     e.preventDefault(); e.stopPropagation();
@@ -1743,6 +1748,11 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
       _clearRelFn = () => { if (visLine.isConnected) visLine.setAttribute('stroke', '#000'); };
     });
     hitLine.addEventListener('mousedown', e => {
+      if (drawMode === 'line' || drawMode === 'dash-line') {
+        e.preventDefault(); e.stopPropagation();
+        setDrawMode(null);
+        return;
+      }
       if (drawMode || placeMode) return;
       if (selectedRelId !== relId || selectedSegmentEls?.segIdx !== segIdx) return; // 選択済みのみドラッグ
       e.preventDefault(); e.stopPropagation();
@@ -2004,9 +2014,20 @@ function setStrokeWidth(w, btn) {
   });
 }
 
+function clearCanvasSelections() {
+  clearDrawElSelection();
+  clearRelSelection();
+  clearNodeSelection();
+  if (selectedEl) {
+    selectedEl.removeAttribute('stroke-dasharray');
+    clearSelection();
+  }
+}
+
 function setDrawMode(mode) {
   drawMode = drawMode === mode ? null : mode;
   placeMode = null;
+  clearCanvasSelections();
   document.querySelectorAll('.item-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.dtool-btn:not([data-sw])').forEach(b => b.classList.remove('active'));
   if (drawMode) document.getElementById('dtool-' + drawMode)?.classList.add('active');
@@ -2077,6 +2098,7 @@ function togglePalette() {
   if (!open) {
     // 開くとき：描画モードを解除
     drawMode = null;
+    clearCanvasSelections();
     document.querySelectorAll('.dtool-btn:not([data-sw])').forEach(b => b.classList.remove('active'));
     document.getElementById('stroke-size-picker').style.display = 'none';
     document.getElementById('text-size-picker').style.display = 'none';
@@ -2092,6 +2114,7 @@ function setPlaceMode(mode) {
   placeMode = placeMode === mode ? null : mode;
   // placeModeをセットする場合はdrawModeをリセット（相互呼び出しなし）
   drawMode = null;
+  clearCanvasSelections();
   document.querySelectorAll('.dtool-btn:not([data-sw])').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.item-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('stroke-size-picker').style.display = 'none';
@@ -2321,6 +2344,11 @@ function addEraseListener(elem) {
   });
   // mousedown: 辺選択済みなら辺ドラッグ、そうでなければ全体ドラッグ
   elem.addEventListener('mousedown', e => {
+    if (drawMode === 'line' || drawMode === 'dash-line') {
+      e.preventDefault(); e.stopPropagation();
+      setDrawMode(null);
+      return;
+    }
     if (drawMode || placeMode) return;
     if (selectedDrawEl !== elem) return;
     e.preventDefault(); e.stopPropagation();

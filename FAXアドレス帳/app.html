@@ -114,8 +114,9 @@ header h1{font-size:19px;font-weight:800;white-space:nowrap}
 .btn-copy-kagami.copied{background:#1a6b33}
 .btn-save-tpl{padding:9px 16px;background:#eef2f7;border:2px solid #c5d4e6;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600;color:#2d5a8e}
 .btn-save-tpl:hover{background:#dce8f5}
-.btn-del-tpl{margin-left:auto;padding:9px 14px;background:#fdf0ee;color:#c0392b;border:1px solid #f1a99e;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600}
+.btn-del-tpl{padding:9px 14px;background:#fdf0ee;color:#c0392b;border:1px solid #f1a99e;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600}
 .btn-del-tpl:hover{background:#fad7d2}
+.btn-close-kagami{margin-left:auto}
 .kagami-empty{flex:1;display:flex;align-items:center;justify-content:center;color:#90a8c4;font-size:14px}
 .pcat-btn{padding:4px 10px;border:1.5px solid #c5d4e6;border-radius:14px;background:#fff;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;color:#2d5a8e;transition:all 0.12s;white-space:nowrap}
 .pcat-btn:hover{border-color:#2d5a8e;background:#eef2f7}
@@ -199,7 +200,6 @@ header h1{font-size:19px;font-weight:800;white-space:nowrap}
   <div class="kagami-modal">
     <div class="kagami-header">
       <h3>📄 FAXかがみ テンプレート</h3>
-      <button class="btn-cancel" onclick="closeKagami()">閉じる</button>
     </div>
     <div class="kagami-body">
       <div class="kagami-list" id="kagamiList"></div>
@@ -486,7 +486,7 @@ function renderKagamiEditor(){
   if(!tpl){ed.innerHTML='<div class="kagami-empty">← テンプレートを選択してください</div>';return;}
   ed.innerHTML='<div><label style="font-size:12px;font-weight:700;color:#2d5a8e;display:block;margin-bottom:5px">テンプレート名</label><input class="tpl-name-input" id="tplName" value="'+escHtml(tpl.name)+'"></div>'
     +'<div style="flex:1;display:flex;flex-direction:column;gap:6px"><label style="font-size:12px;font-weight:700;color:#2d5a8e">文面（自由に編集できます）</label><textarea class="kagami-textarea" id="tplBody">'+escHtml(tpl.body)+'</textarea></div>'
-    +'<div class="kagami-actions"><button class="btn-copy-kagami" id="copyKagamiBtn" onclick="copyKagami()">📋 文面をコピー</button><button class="btn-save-tpl" onclick="saveTemplate()">保存</button><button class="btn-del-tpl" onclick="deleteTemplate(\''+tpl.id+'\')">削除</button></div>';
+    +'<div class="kagami-actions"><button class="btn-copy-kagami" id="copyKagamiBtn" onclick="copyKagami()">📋 文面をコピー</button><button class="btn-save-tpl" onclick="saveTemplate()">保存</button><button class="btn-del-tpl" onclick="deleteTemplate(\''+tpl.id+'\')">削除</button><button class="btn-cancel btn-close-kagami" onclick="closeKagami()">閉じる</button></div>';
 }
 function copyKagami(){navigator.clipboard.writeText(document.getElementById('tplBody').value).then(()=>{const btn=document.getElementById('copyKagamiBtn');btn.textContent='✓ コピーしました';btn.classList.add('copied');setTimeout(()=>{btn.textContent='📋 文面をコピー';btn.classList.remove('copied');},2000);showToast('かがみ文面をコピーしました');});}
 function saveTemplate(){const name=document.getElementById('tplName').value.trim();if(!name){alert('テンプレート名を入力してください');return;}const tpl=templates.find(t=>t.id===selectedTplId);if(tpl){tpl.name=name;tpl.body=document.getElementById('tplBody').value;}saveTemplates();renderKagamiList();showToast('テンプレートを保存しました');}

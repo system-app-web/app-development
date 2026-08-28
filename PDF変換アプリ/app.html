@@ -1104,8 +1104,7 @@
       setActionButtonsDisabled(true);
       try {
         if (isMergeMode()) {
-          const mergeCanvases = await renderMergedPagesForPrint(mergeFiles);
-          printCanvasesInCurrentWindow(mergeCanvases, buildMergedPageCanvas);
+          await printMergedPdfBlob(await buildMergedPdfBlob(mergeFiles));
         } else if (isPencilMode()) {
           printCanvasesInCurrentWindow(outputCanvases, buildMergedPageCanvas);
         } else {
@@ -2173,6 +2172,40 @@
         await nextFrame();
       }
       return new Blob([await mergedPdf.save()], { type: "application/pdf" });
+    }
+
+    // Keep the original PDF data intact so thin lines and text are not rasterized for fax printing.
+    function printMergedPdfBlob(blob) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const frame = document.createElement("iframe");
+        frame.setAttribute("aria-hidden", "true");
+        frame.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none";
+
+        const cleanup = () => {
+          frame.remove();
+          URL.revokeObjectURL(url);
+        };
+
+        frame.addEventListener("load", () => {
+          window.setTimeout(() => {
+            try {
+              const printWindow = frame.contentWindow;
+              if (!printWindow) throw new Error("印刷用PDFを開けませんでした。");
+              printWindow.focus();
+              printWindow.print();
+              window.setTimeout(cleanup, 60000);
+              resolve();
+            } catch (error) {
+              cleanup();
+              reject(error);
+            }
+          }, 250);
+        }, { once: true });
+
+        frame.src = url;
+        document.body.appendChild(frame);
+      });
     }
 
     function objectsToPdfBlobFromPageImages(pageImages) {

@@ -573,6 +573,7 @@ const itemCatalog = {
   plant: { name: "観葉植物", type: "plant", w: 56, h: 56, cols: 2, rows: 2 },
   rug: { name: "ラグ", type: "rug", w: 168, h: 112, cols: 6, rows: 4 }
 };
+const ITEM_SCALE = 0.8;
 
 let rooms = [];
 let dragState = null;
@@ -1139,8 +1140,8 @@ function syncDrawLinesToGrid() {
 
 function getItemDimensions(item) {
   return {
-    w: item.cols * gridStep("x"),
-    h: item.rows * gridStep("y")
+    w: item.cols * ITEM_SCALE * gridStep("x"),
+    h: item.rows * ITEM_SCALE * gridStep("y")
   };
 }
 
@@ -1154,8 +1155,8 @@ function createCanvasItem(item, x, y) {
     y: clampedY,
     w,
     h,
-    itemCols: item.cols,
-    itemRows: item.rows,
+    itemCols: item.cols * ITEM_SCALE,
+    itemRows: item.rows * ITEM_SCALE,
     itemGridX: clampedX / gridStep("x"),
     itemGridY: clampedY / gridStep("y")
   });
@@ -1176,8 +1177,8 @@ function isCanvasItem(room) {
 function attachCanvasItemToFloorPlan(room, plans = rooms.filter((candidate) => candidate.type === "floorplan")) {
   if (!isCanvasItem(room)) return;
   const definition = Object.values(itemCatalog).find((item) => item.type === room.type);
-  room.itemCols ||= definition?.cols || 1;
-  room.itemRows ||= definition?.rows || 1;
+  room.itemCols ||= (definition?.cols || 1) * ITEM_SCALE;
+  room.itemRows ||= (definition?.rows || 1) * ITEM_SCALE;
   room.itemGridX ??= Math.max(0, room.x / gridStep("x"));
   room.itemGridY ??= Math.max(0, room.y / gridStep("y"));
   const centerX = room.itemGridX + room.itemCols / 2;
@@ -1216,8 +1217,8 @@ function syncCanvasItemsToGrid() {
   rooms.forEach((room) => {
     const definition = catalog.find((item) => item.type === room.type);
     if (!definition) return;
-    room.itemCols ||= definition.cols;
-    room.itemRows ||= definition.rows;
+    room.itemCols ||= definition.cols * ITEM_SCALE;
+    room.itemRows ||= definition.rows * ITEM_SCALE;
     room.itemGridX ??= Math.max(0, room.x / fallbackStepX);
     room.itemGridY ??= Math.max(0, room.y / fallbackStepY);
     room.w = room.itemCols * stepX;

@@ -201,22 +201,26 @@ h1 {
 .canvas-wrap {
   position: relative;
   --canvas-zoom: 1;
+  --grid-size: 28px;
+  --grid-offset-x: 0px;
+  --grid-offset-y: 0px;
   flex: 1;
   overflow: hidden;
   border-radius: 28px;
   border: 1px solid #d9edf1;
-  background: #fff;
+  background-color: #fff;
+  background-image:
+    linear-gradient(to right, #d8e2ea 1px, transparent 1px),
+    linear-gradient(to bottom, #d8e2ea 1px, transparent 1px);
+  background-position: var(--grid-offset-x) var(--grid-offset-y);
+  background-size: var(--grid-size) var(--grid-size);
   box-shadow: 0 22px 42px rgba(74, 166, 180, 0.10);
 }
 #svg-main {
   width: 100%;
   height: 100%;
   display: block;
-  background-image:
-    linear-gradient(to right, #d8e2ea 1px, transparent 1px),
-    linear-gradient(to bottom, #d8e2ea 1px, transparent 1px);
-  background-size: 28px 28px;
-  background-color: transparent;
+  background: transparent;
   transform: scale(var(--canvas-zoom));
   transform-origin: center;
   will-change: transform;
@@ -1056,9 +1060,16 @@ function gridStep(axis) {
 
 function setCanvasZoom(nextZoom) {
   canvasZoom = Math.max(0.6, Math.min(1.8, Math.round(nextZoom * 10) / 10));
+  updateCanvasGridAlignment();
+  document.getElementById("canvas-zoom-level").textContent = `${Math.round(canvasZoom * 100)}%`;
+}
+
+function updateCanvasGridAlignment() {
   const wrap = document.querySelector(".canvas-wrap");
   wrap.style.setProperty("--canvas-zoom", canvasZoom);
-  document.getElementById("canvas-zoom-level").textContent = `${Math.round(canvasZoom * 100)}%`;
+  wrap.style.setProperty("--grid-size", `${GRID_PIXELS * canvasZoom}px`);
+  wrap.style.setProperty("--grid-offset-x", `${(1 - canvasZoom) * wrap.clientWidth / 2}px`);
+  wrap.style.setProperty("--grid-offset-y", `${(1 - canvasZoom) * wrap.clientHeight / 2}px`);
 }
 
 function adjustCanvasZoom(amount) {
@@ -1857,6 +1868,7 @@ window.addEventListener("pointerup", () => {
 });
 
 window.addEventListener("resize", () => {
+  updateCanvasGridAlignment();
   updateAllTextDrawElements();
   syncDrawLinesToGrid();
   syncCanvasItemsToGrid();
@@ -2073,6 +2085,7 @@ const canvas = document.getElementById("svg-main");
 previousGridStepX = gridStep("x");
 previousGridStepY = gridStep("y");
 const canvasResizeObserver = new ResizeObserver(() => {
+  updateCanvasGridAlignment();
   syncDrawLinesToGrid();
   syncCanvasItemsToGrid();
   syncFloorPlansToGrid();

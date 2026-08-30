@@ -889,7 +889,7 @@ function renderBed(group, room) {
   const inset = Math.max(4, Math.min(room.w, room.h) * 0.08);
   const radius = Math.max(4, Math.min(room.w, room.h) * 0.11);
   const strokeWidth = Math.max(1, Math.min(room.w, room.h) * 0.016);
-  const stroke = "#456a67";
+  const stroke = "#111";
   group.appendChild(svgEl("rect", {
     width: room.w,
     height: room.h,
@@ -897,16 +897,6 @@ function renderBed(group, room) {
     fill: "#ffffff",
     stroke,
     "stroke-width": strokeWidth
-  }));
-  group.appendChild(svgEl("rect", {
-    x: inset,
-    y: inset,
-    width: room.w * 0.3 - inset,
-    height: room.h - inset * 2,
-    rx: radius * 0.72,
-    fill: "#f5fbf9",
-    stroke,
-    "stroke-width": Math.max(1, strokeWidth * 0.68)
   }));
   group.appendChild(svgEl("rect", {
     x: room.w * 0.105,
@@ -924,18 +914,9 @@ function renderBed(group, room) {
     width: room.w * 0.58,
     height: room.h - inset * 2,
     rx: radius * 0.7,
-    fill: "#eef8f5",
+    fill: "#ffffff",
     stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)
-  }));
-  group.appendChild(svgEl("line", {
-    x1: room.w * 0.42,
-    y1: room.h * 0.18,
-    x2: room.w * 0.42,
-    y2: room.h * 0.82,
-    stroke,
-    "stroke-width": Math.max(1, strokeWidth * 0.62),
-    "stroke-linecap": "round"
   }));
 }
 

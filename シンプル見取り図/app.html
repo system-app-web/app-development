@@ -552,6 +552,8 @@ const itemCatalog = {
   chair: { name: "椅子", type: "chair", w: 84, h: 84, cols: 3, rows: 3 },
   sofa: { name: "ソファ", type: "sofa", w: 168, h: 84, cols: 6, rows: 3 },
   toiletItem: { name: "トイレ", type: "toiletItem", w: 56, h: 112, cols: 2, rows: 4 },
+  door: { name: "ドア", type: "door", w: 112, h: 28, cols: 4, rows: 1 },
+  windowItem: { name: "窓", type: "windowItem", w: 112, h: 28, cols: 4, rows: 1 },
 };
 const ITEM_SCALE = 0.8;
 
@@ -886,6 +888,11 @@ function renderCatalogItem(group, room) {
   if (room.type === "door") {
     rect({ x: room.w * 0.03, y: room.h * 0.15, width: room.w * 0.94, height: room.h * 0.7, rx: room.h * 0.12, fill: "#f8fbfb" });
     lineEl({ x1: room.w * 0.12, y1: room.h * 0.5, x2: room.w * 0.88, y2: room.h * 0.5, "stroke-width": Math.max(1, line * 0.6) });
+    return;
+  }
+  if (room.type === "windowItem") {
+    rect({ x: room.w * 0.03, y: room.h * 0.18, width: room.w * 0.94, height: room.h * 0.64, rx: room.h * 0.08, fill: "#f6fcfd" });
+    [0.35, 0.65].forEach((x) => lineEl({ x1: room.w * x, y1: room.h * 0.23, x2: room.w * x, y2: room.h * 0.77, "stroke-width": Math.max(1, line * 0.6) }));
     return;
   }
   if (room.type === "plant") {

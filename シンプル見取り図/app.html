@@ -684,7 +684,7 @@ function renderSVG(showHint = true) {
   rooms.forEach((room) => {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     const visualRotation = room.type === "floorplan" ? 0 : room.rotation;
-    group.setAttribute("transform", `translate(${room.x} ${room.y}) rotate(${visualRotation} ${room.w / 2} ${room.h / 2})`);
+    group.setAttribute("transform", getVisualItemTransform(room, visualRotation));
     group.dataset.id = room.id;
     group.style.cursor = "grab";
     group.classList.toggle("selected", room.id === selectedRoomId);
@@ -699,6 +699,23 @@ function renderSVG(showHint = true) {
     layerNodes.appendChild(group);
     group.addEventListener("pointerdown", (event) => startDrag(event, room.id));
   });
+}
+
+function getVisualItemTransform(room, rotation) {
+  const baseTransform = `translate(${room.x} ${room.y})`;
+  if (!rotation) return baseTransform;
+
+  const svg = document.getElementById("svg-main");
+  const scaleX = svg?.clientWidth ? svg.clientWidth / 1200 : 1;
+  const scaleY = svg?.clientHeight ? svg.clientHeight / 800 : 1;
+  const radians = rotation * Math.PI / 180;
+  const cosine = Math.cos(radians).toFixed(12);
+  const sineX = (Math.sin(radians) * scaleX / scaleY).toFixed(12);
+  const sineY = (-Math.sin(radians) * scaleY / scaleX).toFixed(12);
+  const centerX = room.w / 2;
+  const centerY = room.h / 2;
+
+  return `${baseTransform} translate(${centerX} ${centerY}) matrix(${cosine} ${sineX} ${sineY} ${cosine} 0 0) translate(${-centerX} ${-centerY})`;
 }
 
 function renderSpace(group, room) {
@@ -954,6 +971,9 @@ function addLabel(group, text, x, y, size) {
 function svgEl(name, attrs) {
   const el = document.createElementNS("http://www.w3.org/2000/svg", name);
   Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+  if (attrs.stroke && attrs.stroke !== "none" && !attrs["vector-effect"]) {
+    el.setAttribute("vector-effect", "non-scaling-stroke");
+  }
   return el;
 }
 

@@ -1165,6 +1165,8 @@ function captureCanvasItemGrid(room) {
   const stepY = gridStep("y");
   room.itemGridX = Math.max(0, Math.round(room.x / stepX));
   room.itemGridY = Math.max(0, Math.round(room.y / stepY));
+  room.x = room.itemGridX * stepX;
+  room.y = room.itemGridY * stepY;
   attachCanvasItemToFloorPlan(room);
 }
 

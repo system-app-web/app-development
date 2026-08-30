@@ -681,7 +681,12 @@ function renderSVG(showHint = true) {
   const layerNodes = document.getElementById("layer-nodes");
   if (!layerNodes) return;
   layerNodes.innerHTML = "";
-  rooms.forEach((room) => {
+  const drawingOrder = [...rooms].sort((first, second) => {
+    if (first.type === "floorplan") return -1;
+    if (second.type === "floorplan") return 1;
+    return 0;
+  });
+  drawingOrder.forEach((room) => {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     const visualRotation = room.type === "floorplan" ? 0 : room.rotation;
     group.setAttribute("transform", getVisualItemTransform(room, visualRotation));

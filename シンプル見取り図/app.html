@@ -363,6 +363,15 @@ h1 {
   border-color: #2daec0;
   box-shadow: 0 0 0 2px rgba(45, 174, 192, 0.18);
 }
+.palette-chair-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .item-btn.item-preview {
   width: 42px;
   height: 42px;
@@ -493,7 +502,7 @@ h1 {
       <div class="item-control-heading">アイコンを選択</div>
       <div class="item-control-actions">
         <button class="dtool-btn" type="button" onclick="addFloorPlan()" title="間取りを配置" aria-label="間取りを配置"><span class="floor-plan-icon" aria-hidden="true"></span></button>
-        <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette">☰</button>
+        <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette"><svg class="palette-chair-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v7H7zM5.5 11h13v5h-13zM7 16v4M17 16v4"/></svg></button>
       </div>
       <div id="item-palette" class="item-palette" aria-label="アイテム一覧"></div>
     </div>

@@ -1198,12 +1198,16 @@ function startDrag(event, id) {
   if (!room) return;
   selectedRoomId = id;
   renderAll(false);
+  const draggedRoomIds = room.type === "floorplan"
+    ? [room.id, ...rooms.filter((item) => item.parentFloorPlanId === room.id).map((item) => item.id)]
+    : [room.id];
   dragState = {
     id,
     startX: event.clientX,
     startY: event.clientY,
     moved: false,
-    rooms: [room].map((item) => {
+    rooms: draggedRoomIds.map((roomId) => {
+      const item = rooms.find((candidate) => candidate.id === roomId);
       return {
         id: item.id,
         x: item.x,

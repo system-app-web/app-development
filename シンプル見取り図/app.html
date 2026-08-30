@@ -750,7 +750,7 @@ function renderBed(group, room) {
   const headHeight = Math.max(18, room.h * 0.22);
   const pillowGap = Math.max(3, inset * 0.55);
   const pillowWidth = (room.w - inset * 2 - pillowGap) / 2;
-  const strokeWidth = Math.max(1.4, Math.min(room.w, room.h) * 0.025);
+  const strokeWidth = Math.max(1, Math.min(room.w, room.h) * 0.018);
   group.appendChild(svgEl("rect", {
     width: room.w,
     height: room.h,
@@ -802,7 +802,7 @@ function renderBed(group, room) {
 function renderCatalogItem(group, room) {
   const stroke = "#111";
   const accent = "#fff";
-  const line = Math.max(1.4, Math.min(room.w, room.h) * 0.028);
+  const line = Math.max(1, Math.min(room.w, room.h) * 0.02);
   const rect = ({ fill: _fill, stroke: requestedStroke, ...attrs }) => group.appendChild(svgEl("rect", {
     fill: "#fff", stroke: requestedStroke === "none" ? "none" : stroke, "stroke-width": line, ...attrs
   }));

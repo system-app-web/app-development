@@ -992,9 +992,17 @@ function renderCatalogItem(group, room) {
     return;
   }
   if (room.type === "toiletItem") {
-    rect({ x: room.w * 0.24, y: room.h * 0.04, width: room.w * 0.52, height: room.h * 0.26, rx: room.w * 0.07, fill: accent });
-    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.64, rx: room.w * 0.34, ry: room.h * 0.31, fill: "#fff", stroke, "stroke-width": line }));
-    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.64, rx: room.w * 0.19, ry: room.h * 0.18, fill: "#fff", stroke, "stroke-width": Math.max(1, line * 0.6) }));
+    rect({ x: room.w * 0.21, y: room.h * 0.04, width: room.w * 0.58, height: room.h * 0.19, rx: room.w * 0.11, fill: accent });
+    pathEl({ d: `M ${room.w * 0.5} ${room.h * 0.27}
+      C ${room.w * 0.72} ${room.h * 0.27}, ${room.w * 0.82} ${room.h * 0.4}, ${room.w * 0.8} ${room.h * 0.58}
+      C ${room.w * 0.78} ${room.h * 0.84}, ${room.w * 0.66} ${room.h * 0.96}, ${room.w * 0.5} ${room.h * 0.96}
+      C ${room.w * 0.34} ${room.h * 0.96}, ${room.w * 0.22} ${room.h * 0.84}, ${room.w * 0.2} ${room.h * 0.58}
+      C ${room.w * 0.18} ${room.h * 0.4}, ${room.w * 0.28} ${room.h * 0.27}, ${room.w * 0.5} ${room.h * 0.27} Z`, fill: "#fff", stroke, "stroke-width": line });
+    pathEl({ d: `M ${room.w * 0.5} ${room.h * 0.41}
+      C ${room.w * 0.62} ${room.h * 0.41}, ${room.w * 0.68} ${room.h * 0.5}, ${room.w * 0.67} ${room.h * 0.64}
+      C ${room.w * 0.66} ${room.h * 0.76}, ${room.w * 0.6} ${room.h * 0.83}, ${room.w * 0.5} ${room.h * 0.83}
+      C ${room.w * 0.4} ${room.h * 0.83}, ${room.w * 0.34} ${room.h * 0.76}, ${room.w * 0.33} ${room.h * 0.64}
+      C ${room.w * 0.32} ${room.h * 0.5}, ${room.w * 0.38} ${room.h * 0.41}, ${room.w * 0.5} ${room.h * 0.41} Z`, fill: "#fff", stroke, "stroke-width": Math.max(1, line * 0.6) });
     return;
   }
   if (room.type === "bath") {

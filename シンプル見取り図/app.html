@@ -1045,6 +1045,42 @@ function snapToGrid(value, axis) {
   return Math.round(value / step) * step;
 }
 
+function drawPathFromGridPoints(line, points) {
+  const stepX = gridStep("x");
+  const stepY = gridStep("y");
+  line.dataset.gridPoints = JSON.stringify(points);
+  line.setAttribute("d", `M ${points.map((point) => `${point.x * stepX} ${point.y * stepY}`).join(" L ")}`);
+}
+
+function getDrawPathGridPoints(line, fallbackStepX, fallbackStepY) {
+  try {
+    const saved = JSON.parse(line.dataset.gridPoints || "");
+    if (Array.isArray(saved) && saved.length) return saved;
+  } catch {
+    // Lines created before grid coordinates were stored are migrated below.
+  }
+  const values = (line.getAttribute("d") || "").match(/-?\d+(?:\.\d+)?/g) || [];
+  const points = [];
+  for (let index = 0; index + 1 < values.length; index += 2) {
+    points.push({
+      x: Math.round(Number(values[index]) / fallbackStepX),
+      y: Math.round(Number(values[index + 1]) / fallbackStepY)
+    });
+  }
+  return points;
+}
+
+function syncDrawLinesToGrid() {
+  const canvas = document.getElementById("svg-main");
+  if (!canvas || !canvas.clientWidth || !canvas.clientHeight) return;
+  const fallbackStepX = previousGridStepX || gridStep("x");
+  const fallbackStepY = previousGridStepY || gridStep("y");
+  document.querySelectorAll("#layer-draw path.canvas-draw").forEach((line) => {
+    const points = getDrawPathGridPoints(line, fallbackStepX, fallbackStepY);
+    if (points.length) drawPathFromGridPoints(line, points);
+  });
+}
+
 function getItemDimensions(item) {
   return {
     w: item.cols * gridStep("x"),
@@ -1142,6 +1178,7 @@ function startLineDraw(event) {
   line.style.pointerEvents = "stroke";
   line.addEventListener("pointerdown", (lineEvent) => selectDrawElement(lineEvent, line));
   document.getElementById("layer-draw").appendChild(line);
+  drawPathFromGridPoints(line, [{ x: Math.round(start.x / gridStep("x")), y: Math.round(start.y / gridStep("y")) }]);
   lineDrawState = { line, start, points: [start], moved: false };
 }
 
@@ -1628,7 +1665,10 @@ window.addEventListener("pointermove", (event) => {
   }
   if (nextX !== last.x || nextY !== last.y) {
     lineDrawState.points.push({ x: nextX, y: nextY });
-    lineDrawState.line.setAttribute("d", `M ${lineDrawState.points.map((item) => `${item.x} ${item.y}`).join(" L ")}`);
+    drawPathFromGridPoints(lineDrawState.line, lineDrawState.points.map((item) => ({
+      x: Math.round(item.x / gridStep("x")),
+      y: Math.round(item.y / gridStep("y"))
+    })));
     lineDrawState.moved = true;
   }
 });
@@ -1785,6 +1825,7 @@ window.addEventListener("pointerup", () => {
 
 window.addEventListener("resize", () => {
   updateAllTextDrawElements();
+  syncDrawLinesToGrid();
   syncCanvasItemsToGrid();
   syncFloorPlansToGrid();
 });
@@ -1999,6 +2040,7 @@ const canvas = document.getElementById("svg-main");
 previousGridStepX = gridStep("x");
 previousGridStepY = gridStep("y");
 const canvasResizeObserver = new ResizeObserver(() => {
+  syncDrawLinesToGrid();
   syncCanvasItemsToGrid();
   syncFloorPlansToGrid();
 });

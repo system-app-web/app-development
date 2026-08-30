@@ -198,6 +198,12 @@ h1 {
   text-align: center;
 }
 .preset-btn:hover { background: #e8f9fd; }
+.preset-btn.saved-template {
+  border-color: #a9d9bc;
+  background: #f0fbf3;
+  color: #28734a;
+}
+.preset-btn.saved-template:hover { background: #ddf4e4; }
 .canvas-wrap {
   position: relative;
   --canvas-zoom: 1;
@@ -654,13 +660,16 @@ function toggleTemplatePanel() {
 function renderTemplateButtons() {
   const wrap = document.getElementById("templateBtns");
   wrap.innerHTML = "";
-  [...templates, ...getSavedTemplates()].forEach((tpl) => {
+  const addButton = (tpl, isSaved) => {
     const btn = document.createElement("button");
     btn.className = "preset-btn";
+    btn.classList.toggle("saved-template", isSaved);
     btn.textContent = tpl.name;
     btn.onclick = () => applyTemplate(tpl);
     wrap.appendChild(btn);
-  });
+  };
+  templates.forEach((tpl) => addButton(tpl, false));
+  getSavedTemplates().forEach((tpl) => addButton(tpl, true));
 }
 
 function getSavedTemplates() {

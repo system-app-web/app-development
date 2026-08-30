@@ -887,34 +887,34 @@ function renderSpace(group, room) {
 
 function renderBed(group, room) {
   const inset = Math.max(4, Math.min(room.w, room.h) * 0.08);
-  const radius = Math.max(6, Math.min(room.w, room.h) * 0.16);
-  const pillowRadius = Math.min(radius, room.h * 0.09);
+  const radius = Math.max(4, Math.min(room.w, room.h) * 0.11);
   const strokeWidth = Math.max(1, Math.min(room.w, room.h) * 0.016);
   const stroke = "#111";
-  group.appendChild(svgEl("rect", {
-    width: room.w,
-    height: room.h,
-    rx: radius,
+  const roundedRect = (x, y, width, height, cornerRadius, attrs) => {
+    const svg = document.getElementById("svg-main");
+    const scaleX = svg?.clientWidth ? svg.clientWidth / 1200 : 1;
+    const scaleY = svg?.clientHeight ? svg.clientHeight / 800 : 1;
+    // The canvas can stretch horizontally and vertically at different rates.
+    const rx = Math.min(width / 2, cornerRadius * scaleY / scaleX);
+    const ry = Math.min(height / 2, cornerRadius);
+    const right = x + width;
+    const bottom = y + height;
+    return svgEl("path", {
+      d: `M ${x + rx} ${y} H ${right - rx} A ${rx} ${ry} 0 0 1 ${right} ${y + ry} V ${bottom - ry} A ${rx} ${ry} 0 0 1 ${right - rx} ${bottom} H ${x + rx} A ${rx} ${ry} 0 0 1 ${x} ${bottom - ry} V ${y + ry} A ${rx} ${ry} 0 0 1 ${x + rx} ${y} Z`,
+      ...attrs
+    });
+  };
+  group.appendChild(roundedRect(0, 0, room.w, room.h, radius, {
     fill: "#ffffff",
     stroke,
     "stroke-width": strokeWidth
   }));
-  group.appendChild(svgEl("rect", {
-    x: room.w * 0.25,
-    y: room.h * 0.09,
-    width: room.w * 0.5,
-    height: room.h * 0.205,
-    rx: pillowRadius,
+  group.appendChild(roundedRect(room.w * 0.25, room.h * 0.09, room.w * 0.5, room.h * 0.205, radius * 0.72, {
     fill: "#ffffff",
     stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)
   }));
-  group.appendChild(svgEl("rect", {
-    x: inset,
-    y: room.h * 0.34,
-    width: room.w - inset * 2,
-    height: room.h * 0.59,
-    rx: radius,
+  group.appendChild(roundedRect(inset, room.h * 0.34, room.w - inset * 2, room.h * 0.59, radius * 0.7, {
     fill: "#ffffff",
     stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)

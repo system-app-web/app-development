@@ -392,6 +392,14 @@ h1 {
   padding: 2px 0 6px;
 }
 .item-control-slot.open .item-palette { display: grid; }
+.door-palette {
+  display: none;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px 4px;
+  margin-top: 12px;
+  padding: 2px 0 6px;
+}
+.item-control-slot.doors-open .door-palette { display: grid; }
 .dtool-btn, .size-btn, .item-btn {
   width: 36px;
   height: 36px;
@@ -555,10 +563,11 @@ h1 {
       <div class="item-control-actions">
         <button class="dtool-btn" type="button" onclick="addFloorPlan()" title="間取りを配置" aria-label="間取りを配置"><span class="floor-plan-icon" aria-hidden="true"></span></button>
         <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette"><svg class="palette-chair-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v7H7zM5.5 11h13v5h-13zM7 16v4M17 16v4"/></svg></button>
-        <button class="dtool-btn" type="button" onclick="addCanvasItem('door')" title="ドアを配置" aria-label="ドアを配置">ドア</button>
+        <button id="door-toggle" class="dtool-btn" type="button" onclick="toggleDoorPalette()" title="ドア" aria-label="ドア" aria-expanded="false" aria-controls="door-palette">ドア</button>
         <button class="dtool-btn" type="button" onclick="addCanvasItem('windowItem')" title="窓を配置" aria-label="窓を配置">窓</button>
       </div>
       <div id="item-palette" class="item-palette" aria-label="アイテム一覧"></div>
+      <div id="door-palette" class="door-palette" aria-label="ドア一覧"></div>
     </div>
   </div>
 
@@ -608,7 +617,13 @@ const itemCatalog = {
   chair: { name: "椅子", type: "chair", w: 84, h: 84, cols: 3, rows: 3 },
   sofa: { name: "ソファ", type: "sofa", w: 168, h: 84, cols: 6, rows: 3 },
   toiletItem: { name: "トイレ", type: "toiletItem", w: 56, h: 112, cols: 2, rows: 4 },
-  door: { name: "ドア", type: "door", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false },
+  door: { name: "ドア", type: "door", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: false },
+  doorLeft: { name: "左開き", type: "doorLeft", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
+  doorRight: { name: "右開き", type: "doorRight", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
+  doorIn: { name: "手前開き", type: "doorIn", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
+  doorOut: { name: "奥開き", type: "doorOut", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
+  slidingDoor: { name: "引き戸", type: "slidingDoor", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
+  doubleSlidingDoor: { name: "両引き戸", type: "doubleSlidingDoor", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
   windowItem: { name: "窓", type: "windowItem", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false },
 };
 const ITEM_SCALE = 0.8;
@@ -770,6 +785,28 @@ function renderItemPalette() {
   });
 }
 
+function renderDoorPalette() {
+  const palette = document.getElementById("door-palette");
+  palette.innerHTML = "";
+  Object.entries(itemCatalog).filter(([, item]) => item.showInDoorPalette === true).forEach(([mode, item]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "item-btn item-preview";
+    button.title = item.name;
+    button.setAttribute("aria-label", item.name);
+    button.addEventListener("click", () => addCanvasItem(mode));
+
+    const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
+    preview.setAttribute("aria-hidden", "true");
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    renderCatalogItem(group, item);
+    preview.appendChild(group);
+    button.appendChild(preview);
+    palette.appendChild(button);
+  });
+}
+
 function applyTemplate(template) {
   rooms = template.rooms.map((room) => createRoom(room));
   selectedRoomId = null;
@@ -915,6 +952,9 @@ function renderCatalogItem(group, room) {
   const circle = ({ fill: _fill, stroke: _stroke, ...attrs }) => group.appendChild(svgEl("circle", {
     fill: "#fff", stroke, "stroke-width": line, ...attrs
   }));
+  const pathEl = ({ fill: _fill, stroke: _stroke, ...attrs }) => group.appendChild(svgEl("path", {
+    fill: "none", stroke, "stroke-width": line, "stroke-linecap": "round", "stroke-linejoin": "round", ...attrs
+  }));
 
   if (room.type === "table") {
     rect({ x: room.w * 0.1, y: room.h * 0.12, width: room.w * 0.8, height: room.h * 0.76, rx: room.h * 0.08, fill: "#f8fbfb" });
@@ -993,6 +1033,31 @@ function renderCatalogItem(group, room) {
   if (room.type === "door") {
     rect({ x: room.w * 0.03, y: room.h * 0.15, width: room.w * 0.94, height: room.h * 0.7, rx: room.h * 0.12, fill: "#f8fbfb" });
     lineEl({ x1: room.w * 0.12, y1: room.h * 0.5, x2: room.w * 0.88, y2: room.h * 0.5, "stroke-width": Math.max(1, line * 0.6) });
+    return;
+  }
+  if (["doorLeft", "doorRight", "doorIn", "doorOut"].includes(room.type)) {
+    const hingeOnLeft = room.type === "doorLeft" || room.type === "doorIn";
+    const opensToward = room.type === "doorIn";
+    const hingeX = room.w * (hingeOnLeft ? 0.12 : 0.88);
+    const leafX = room.w * (hingeOnLeft ? 0.82 : 0.18);
+    const baseY = room.h * 0.82;
+    const leafY = room.h * (opensToward ? 0.16 : 0.26);
+    lineEl({ x1: room.w * 0.05, y1: baseY, x2: room.w * 0.95, y2: baseY, "stroke-width": Math.max(1, line * 0.7) });
+    lineEl({ x1: hingeX, y1: baseY, x2: leafX, y2: leafY });
+    const sweep = hingeOnLeft ? 1 : 0;
+    pathEl({ d: `M ${hingeX} ${baseY} A ${room.w * 0.7} ${room.h * 0.7} 0 0 ${sweep} ${leafX} ${baseY}`, "stroke-dasharray": opensToward ? "3 2" : "" });
+    return;
+  }
+  if (room.type === "slidingDoor") {
+    rect({ x: room.w * 0.05, y: room.h * 0.26, width: room.w * 0.9, height: room.h * 0.48, rx: room.h * 0.06, fill: "#f8fbfb" });
+    lineEl({ x1: room.w * 0.5, y1: room.h * 0.3, x2: room.w * 0.5, y2: room.h * 0.7 });
+    pathEl({ d: `M ${room.w * 0.7} ${room.h * 0.5} H ${room.w * 0.3} M ${room.w * 0.3} ${room.h * 0.5} l ${room.w * 0.12} ${-room.h * 0.12} M ${room.w * 0.3} ${room.h * 0.5} l ${room.w * 0.12} ${room.h * 0.12}` });
+    return;
+  }
+  if (room.type === "doubleSlidingDoor") {
+    rect({ x: room.w * 0.05, y: room.h * 0.26, width: room.w * 0.9, height: room.h * 0.48, rx: room.h * 0.06, fill: "#f8fbfb" });
+    [0.35, 0.65].forEach((x) => lineEl({ x1: room.w * x, y1: room.h * 0.3, x2: room.w * x, y2: room.h * 0.7 }));
+    pathEl({ d: `M ${room.w * 0.48} ${room.h * 0.5} H ${room.w * 0.2} M ${room.w * 0.2} ${room.h * 0.5} l ${room.w * 0.1} ${-room.h * 0.12} M ${room.w * 0.2} ${room.h * 0.5} l ${room.w * 0.1} ${room.h * 0.12} M ${room.w * 0.52} ${room.h * 0.5} H ${room.w * 0.8} M ${room.w * 0.8} ${room.h * 0.5} l ${-room.w * 0.1} ${-room.h * 0.12} M ${room.w * 0.8} ${room.h * 0.5} l ${-room.w * 0.1} ${room.h * 0.12}` });
     return;
   }
   if (room.type === "windowItem") {
@@ -2109,8 +2174,18 @@ function showToast() {}
 
 function togglePalette() {
   const slot = document.querySelector(".item-control-slot");
+  slot.classList.remove("doors-open");
   const isOpen = slot.classList.toggle("open");
   document.getElementById("palette-toggle").setAttribute("aria-expanded", String(isOpen));
+  document.getElementById("door-toggle").setAttribute("aria-expanded", "false");
+}
+
+function toggleDoorPalette() {
+  const slot = document.querySelector(".item-control-slot");
+  slot.classList.remove("open");
+  const isOpen = slot.classList.toggle("doors-open");
+  document.getElementById("door-toggle").setAttribute("aria-expanded", String(isOpen));
+  document.getElementById("palette-toggle").setAttribute("aria-expanded", "false");
 }
 
 function setDrawMode(mode, button) {
@@ -2289,6 +2364,7 @@ async function exportPNG() {
 
 renderTemplateButtons();
 renderItemPalette();
+renderDoorPalette();
 renderAll();
 const canvas = document.getElementById("svg-main");
 previousGridStepX = gridStep("x");

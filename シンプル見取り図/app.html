@@ -899,10 +899,10 @@ function renderBed(group, room) {
     "stroke-width": strokeWidth
   }));
   group.appendChild(svgEl("rect", {
-    x: room.w * 0.26,
-    y: room.h * 0.11,
-    width: room.w * 0.48,
-    height: room.h * 0.2,
+    x: room.w * 0.25,
+    y: room.h * 0.09,
+    width: room.w * 0.5,
+    height: room.h * 0.205,
     rx: radius * 0.72,
     fill: "#ffffff",
     stroke,
@@ -910,9 +910,9 @@ function renderBed(group, room) {
   }));
   group.appendChild(svgEl("rect", {
     x: inset,
-    y: room.h * 0.38,
+    y: room.h * 0.34,
     width: room.w - inset * 2,
-    height: room.h * 0.5,
+    height: room.h * 0.59,
     rx: radius * 0.7,
     fill: "#ffffff",
     stroke,

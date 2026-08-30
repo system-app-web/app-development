@@ -1686,8 +1686,9 @@ function addFloorPlan() {
 
 window.addEventListener("pointermove", (event) => {
   const svg = document.getElementById("svg-main");
-  const scaleX = 1200 / svg.clientWidth;
-  const scaleY = 800 / svg.clientHeight;
+  const svgBounds = svg.getBoundingClientRect();
+  const scaleX = 1200 / svgBounds.width;
+  const scaleY = 800 / svgBounds.height;
 
   if (resizeState) {
     const room = rooms.find((item) => item.id === resizeState.id);

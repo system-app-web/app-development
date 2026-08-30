@@ -538,7 +538,8 @@ const itemCatalog = {
 
 let rooms = [];
 let dragState = null;
-const LINE_STROKE_WIDTH = 5;
+const LINE_STROKE_WIDTH = 4;
+const FLOOR_PLAN_STROKE_WIDTH = 4;
 let currentDrawMode = "";
 let currentPlaceMode = "";
 let currentTextSize = 28;
@@ -855,7 +856,7 @@ function renderFloorPlan(group, room) {
     height: room.h,
     fill: "transparent",
     stroke: "#000",
-    "stroke-width": 5,
+    "stroke-width": FLOOR_PLAN_STROKE_WIDTH,
     "vector-effect": "non-scaling-stroke",
     class: "floor-plan-outline"
   });

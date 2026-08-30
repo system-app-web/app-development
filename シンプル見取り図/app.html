@@ -417,20 +417,6 @@ h1 {
   border-radius: 16px;
   box-shadow: 0 16px 28px rgba(71, 184, 200, 0.14);
 }
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%) translateY(70px);
-  background: #1e293b;
-  color: #fff;
-  padding: 9px 18px;
-  border-radius: 999px;
-  font-size: 13px;
-  transition: transform 0.24s;
-  z-index: 100;
-}
-.toast.show { transform: translateX(-50%) translateY(0); }
 @media (max-width: 520px) {
   body {
     height: auto;
@@ -547,8 +533,6 @@ h1 {
     <div id="text-overlay" aria-label="テキスト入力欄"></div>
   </div>
 </div>
-
-<div id="toast" class="toast"></div>
 
 <script>
 const templates = [];
@@ -1953,13 +1937,7 @@ function clearAll() {
   showToast("見取り図をリセットしました");
 }
 
-function showToast(message) {
-  const el = document.getElementById("toast");
-  el.textContent = message;
-  el.classList.add("show");
-  clearTimeout(showToast._timer);
-  showToast._timer = setTimeout(() => el.classList.remove("show"), 1800);
-}
+function showToast() {}
 
 function togglePalette() {
   const slot = document.querySelector(".item-control-slot");

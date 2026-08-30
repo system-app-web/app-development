@@ -1015,6 +1015,7 @@ function startDrag(event, id) {
     id,
     startX: event.clientX,
     startY: event.clientY,
+    moved: false,
     rooms: connectedRoomIds.map((roomId) => {
       const item = rooms.find((candidate) => candidate.id === roomId);
       return {
@@ -1722,6 +1723,8 @@ window.addEventListener("pointermove", (event) => {
   if (!room) return;
   const origin = dragState.rooms.find((item) => item.id === room.id);
   if (!origin) return;
+  if (!dragState.moved && Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY) < 4) return;
+  dragState.moved = true;
   const x = origin.x + (event.clientX - dragState.startX) * scaleX;
   const y = origin.y + (event.clientY - dragState.startY) * scaleY;
 

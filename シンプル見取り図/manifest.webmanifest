@@ -1,6 +1,6 @@
 {
-  "name": "かんたん見取り図",
-  "short_name": "かんたん見取り図",
+  "name": "シンプル見取り図",
+  "short_name": "シンプル見取り図",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

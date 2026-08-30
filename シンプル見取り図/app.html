@@ -886,54 +886,34 @@ function renderSpace(group, room) {
 }
 
 function renderBed(group, room) {
-  const inset = Math.max(5, Math.min(room.w, room.h) * 0.08);
-  const headHeight = Math.max(18, room.h * 0.22);
-  const pillowGap = Math.max(3, inset * 0.55);
-  const pillowWidth = (room.w - inset * 2 - pillowGap) / 2;
+  const inset = Math.max(4, Math.min(room.w, room.h) * 0.08);
+  const radius = Math.max(3, Math.min(room.w, room.h) * 0.08);
   const strokeWidth = Math.max(1, Math.min(room.w, room.h) * 0.018);
   group.appendChild(svgEl("rect", {
     width: room.w,
     height: room.h,
-    rx: 1,
+    rx: radius,
     fill: "#ffffff",
     stroke: "#111",
     "stroke-width": strokeWidth
   }));
   group.appendChild(svgEl("rect", {
-    x: inset,
-    y: inset,
-    width: room.w - inset * 2,
-    height: headHeight,
-    rx: 1,
-    fill: "#fff",
-    stroke: "#111",
-    "stroke-width": Math.max(1, strokeWidth * 0.7)
-  }));
-  [0, 1].forEach((index) => {
-    group.appendChild(svgEl("rect", {
-      x: inset + index * (pillowWidth + pillowGap),
-      y: inset + pillowGap,
-      width: pillowWidth,
-      height: Math.max(16, headHeight - pillowGap * 2),
-      rx: 1,
-      fill: "#fff",
-      stroke: "#111",
-      "stroke-width": Math.max(1, strokeWidth * 0.55)
-    }));
-  });
-  group.appendChild(svgEl("line", {
-    x1: inset,
-    y1: inset + headHeight + inset * 0.45,
-    x2: room.w - inset,
-    y2: inset + headHeight + inset * 0.45,
+    x: room.w * 0.22,
+    y: room.h * 0.1,
+    width: room.w * 0.56,
+    height: room.h * 0.18,
+    rx: radius * 0.65,
+    fill: "#f8fbfb",
     stroke: "#111",
     "stroke-width": Math.max(1, strokeWidth * 0.65)
   }));
-  group.appendChild(svgEl("line", {
-    x1: room.w - inset,
-    y1: room.h - inset,
-    x2: room.w - inset - room.w * 0.2,
-    y2: room.h - inset - room.h * 0.13,
+  group.appendChild(svgEl("rect", {
+    x: inset,
+    y: room.h * 0.34,
+    width: room.w - inset * 2,
+    height: room.h * 0.54,
+    rx: radius * 0.7,
+    fill: "#f8fbfb",
     stroke: "#111",
     "stroke-width": Math.max(1, strokeWidth * 0.65)
   }));

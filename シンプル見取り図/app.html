@@ -372,6 +372,15 @@ h1 {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.structure-item-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .item-btn.item-preview {
   width: 42px;
   height: 42px;
@@ -503,6 +512,8 @@ h1 {
       <div class="item-control-actions">
         <button class="dtool-btn" type="button" onclick="addFloorPlan()" title="間取りを配置" aria-label="間取りを配置"><span class="floor-plan-icon" aria-hidden="true"></span></button>
         <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette"><svg class="palette-chair-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v7H7zM5.5 11h13v5h-13zM7 16v4M17 16v4"/></svg></button>
+        <button class="dtool-btn" type="button" onclick="addCanvasItem('door')" title="ドアを配置" aria-label="ドアを配置"><svg class="structure-item-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="8" width="19" height="8" rx="1.5"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button class="dtool-btn" type="button" onclick="addCanvasItem('windowItem')" title="窓を配置" aria-label="窓を配置"><svg class="structure-item-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="8" width="19" height="8" rx="1.2"/><line x1="8.5" y1="8.5" x2="8.5" y2="15.5"/><line x1="15.5" y1="8.5" x2="15.5" y2="15.5"/></svg></button>
       </div>
       <div id="item-palette" class="item-palette" aria-label="アイテム一覧"></div>
     </div>
@@ -552,8 +563,8 @@ const itemCatalog = {
   chair: { name: "椅子", type: "chair", w: 84, h: 84, cols: 3, rows: 3 },
   sofa: { name: "ソファ", type: "sofa", w: 168, h: 84, cols: 6, rows: 3 },
   toiletItem: { name: "トイレ", type: "toiletItem", w: 56, h: 112, cols: 2, rows: 4 },
-  door: { name: "ドア", type: "door", w: 112, h: 28, cols: 4, rows: 1 },
-  windowItem: { name: "窓", type: "windowItem", w: 112, h: 28, cols: 4, rows: 1 },
+  door: { name: "ドア", type: "door", w: 112, h: 28, cols: 4, rows: 1, showInPalette: false },
+  windowItem: { name: "窓", type: "windowItem", w: 112, h: 28, cols: 4, rows: 1, showInPalette: false },
 };
 const ITEM_SCALE = 0.8;
 
@@ -647,7 +658,7 @@ function getCanvasItem(mode) {
 function renderItemPalette() {
   const palette = document.getElementById("item-palette");
   palette.innerHTML = "";
-  Object.entries(itemCatalog).forEach(([mode, item]) => {
+  Object.entries(itemCatalog).filter(([, item]) => item.showInPalette !== false).forEach(([mode, item]) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "item-btn item-preview";

@@ -625,11 +625,11 @@ function createRoom(data = {}) {
     gridY: Number.isFinite(gridY) ? Math.max(0, Math.round(gridY)) : null,
     itemCols: Number.isFinite(itemCols) ? Math.max(1, Math.round(itemCols)) : null,
     itemRows: Number.isFinite(itemRows) ? Math.max(1, Math.round(itemRows)) : null,
-    itemGridX: Number.isFinite(itemGridX) ? Math.max(0, Math.round(itemGridX)) : null,
-    itemGridY: Number.isFinite(itemGridY) ? Math.max(0, Math.round(itemGridY)) : null,
+    itemGridX: Number.isFinite(itemGridX) ? Math.max(0, itemGridX) : null,
+    itemGridY: Number.isFinite(itemGridY) ? Math.max(0, itemGridY) : null,
     parentFloorPlanId: data.parentFloorPlanId || null,
-    parentFloorPlanOffsetX: Number.isFinite(parentFloorPlanOffsetX) ? Math.round(parentFloorPlanOffsetX) : null,
-    parentFloorPlanOffsetY: Number.isFinite(parentFloorPlanOffsetY) ? Math.round(parentFloorPlanOffsetY) : null,
+    parentFloorPlanOffsetX: Number.isFinite(parentFloorPlanOffsetX) ? parentFloorPlanOffsetX : null,
+    parentFloorPlanOffsetY: Number.isFinite(parentFloorPlanOffsetY) ? parentFloorPlanOffsetY : null,
     parentFloorPlanReady: data.parentFloorPlanReady === true,
     layoutIndex: Number.isFinite(layoutIndex) ? Math.max(0, Math.round(layoutIndex)) : null,
     autoCentered: data.autoCentered === true,
@@ -1146,8 +1146,8 @@ function getItemDimensions(item) {
 
 function createCanvasItem(item, x, y) {
   const { w, h } = getItemDimensions(item);
-  const clampedX = Math.max(0, Math.min(1200 - w, snapToGrid(x, "x")));
-  const clampedY = Math.max(0, Math.min(800 - h, snapToGrid(y, "y")));
+  const clampedX = Math.max(0, Math.min(1200 - w, x));
+  const clampedY = Math.max(0, Math.min(800 - h, y));
   return createRoom({
     ...item,
     x: clampedX,
@@ -1156,18 +1156,16 @@ function createCanvasItem(item, x, y) {
     h,
     itemCols: item.cols,
     itemRows: item.rows,
-    itemGridX: Math.round(clampedX / gridStep("x")),
-    itemGridY: Math.round(clampedY / gridStep("y"))
+    itemGridX: clampedX / gridStep("x"),
+    itemGridY: clampedY / gridStep("y")
   });
 }
 
 function captureCanvasItemGrid(room) {
   const stepX = gridStep("x");
   const stepY = gridStep("y");
-  room.itemGridX = Math.max(0, Math.round(room.x / stepX));
-  room.itemGridY = Math.max(0, Math.round(room.y / stepY));
-  room.x = room.itemGridX * stepX;
-  room.y = room.itemGridY * stepY;
+  room.itemGridX = Math.max(0, room.x / stepX);
+  room.itemGridY = Math.max(0, room.y / stepY);
   attachCanvasItemToFloorPlan(room);
 }
 
@@ -1180,8 +1178,8 @@ function attachCanvasItemToFloorPlan(room, plans = rooms.filter((candidate) => c
   const definition = Object.values(itemCatalog).find((item) => item.type === room.type);
   room.itemCols ||= definition?.cols || 1;
   room.itemRows ||= definition?.rows || 1;
-  room.itemGridX ??= Math.max(0, Math.round(room.x / gridStep("x")));
-  room.itemGridY ??= Math.max(0, Math.round(room.y / gridStep("y")));
+  room.itemGridX ??= Math.max(0, room.x / gridStep("x"));
+  room.itemGridY ??= Math.max(0, room.y / gridStep("y"));
   const centerX = room.itemGridX + room.itemCols / 2;
   const centerY = room.itemGridY + room.itemRows / 2;
   const parent = plans.find((plan) => (
@@ -1220,8 +1218,8 @@ function syncCanvasItemsToGrid() {
     if (!definition) return;
     room.itemCols ||= definition.cols;
     room.itemRows ||= definition.rows;
-    room.itemGridX ??= Math.max(0, Math.round(room.x / fallbackStepX));
-    room.itemGridY ??= Math.max(0, Math.round(room.y / fallbackStepY));
+    room.itemGridX ??= Math.max(0, room.x / fallbackStepX);
+    room.itemGridY ??= Math.max(0, room.y / fallbackStepY);
     room.w = room.itemCols * stepX;
     room.h = room.itemRows * stepY;
     room.x = Math.max(0, Math.min(1200 - room.w, room.itemGridX * stepX));
@@ -1749,8 +1747,8 @@ window.addEventListener("pointermove", (event) => {
       candidate.y = item.y + moveY;
     });
   } else {
-    room.x = Math.max(0, Math.round(x));
-    room.y = Math.max(0, Math.round(y));
+    room.x = Math.max(0, Math.min(1200 - room.w, x));
+    room.y = Math.max(0, Math.min(800 - room.h, y));
   }
   renderAll(false);
 });

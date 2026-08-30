@@ -1358,11 +1358,58 @@ function createCanvasItem(item, x, y) {
 function captureCanvasItemGrid(room) {
   const stepX = gridStep("x");
   const stepY = gridStep("y");
+  snapWallItemToFloorPlan(room);
   room.itemCols = Math.max(0.1, room.w / stepX);
   room.itemRows = Math.max(0.1, room.h / stepY);
   room.itemGridX = Math.max(0, room.x / stepX);
   room.itemGridY = Math.max(0, room.y / stepY);
   attachCanvasItemToFloorPlan(room);
+}
+
+function isWallItem(room) {
+  return room.type === "windowItem" || room.type === "door" || room.type.endsWith("Door") || room.type.startsWith("door");
+}
+
+function snapWallItemToFloorPlan(room) {
+  if (!isWallItem(room)) return;
+  const svg = document.getElementById("svg-main");
+  if (!svg?.clientWidth || !svg.clientHeight) return;
+  const thresholdX = 16 * (1200 / svg.clientWidth);
+  const thresholdY = 16 * (800 / svg.clientHeight);
+  const candidates = [];
+
+  rooms.filter((candidate) => candidate.type === "floorplan").forEach((plan) => {
+    const overlapsHorizontally = room.x + room.w > plan.x - thresholdX && room.x < plan.x + plan.w + thresholdX;
+    const overlapsVertically = room.y + room.h > plan.y - thresholdY && room.y < plan.y + plan.h + thresholdY;
+    if (overlapsHorizontally) {
+      candidates.push({ edge: "top", distance: Math.abs(room.y - plan.y), plan });
+      candidates.push({ edge: "bottom", distance: Math.abs(room.y + room.h - (plan.y + plan.h)), plan });
+    }
+    if (overlapsVertically) {
+      candidates.push({ edge: "left", distance: Math.abs(room.x - plan.x), plan });
+      candidates.push({ edge: "right", distance: Math.abs(room.x + room.w - (plan.x + plan.w)), plan });
+    }
+  });
+
+  const nearest = candidates.sort((first, second) => first.distance - second.distance)[0];
+  if (!nearest) return;
+  const limit = nearest.edge === "top" || nearest.edge === "bottom" ? thresholdY : thresholdX;
+  if (nearest.distance > limit) return;
+
+  const { plan } = nearest;
+  if (nearest.edge === "top") {
+    room.x = Math.max(plan.x, Math.min(plan.x + plan.w - room.w, room.x));
+    room.y = plan.y;
+  } else if (nearest.edge === "bottom") {
+    room.x = Math.max(plan.x, Math.min(plan.x + plan.w - room.w, room.x));
+    room.y = plan.y + plan.h - room.h;
+  } else if (nearest.edge === "left") {
+    room.x = plan.x;
+    room.y = Math.max(plan.y, Math.min(plan.y + plan.h - room.h, room.y));
+  } else {
+    room.x = plan.x + plan.w - room.w;
+    room.y = Math.max(plan.y, Math.min(plan.y + plan.h - room.h, room.y));
+  }
 }
 
 function isCanvasItem(room) {
@@ -1625,7 +1672,7 @@ function placeItemOnCanvas(event) {
   const room = createCanvasItem(item, x - w / 2, y - h / 2);
 
   rooms.push(room);
-  attachCanvasItemToFloorPlan(room);
+  captureCanvasItemGrid(room);
   actionHistory.push(() => {
     rooms = rooms.filter((item) => item.id !== room.id);
     if (selectedRoomId === room.id) selectedRoomId = null;
@@ -1647,7 +1694,7 @@ function addCanvasItem(mode) {
   const { w, h } = getItemDimensions(item);
   const room = createCanvasItem(item, (1200 - w) / 2 + offsetX, (800 - h) / 2 + offsetY);
   rooms.push(room);
-  attachCanvasItemToFloorPlan(room);
+  captureCanvasItemGrid(room);
   selectedRoomId = room.id;
   actionHistory.push(() => {
     rooms = rooms.filter((candidate) => candidate.id !== room.id);

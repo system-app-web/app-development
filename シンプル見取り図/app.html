@@ -662,8 +662,8 @@ function createRoom(data = {}) {
     gridRows: Number.isFinite(gridRows) ? Math.max(1, Math.round(gridRows)) : null,
     gridX: Number.isFinite(gridX) ? Math.max(0, Math.round(gridX)) : null,
     gridY: Number.isFinite(gridY) ? Math.max(0, Math.round(gridY)) : null,
-    itemCols: Number.isFinite(itemCols) ? Math.max(1, Math.round(itemCols)) : null,
-    itemRows: Number.isFinite(itemRows) ? Math.max(1, Math.round(itemRows)) : null,
+    itemCols: Number.isFinite(itemCols) ? Math.max(0.1, itemCols) : null,
+    itemRows: Number.isFinite(itemRows) ? Math.max(0.1, itemRows) : null,
     itemGridX: Number.isFinite(itemGridX) ? Math.max(0, itemGridX) : null,
     itemGridY: Number.isFinite(itemGridY) ? Math.max(0, itemGridY) : null,
     parentFloorPlanId: data.parentFloorPlanId || null,
@@ -801,6 +801,8 @@ function renderSVG(showHint = true) {
     else if (Object.values(itemCatalog).some((item) => item.type === room.type)) renderCatalogItem(group, room);
     else if (room.type === "furniture") renderFurniture(group, room);
     else renderSpace(group, room);
+
+    if (isCanvasItem(room)) renderCanvasItemResizeHandles(group, room);
 
     layerNodes.appendChild(group);
     group.addEventListener("pointerdown", (event) => startDrag(event, room.id));
@@ -1054,6 +1056,37 @@ function renderFloorPlan(group, room) {
   }
 }
 
+function renderCanvasItemResizeHandles(group, room) {
+  if (room.id !== selectedRoomId) return;
+  const svg = document.getElementById("svg-main");
+  const handleW = svg?.clientWidth ? 12 * (1200 / svg.clientWidth) : 12;
+  const handleH = svg?.clientHeight ? 12 * (800 / svg.clientHeight) : 12;
+  const halfW = handleW / 2;
+  const halfH = handleH / 2;
+  const handles = [
+    { corner: "nw", x: -halfW, y: -halfH, cursor: "nwse-resize" },
+    { corner: "ne", x: room.w - halfW, y: -halfH, cursor: "nesw-resize" },
+    { corner: "sw", x: -halfW, y: room.h - halfH, cursor: "nesw-resize" },
+    { corner: "se", x: room.w - halfW, y: room.h - halfH, cursor: "nwse-resize" }
+  ];
+  handles.forEach(({ corner, x, y, cursor }) => {
+    const handle = svgEl("rect", {
+      x,
+      y,
+      width: handleW,
+      height: handleH,
+      rx: Math.min(handleW, handleH) * 0.18,
+      fill: "#fff",
+      stroke: "#3972ad",
+      "stroke-width": 2,
+      class: "canvas-item-handle"
+    });
+    handle.style.cursor = cursor;
+    handle.addEventListener("pointerdown", (event) => startResize(event, room.id, corner));
+    group.appendChild(handle);
+  });
+}
+
 function renderDoor(group, room) {
   group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "#fff", stroke: "#000", "stroke-width": 3 }));
   group.appendChild(svgEl("line", { x1: 0, y1: room.h / 2, x2: room.w, y2: room.h / 2, stroke: "#000", "stroke-width": 3 }));
@@ -1144,6 +1177,14 @@ function startResize(event, id, corner) {
     origGridRows: room.gridRows,
     origGridX: room.gridX,
     origGridY: room.gridY,
+    origItemCols: room.itemCols,
+    origItemRows: room.itemRows,
+    origItemGridX: room.itemGridX,
+    origItemGridY: room.itemGridY,
+    origParentFloorPlanId: room.parentFloorPlanId,
+    origParentFloorPlanOffsetX: room.parentFloorPlanOffsetX,
+    origParentFloorPlanOffsetY: room.parentFloorPlanOffsetY,
+    origParentFloorPlanReady: room.parentFloorPlanReady,
     origAutoCentered: room.autoCentered,
     origAutoPlaced: room.autoPlaced
   };
@@ -1252,6 +1293,8 @@ function createCanvasItem(item, x, y) {
 function captureCanvasItemGrid(room) {
   const stepX = gridStep("x");
   const stepY = gridStep("y");
+  room.itemCols = Math.max(0.1, room.w / stepX);
+  room.itemRows = Math.max(0.1, room.h / stepY);
   room.itemGridX = Math.max(0, room.x / stepX);
   room.itemGridY = Math.max(0, room.y / stepY);
   attachCanvasItemToFloorPlan(room);
@@ -1782,19 +1825,31 @@ window.addEventListener("pointermove", (event) => {
   if (resizeState) {
     const room = rooms.find((item) => item.id === resizeState.id);
     if (!room) return;
-    const minW = gridStep("x");
-    const minH = gridStep("y");
+    const isItem = isCanvasItem(room);
+    const minW = isItem ? 24 * scaleX : gridStep("x");
+    const minH = isItem ? 24 * scaleY : gridStep("y");
     let left = resizeState.origX;
     let top = resizeState.origY;
     let right = resizeState.origX + resizeState.origW;
     let bottom = resizeState.origY + resizeState.origH;
-    const pointerX = snapToGrid(resizeState.origX + (event.clientX - resizeState.startX) * scaleX, "x");
-    const pointerY = snapToGrid(resizeState.origY + (event.clientY - resizeState.startY) * scaleY, "y");
+    let deltaX = event.clientX - resizeState.startX;
+    let deltaY = event.clientY - resizeState.startY;
+    if (isItem && room.rotation % 360) {
+      const radians = -room.rotation * Math.PI / 180;
+      const rotatedX = deltaX * Math.cos(radians) - deltaY * Math.sin(radians);
+      const rotatedY = deltaX * Math.sin(radians) + deltaY * Math.cos(radians);
+      deltaX = rotatedX;
+      deltaY = rotatedY;
+    }
+    const pointerX = resizeState.origX + deltaX * scaleX;
+    const pointerY = resizeState.origY + deltaY * scaleY;
+    const nextX = isItem ? pointerX : snapToGrid(pointerX, "x");
+    const nextY = isItem ? pointerY : snapToGrid(pointerY, "y");
 
-    if (resizeState.corner.includes("w")) left = Math.max(0, Math.min(right - minW, pointerX));
-    if (resizeState.corner.includes("e")) right = Math.min(1200, Math.max(left + minW, pointerX + resizeState.origW));
-    if (resizeState.corner.includes("n")) top = Math.max(0, Math.min(bottom - minH, pointerY));
-    if (resizeState.corner.includes("s")) bottom = Math.min(800, Math.max(top + minH, pointerY + resizeState.origH));
+    if (resizeState.corner.includes("w")) left = Math.max(0, Math.min(right - minW, nextX));
+    if (resizeState.corner.includes("e")) right = Math.min(1200, Math.max(left + minW, nextX + resizeState.origW));
+    if (resizeState.corner.includes("n")) top = Math.max(0, Math.min(bottom - minH, nextY));
+    if (resizeState.corner.includes("s")) bottom = Math.min(800, Math.max(top + minH, nextY + resizeState.origH));
 
     room.x = left;
     room.y = top;
@@ -1961,12 +2016,14 @@ window.addEventListener("pointerup", () => {
   }
   if (resizeState) {
     const room = rooms.find((item) => item.id === resizeState.id);
-    const { origX, origY, origW, origH, origGridColumns, origGridRows, origGridX, origGridY, origAutoCentered, origAutoPlaced } = resizeState;
+    const { origX, origY, origW, origH, origGridColumns, origGridRows, origGridX, origGridY, origItemCols, origItemRows, origItemGridX, origItemGridY, origParentFloorPlanId, origParentFloorPlanOffsetX, origParentFloorPlanOffsetY, origParentFloorPlanReady, origAutoCentered, origAutoPlaced } = resizeState;
     if (room && (room.x !== origX || room.y !== origY || room.w !== origW || room.h !== origH)) {
       if (room.type === "floorplan") {
         room.autoCentered = false;
         room.autoPlaced = false;
         captureFloorPlanGrid(room);
+      } else if (isCanvasItem(room)) {
+        captureCanvasItemGrid(room);
       }
       actionHistory.push(() => {
         room.x = origX;
@@ -1977,6 +2034,14 @@ window.addEventListener("pointerup", () => {
         room.gridRows = origGridRows;
         room.gridX = origGridX;
         room.gridY = origGridY;
+        room.itemCols = origItemCols;
+        room.itemRows = origItemRows;
+        room.itemGridX = origItemGridX;
+        room.itemGridY = origItemGridY;
+        room.parentFloorPlanId = origParentFloorPlanId;
+        room.parentFloorPlanOffsetX = origParentFloorPlanOffsetX;
+        room.parentFloorPlanOffsetY = origParentFloorPlanOffsetY;
+        room.parentFloorPlanReady = origParentFloorPlanReady;
         room.autoCentered = origAutoCentered;
         room.autoPlaced = origAutoPlaced;
         renderAll(false);

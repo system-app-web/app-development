@@ -612,7 +612,7 @@ const templates = [];
 const TEMPLATE_STORAGE_KEY = "simple-mitorizu-templates";
 
 const itemCatalog = {
-  bed: { name: "ベッド", type: "bed", w: 140, h: 98, cols: 5, rows: 3.5 },
+  bed: { name: "ベッド", type: "bed", w: 98, h: 140, cols: 3.5, rows: 5 },
   table: { name: "テーブル", type: "table", w: 168, h: 112, cols: 6, rows: 4 },
   chair: { name: "椅子", type: "chair", w: 84, h: 84, cols: 3, rows: 3 },
   sofa: { name: "ソファ", type: "sofa", w: 168, h: 84, cols: 6, rows: 3 },
@@ -899,20 +899,20 @@ function renderBed(group, room) {
     "stroke-width": strokeWidth
   }));
   group.appendChild(svgEl("rect", {
-    x: room.w * 0.105,
-    y: room.h * 0.24,
-    width: room.w * 0.125,
-    height: room.h * 0.52,
+    x: room.w * 0.26,
+    y: room.h * 0.11,
+    width: room.w * 0.48,
+    height: room.h * 0.2,
     rx: radius * 0.72,
     fill: "#ffffff",
     stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)
   }));
   group.appendChild(svgEl("rect", {
-    x: room.w * 0.34,
-    y: inset,
-    width: room.w * 0.58,
-    height: room.h - inset * 2,
+    x: inset,
+    y: room.h * 0.38,
+    width: room.w - inset * 2,
+    height: room.h * 0.5,
     rx: radius * 0.7,
     fill: "#ffffff",
     stroke,

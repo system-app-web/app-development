@@ -989,32 +989,6 @@ function renderAll(showHint = true) {
   renderSVG(showHint);
 }
 
-function floorPlansShareEdge(first, second) {
-  const epsilon = 0.01;
-  const overlapsVertically = first.y < second.y + second.h - epsilon && first.y + first.h > second.y + epsilon;
-  const overlapsHorizontally = first.x < second.x + second.w - epsilon && first.x + first.w > second.x + epsilon;
-  const sharesVerticalEdge = Math.abs(first.x + first.w - second.x) < epsilon || Math.abs(second.x + second.w - first.x) < epsilon;
-  const sharesHorizontalEdge = Math.abs(first.y + first.h - second.y) < epsilon || Math.abs(second.y + second.h - first.y) < epsilon;
-  return (sharesVerticalEdge && overlapsVertically) || (sharesHorizontalEdge && overlapsHorizontally);
-}
-
-function getConnectedFloorPlanIds(id) {
-  const selected = rooms.find((room) => room.id === id);
-  if (!selected || selected.type !== "floorplan") return [id];
-
-  const connected = new Set([id]);
-  const pending = [selected];
-  while (pending.length) {
-    const current = pending.pop();
-    rooms.filter((room) => room.type === "floorplan" && !connected.has(room.id)).forEach((candidate) => {
-      if (!floorPlansShareEdge(current, candidate)) return;
-      connected.add(candidate.id);
-      pending.push(candidate);
-    });
-  }
-  return [...connected];
-}
-
 function startDrag(event, id) {
   if (currentPlaceMode || currentDrawMode) return;
   event.stopPropagation();
@@ -1023,14 +997,12 @@ function startDrag(event, id) {
   if (!room) return;
   selectedRoomId = id;
   renderAll(false);
-  const connectedRoomIds = getConnectedFloorPlanIds(id);
   dragState = {
     id,
     startX: event.clientX,
     startY: event.clientY,
     moved: false,
-    rooms: connectedRoomIds.map((roomId) => {
-      const item = rooms.find((candidate) => candidate.id === roomId);
+    rooms: [room].map((item) => {
       return {
         id: item.id,
         x: item.x,

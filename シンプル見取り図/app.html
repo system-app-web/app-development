@@ -200,6 +200,7 @@ h1 {
 .preset-btn:hover { background: #e8f9fd; }
 .canvas-wrap {
   position: relative;
+  --canvas-zoom: 1;
   flex: 1;
   overflow: hidden;
   border-radius: 28px;
@@ -216,6 +217,9 @@ h1 {
     linear-gradient(to bottom, #d8e2ea 1px, transparent 1px);
   background-size: 28px 28px;
   background-color: transparent;
+  transform: scale(var(--canvas-zoom));
+  transform-origin: center;
+  will-change: transform;
 }
 .canvas-wrap.place-mode #svg-main {
   cursor: crosshair;
@@ -258,6 +262,31 @@ h1 {
   inset: 0;
   z-index: 20;
   pointer-events: none;
+  transform: scale(var(--canvas-zoom));
+  transform-origin: center;
+  will-change: transform;
+}
+.canvas-zoom-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #d6edf0;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(48, 117, 132, 0.16);
+}
+.canvas-zoom-controls .dtool-btn { box-shadow: none; }
+.canvas-zoom-level {
+  min-width: 38px;
+  color: #547b83;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
 }
 #text-overlay .canvas-text-editor {
   position: absolute;
@@ -488,6 +517,11 @@ h1 {
     <button id="dtool-text" class="dtool-btn canvas-text-trigger" type="button" onclick="setDrawMode('text', this)" title="テキスト" aria-label="テキスト"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><text x="3" y="16" font-size="15" font-weight="700" fill="currentColor" font-family="sans-serif">A</text><line x1="2" y1="19" x2="20" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <button class="dtool-btn canvas-delete-trigger" type="button" onclick="deleteSelected()" title="選択した要素を削除" aria-label="選択した要素を削除"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><polyline points="2,4 16,4" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><path d="M5 4V3a1 1 0 011-1h6a1 1 0 011 1v1" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><rect x="3.5" y="4" width="11" height="11" rx="1.5" stroke="#c44" stroke-width="1.8"/><line x1="7" y1="7.5" x2="7" y2="12" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><line x1="11" y1="7.5" x2="11" y2="12" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <button class="dtool-btn canvas-undo-trigger" type="button" onclick="undoAction()" title="元に戻す" aria-label="元に戻す">↩</button>
+    <div class="canvas-zoom-controls" aria-label="方眼の拡大縮小">
+      <button class="dtool-btn" type="button" onclick="adjustCanvasZoom(-0.1)" title="縮小" aria-label="縮小">−</button>
+      <span id="canvas-zoom-level" class="canvas-zoom-level" aria-live="polite">100%</span>
+      <button class="dtool-btn" type="button" onclick="adjustCanvasZoom(0.1)" title="拡大" aria-label="拡大">＋</button>
+    </div>
 
     <div id="text-size-picker" class="floating-picker" style="top:98px;left:54px;padding:10px;flex-direction:column;align-items:center;gap:6px;">
       <div style="font-size:10px;color:#6e8f94;font-weight:700;">文字サイズ</div>
@@ -554,6 +588,7 @@ const actionHistory = [];
 const GRID_PIXELS = 28;
 let previousGridStepX = null;
 let previousGridStepY = null;
+let canvasZoom = 1;
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -1019,6 +1054,26 @@ function gridStep(axis) {
     : GRID_PIXELS * (1200 / svg.clientWidth);
 }
 
+function setCanvasZoom(nextZoom) {
+  canvasZoom = Math.max(0.6, Math.min(1.8, Math.round(nextZoom * 10) / 10));
+  const wrap = document.querySelector(".canvas-wrap");
+  wrap.style.setProperty("--canvas-zoom", canvasZoom);
+  document.getElementById("canvas-zoom-level").textContent = `${Math.round(canvasZoom * 100)}%`;
+}
+
+function adjustCanvasZoom(amount) {
+  setCanvasZoom(canvasZoom + amount);
+}
+
+function pointInCanvasPixels(event) {
+  const wrap = document.querySelector(".canvas-wrap");
+  const bounds = wrap.getBoundingClientRect();
+  return {
+    x: (event.clientX - bounds.left - bounds.width * (1 - canvasZoom) / 2) / canvasZoom,
+    y: (event.clientY - bounds.top - bounds.height * (1 - canvasZoom) / 2) / canvasZoom
+  };
+}
+
 function snapToGrid(value, axis) {
   const step = gridStep(axis);
   return Math.round(value / step) * step;
@@ -1165,11 +1220,11 @@ function startTextDraw(event) {
   if (currentDrawMode !== "text" || event.button !== 0) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  const canvasBounds = document.getElementById("svg-main").getBoundingClientRect();
+  const canvasPoint = pointInCanvasPixels(event);
   const text = document.createElement("div");
   text.className = "canvas-text-editor canvas-text";
-  text.style.left = `${event.clientX - canvasBounds.left}px`;
-  text.style.top = `${event.clientY - canvasBounds.top}px`;
+  text.style.left = `${canvasPoint.x}px`;
+  text.style.top = `${canvasPoint.y}px`;
   text.dataset.fontSize = currentTextSize;
   text.dataset.direction = currentTextDir;
   text.contentEditable = "true";
@@ -1656,8 +1711,8 @@ window.addEventListener("pointermove", (event) => {
   if (!drawDragState) return;
   const overlay = document.getElementById("text-overlay");
   const element = drawDragState.element;
-  const dx = event.clientX - drawDragState.startX;
-  const dy = event.clientY - drawDragState.startY;
+  const dx = (event.clientX - drawDragState.startX) / canvasZoom;
+  const dy = (event.clientY - drawDragState.startY) / canvasZoom;
   if (!drawDragState.moved && Math.hypot(dx, dy) < 4) return;
   if (!drawDragState.moved) {
     drawDragState.moved = true;
@@ -1672,8 +1727,7 @@ window.addEventListener("pointermove", (event) => {
 
 window.addEventListener("pointermove", (event) => {
   if (!textResizeState) return;
-  const overlayBounds = document.getElementById("text-overlay").getBoundingClientRect();
-  const point = { x: event.clientX - overlayBounds.left, y: event.clientY - overlayBounds.top };
+  const point = pointInCanvasPixels(event);
   const { element, corner, bounds, fontSize } = textResizeState;
   let left = bounds.x;
   let top = bounds.y;
@@ -2027,6 +2081,10 @@ canvasResizeObserver.observe(canvas);
 canvas.addEventListener("pointerdown", startLineDraw);
 canvas.addEventListener("pointerdown", startTextDraw);
 canvas.addEventListener("pointerdown", placeItemOnCanvas);
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  adjustCanvasZoom(event.deltaY < 0 ? 0.1 : -0.1);
+}, { passive: false });
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement || event.target.isContentEditable) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {

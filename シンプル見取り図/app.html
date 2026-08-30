@@ -204,6 +204,33 @@ h1 {
   color: #28734a;
 }
 .preset-btn.saved-template:hover { background: #ddf4e4; }
+.saved-template-entry { position: relative; min-width: 0; }
+.saved-template-entry .preset-btn {
+  width: 100%;
+  padding-right: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saved-template-delete {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #b44a4a;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.saved-template-delete:hover { background: #ffe8e8; }
 .canvas-wrap {
   position: relative;
   --canvas-zoom: 1;
@@ -666,7 +693,21 @@ function renderTemplateButtons() {
     btn.classList.toggle("saved-template", isSaved);
     btn.textContent = tpl.name;
     btn.onclick = () => applyTemplate(tpl);
-    wrap.appendChild(btn);
+    if (!isSaved) {
+      wrap.appendChild(btn);
+      return;
+    }
+    const entry = document.createElement("div");
+    entry.className = "saved-template-entry";
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "saved-template-delete";
+    deleteButton.textContent = "×";
+    deleteButton.title = `${tpl.name}を削除`;
+    deleteButton.setAttribute("aria-label", `${tpl.name}を削除`);
+    deleteButton.onclick = () => deleteSavedTemplate(tpl.id, tpl.name);
+    entry.append(btn, deleteButton);
+    wrap.appendChild(entry);
   };
   templates.forEach((tpl) => addButton(tpl, false));
   getSavedTemplates().forEach((tpl) => addButton(tpl, true));
@@ -691,6 +732,13 @@ function saveTemplate() {
     name: name.trim(),
     rooms: rooms.map((room) => ({ ...room }))
   });
+  localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(saved));
+  renderTemplateButtons();
+}
+
+function deleteSavedTemplate(id, name) {
+  if (!id || !window.confirm(`「${name}」を削除しますか？`)) return;
+  const saved = getSavedTemplates().filter((template) => template.id !== id);
   localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(saved));
   renderTemplateButtons();
 }

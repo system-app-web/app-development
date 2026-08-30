@@ -612,7 +612,7 @@ const templates = [];
 const TEMPLATE_STORAGE_KEY = "simple-mitorizu-templates";
 
 const itemCatalog = {
-  bed: { name: "ベッド", type: "bed", w: 84, h: 168, cols: 3, rows: 6 },
+  bed: { name: "ベッド", type: "bed", w: 140, h: 98, cols: 5, rows: 3.5 },
   table: { name: "テーブル", type: "table", w: 168, h: 112, cols: 6, rows: 4 },
   chair: { name: "椅子", type: "chair", w: 84, h: 84, cols: 3, rows: 3 },
   sofa: { name: "ソファ", type: "sofa", w: 168, h: 84, cols: 6, rows: 3 },
@@ -887,35 +887,55 @@ function renderSpace(group, room) {
 
 function renderBed(group, room) {
   const inset = Math.max(4, Math.min(room.w, room.h) * 0.08);
-  const radius = Math.max(3, Math.min(room.w, room.h) * 0.08);
-  const strokeWidth = Math.max(1, Math.min(room.w, room.h) * 0.018);
+  const radius = Math.max(4, Math.min(room.w, room.h) * 0.11);
+  const strokeWidth = Math.max(1, Math.min(room.w, room.h) * 0.016);
+  const stroke = "#456a67";
   group.appendChild(svgEl("rect", {
     width: room.w,
     height: room.h,
     rx: radius,
     fill: "#ffffff",
-    stroke: "#111",
+    stroke,
     "stroke-width": strokeWidth
   }));
   group.appendChild(svgEl("rect", {
-    x: room.w * 0.22,
-    y: room.h * 0.1,
-    width: room.w * 0.56,
-    height: room.h * 0.18,
-    rx: radius * 0.65,
-    fill: "#f8fbfb",
-    stroke: "#111",
+    x: inset,
+    y: inset,
+    width: room.w * 0.3 - inset,
+    height: room.h - inset * 2,
+    rx: radius * 0.72,
+    fill: "#f5fbf9",
+    stroke,
+    "stroke-width": Math.max(1, strokeWidth * 0.68)
+  }));
+  group.appendChild(svgEl("rect", {
+    x: room.w * 0.105,
+    y: room.h * 0.24,
+    width: room.w * 0.125,
+    height: room.h * 0.52,
+    rx: radius * 0.72,
+    fill: "#ffffff",
+    stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)
   }));
   group.appendChild(svgEl("rect", {
-    x: inset,
-    y: room.h * 0.34,
-    width: room.w - inset * 2,
-    height: room.h * 0.54,
+    x: room.w * 0.34,
+    y: inset,
+    width: room.w * 0.58,
+    height: room.h - inset * 2,
     rx: radius * 0.7,
-    fill: "#f8fbfb",
-    stroke: "#111",
+    fill: "#eef8f5",
+    stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)
+  }));
+  group.appendChild(svgEl("line", {
+    x1: room.w * 0.42,
+    y1: room.h * 0.18,
+    x2: room.w * 0.42,
+    y2: room.h * 0.82,
+    stroke,
+    "stroke-width": Math.max(1, strokeWidth * 0.62),
+    "stroke-linecap": "round"
   }));
 }
 

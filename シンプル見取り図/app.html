@@ -1199,7 +1199,7 @@ function startDrag(event, id) {
   selectedRoomId = id;
   renderAll(false);
   const draggedRoomIds = room.type === "floorplan"
-    ? [room.id, ...rooms.filter((item) => item.parentFloorPlanId === room.id).map((item) => item.id)]
+    ? [room.id, ...rooms.filter((item) => isWallItem(item) && item.parentFloorPlanId === room.id).map((item) => item.id)]
     : [room.id];
   dragState = {
     id,
@@ -1422,6 +1422,13 @@ function isCanvasItem(room) {
 
 function attachCanvasItemToFloorPlan(room, plans = rooms.filter((candidate) => candidate.type === "floorplan")) {
   if (!isCanvasItem(room)) return;
+  if (!isWallItem(room)) {
+    room.parentFloorPlanId = null;
+    room.parentFloorPlanOffsetX = null;
+    room.parentFloorPlanOffsetY = null;
+    room.parentFloorPlanReady = true;
+    return;
+  }
   const definition = Object.values(itemCatalog).find((item) => item.type === room.type);
   room.itemCols ||= (definition?.cols || 1) * ITEM_SCALE;
   room.itemRows ||= (definition?.rows || 1) * ITEM_SCALE;
@@ -1441,7 +1448,7 @@ function attachCanvasItemToFloorPlan(room, plans = rooms.filter((candidate) => c
 }
 
 function syncAttachedCanvasItemsToFloorPlans(plans, stepX, stepY) {
-  rooms.filter(isCanvasItem).forEach((room) => {
+  rooms.filter(isWallItem).forEach((room) => {
     const parent = plans.find((plan) => plan.id === room.parentFloorPlanId);
     if (!parent || room.parentFloorPlanOffsetX === null || room.parentFloorPlanOffsetY === null) return;
     room.itemGridX = parent.gridX + room.parentFloorPlanOffsetX;
@@ -1842,7 +1849,7 @@ function syncFloorPlansToGrid() {
     return;
   }
 
-  rooms.filter((room) => isCanvasItem(room) && !room.parentFloorPlanReady).forEach((room) => {
+  rooms.filter((room) => isWallItem(room) && !room.parentFloorPlanReady).forEach((room) => {
     attachCanvasItemToFloorPlan(room, plans);
   });
 

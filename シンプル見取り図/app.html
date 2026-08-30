@@ -887,7 +887,8 @@ function renderSpace(group, room) {
 
 function renderBed(group, room) {
   const inset = Math.max(4, Math.min(room.w, room.h) * 0.08);
-  const radius = Math.max(4, Math.min(room.w, room.h) * 0.11);
+  const radius = Math.max(6, Math.min(room.w, room.h) * 0.16);
+  const pillowRadius = Math.min(radius, room.h * 0.09);
   const strokeWidth = Math.max(1, Math.min(room.w, room.h) * 0.016);
   const stroke = "#111";
   group.appendChild(svgEl("rect", {
@@ -903,7 +904,7 @@ function renderBed(group, room) {
     y: room.h * 0.09,
     width: room.w * 0.5,
     height: room.h * 0.205,
-    rx: radius * 0.72,
+    rx: pillowRadius,
     fill: "#ffffff",
     stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)
@@ -913,7 +914,7 @@ function renderBed(group, room) {
     y: room.h * 0.34,
     width: room.w - inset * 2,
     height: room.h * 0.59,
-    rx: radius * 0.7,
+    rx: radius,
     fill: "#ffffff",
     stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)

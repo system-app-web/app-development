@@ -1450,7 +1450,7 @@ function captureCanvasItemGrid(room, { allowWallAttachment = true } = {}) {
     detachWallItemFromFloorPlan(room);
     return;
   }
-  attachCanvasItemToFloorPlan(room);
+  attachCanvasItemToFloorPlan(room, undefined, snappedToWall?.plan || null);
   captureViewportFloorPlanAnchor(room);
 }
 
@@ -1505,12 +1505,12 @@ function snapWallItemToFloorPlan(room) {
     const overlapsHorizontally = room.x + room.w > plan.x - thresholdX && room.x < plan.x + plan.w + thresholdX;
     const overlapsVertically = room.y + room.h > plan.y - thresholdY && room.y < plan.y + plan.h + thresholdY;
     if (overlapsHorizontally) {
-      candidates.push({ edge: "top", distance: Math.abs(room.y - plan.y), plan });
-      candidates.push({ edge: "bottom", distance: Math.abs(room.y + room.h - (plan.y + plan.h)), plan });
+      candidates.push({ edge: "top", distance: Math.abs(room.y + room.h / 2 - plan.y), plan });
+      candidates.push({ edge: "bottom", distance: Math.abs(room.y + room.h / 2 - (plan.y + plan.h)), plan });
     }
     if (overlapsVertically) {
-      candidates.push({ edge: "left", distance: Math.abs(room.x - plan.x), plan });
-      candidates.push({ edge: "right", distance: Math.abs(room.x + room.w - (plan.x + plan.w)), plan });
+      candidates.push({ edge: "left", distance: Math.abs(room.x + room.w / 2 - plan.x), plan });
+      candidates.push({ edge: "right", distance: Math.abs(room.x + room.w / 2 - (plan.x + plan.w)), plan });
     }
   });
 
@@ -1522,25 +1522,25 @@ function snapWallItemToFloorPlan(room) {
   const { plan } = nearest;
   if (nearest.edge === "top") {
     room.x = Math.max(plan.x, Math.min(plan.x + plan.w - room.w, room.x));
-    room.y = plan.y;
+    room.y = plan.y - room.h / 2;
   } else if (nearest.edge === "bottom") {
     room.x = Math.max(plan.x, Math.min(plan.x + plan.w - room.w, room.x));
-    room.y = plan.y + plan.h - room.h;
+    room.y = plan.y + plan.h - room.h / 2;
   } else if (nearest.edge === "left") {
-    room.x = plan.x;
+    room.x = plan.x - room.w / 2;
     room.y = Math.max(plan.y, Math.min(plan.y + plan.h - room.h, room.y));
   } else {
-    room.x = plan.x + plan.w - room.w;
+    room.x = plan.x + plan.w - room.w / 2;
     room.y = Math.max(plan.y, Math.min(plan.y + plan.h - room.h, room.y));
   }
-  return plan;
+  return nearest;
 }
 
 function isCanvasItem(room) {
   return Object.values(itemCatalog).some((item) => item.type === room.type);
 }
 
-function attachCanvasItemToFloorPlan(room, plans = rooms.filter((candidate) => candidate.type === "floorplan")) {
+function attachCanvasItemToFloorPlan(room, plans = rooms.filter((candidate) => candidate.type === "floorplan"), attachedPlan = null) {
   if (!isCanvasItem(room)) return;
   if (!isWallItem(room)) {
     room.parentFloorPlanId = null;
@@ -1556,7 +1556,7 @@ function attachCanvasItemToFloorPlan(room, plans = rooms.filter((candidate) => c
   room.itemGridY ??= Math.max(0, room.y / gridStep("y"));
   const centerX = room.itemGridX + room.itemCols / 2;
   const centerY = room.itemGridY + room.itemRows / 2;
-  const parent = plans.find((plan) => (
+  const parent = attachedPlan || plans.find((plan) => (
     plan.gridX !== null && plan.gridY !== null &&
     centerX >= plan.gridX && centerX < plan.gridX + plan.gridColumns &&
     centerY >= plan.gridY && centerY < plan.gridY + plan.gridRows

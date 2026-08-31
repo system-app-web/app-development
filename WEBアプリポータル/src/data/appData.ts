@@ -5,6 +5,7 @@ export type PortalApp = {
   id: string;
   name: string;
   url?: string;
+  installUrl?: string;
   manualUrl?: string;
   icon: string;
   iconImage?: string;
@@ -19,6 +20,7 @@ export const appData: PortalApp[] = [
     id: 'simple-genogram',
     name: 'かんたんジェノグラム',
     url: 'https://easy-genogram-app.vercel.app',
+    installUrl: 'https://easy-genogram-app.vercel.app/app.html?install=1',
     manualUrl: '',
     icon: 'genogram',
     iconImage: 'app-icons/genogram.png',
@@ -30,6 +32,7 @@ export const appData: PortalApp[] = [
     id: 'simple-floor-plan',
     name: 'シンプル見取り図',
     url: 'https://easy-floor-plan.vercel.app',
+    installUrl: 'https://easy-floor-plan.vercel.app/app.html?install=1',
     manualUrl: '',
     icon: 'floorplan',
     iconImage: 'app-icons/floor-plan.png',
@@ -54,6 +57,7 @@ export const appData: PortalApp[] = [
     id: 'pdf-converter',
     name: 'PDF変換アプリ',
     url: 'https://pdf-converter-app-six.vercel.app',
+    installUrl: 'https://pdf-converter-app-six.vercel.app/app.html?install=1',
     manualUrl: '',
     icon: 'pdf',
     iconImage: 'app-icons/pdf-converter.png',
@@ -65,6 +69,7 @@ export const appData: PortalApp[] = [
     id: 'user-checklist',
     name: '利用者チェック表',
     url: 'https://riyosha-check-app.vercel.app',
+    installUrl: 'https://riyosha-check-app.vercel.app/%E5%88%A9%E7%94%A8%E8%80%85%E3%83%81%E3%82%A7%E3%83%83%E3%82%AF%E8%A1%A8.html?install=1',
     manualUrl: '',
     icon: 'check',
     iconImage: 'app-icons/user-checklist.png',
@@ -76,6 +81,7 @@ export const appData: PortalApp[] = [
     id: 'fax-address-book',
     name: 'FAXアドレス帳',
     url: 'https://fax-address-book.vercel.app',
+    installUrl: 'https://fax-address-book.vercel.app/app.html?install=1',
     manualUrl: '',
     icon: 'fax',
     iconImage: 'app-icons/fax-address-book.png',
@@ -87,6 +93,7 @@ export const appData: PortalApp[] = [
     id: 'template-notes',
     name: 'テンプレートメモ帳',
     url: 'https://template-memo.vercel.app',
+    installUrl: 'https://template-memo.vercel.app/app.html?install=1',
     manualUrl: '',
     icon: 'memo',
     iconImage: 'app-icons/template-notes.png',
@@ -99,6 +106,7 @@ export const appData: PortalApp[] = [
     id: 'shortcut-memo',
     name: 'ショートカットメモ',
     url: 'https://shortcut-list.vercel.app',
+    installUrl: 'https://shortcut-list.vercel.app/?install=1',
     manualUrl: '',
     icon: 'shortcut',
     iconImage: 'app-icons/shortcut-memo.svg',

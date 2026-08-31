@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="FAXアドレス帳">
 <meta name="theme-color" content="#1e3a5f">
-<link rel="apple-touch-icon" href="./app-icon.png">
+<link rel="apple-touch-icon" href="/app-icon.png">
 <link rel="icon" type="image/png" href="./app-icon.png">
-<link rel="manifest" href="./manifest.webmanifest">
+<link rel="manifest" href="/manifest.webmanifest">
 <title>FAXアドレス帳</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -494,5 +494,6 @@ function deleteTemplate(id){const tpl=templates.find(t=>t.id===id);if(!tpl||!con
 
 render();
 </script>
+<script type="module" src="./pwa-install.js"></script>
 </body>
 </html>

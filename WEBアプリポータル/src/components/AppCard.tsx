@@ -29,9 +29,16 @@ export function AppCard({ app }: AppCardProps) {
           調整中
         </button>
       ) : (
-        <a className="button primary" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}を新しいタブで開く`}>
-          このアプリを開く
-        </a>
+        <div className="app-card-actions">
+          <a className="button primary" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}を新しいタブで開く`}>
+            このアプリを開く
+          </a>
+          {app.installUrl ? (
+            <a className="button install" href={app.installUrl} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}をアプリとしてインストールする`}>
+              アプリとしてインストール
+            </a>
+          ) : null}
+        </div>
       )}
     </article>
   );

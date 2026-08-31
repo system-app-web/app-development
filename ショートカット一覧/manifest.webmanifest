@@ -1,11 +1,11 @@
 {
-  "name": "テンプレートメモ帳",
-  "short_name": "テンプレートメモ帳",
+  "name": "ショートカットメモ",
+  "short_name": "ショートカットメモ",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#eef2f7",
-  "theme_color": "#1e4d6b",
+  "background_color": "#f7f7f4",
+  "theme_color": "#2f6f73",
   "icons": [
     {
       "src": "/app-icon-192.png",
@@ -16,12 +16,6 @@
     {
       "src": "/app-icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/app-icon.png",
-      "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any maskable"
     }

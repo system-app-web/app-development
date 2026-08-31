@@ -374,6 +374,22 @@ a {
   box-shadow: 0 12px 22px rgba(17, 118, 216, 0.2);
 }
 
+.app-card-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.button.install {
+  color: #1768ad;
+  border-color: #b9dbf7;
+  background: #ffffff;
+}
+
+.button.install:hover {
+  border-color: #62aee8;
+  background: #f1f8ff;
+}
+
 .button.secondary {
   color: var(--blue);
   background: #ffffff;
@@ -535,6 +551,10 @@ a {
     padding: 10px 8px;
     border-radius: 12px;
     font-size: 0.88rem;
+  }
+
+  .app-card-actions {
+    gap: 8px;
   }
 
   .app-section {

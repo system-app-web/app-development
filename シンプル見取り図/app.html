@@ -336,6 +336,15 @@ h1 {
   box-shadow: 0 4px 12px rgba(45, 130, 150, 0.12);
 }
 .canvas-template-save:hover { background: #e8f9fd; }
+.canvas-folder-save {
+  position: absolute;
+  bottom: 58px;
+  left: 50%;
+  z-index: 30;
+  transform: translateX(-50%);
+  padding: 7px 16px;
+  font-size: 12px;
+}
 .canvas-zoom-controls .dtool-btn { box-shadow: none; }
 .canvas-zoom-level {
   min-width: 38px;
@@ -584,6 +593,7 @@ h1 {
       <span id="canvas-zoom-level" class="canvas-zoom-level" aria-live="polite">100%</span>
       <button class="dtool-btn" type="button" onclick="adjustCanvasZoom(0.1)" title="拡大" aria-label="拡大">＋</button>
     </div>
+    <button class="btn btn-primary canvas-folder-save" type="button" onclick="exportPNG()">フォルダ保存</button>
     <button class="canvas-template-save" type="button" onclick="saveTemplate()">＋テンプレートに保存</button>
 
     <div id="text-size-picker" class="floating-picker" style="top:98px;left:54px;padding:10px;flex-direction:column;align-items:center;gap:6px;">

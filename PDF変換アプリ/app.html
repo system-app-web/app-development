@@ -1119,11 +1119,12 @@
       setActionButtonsDisabled(true);
       try {
         if (isMergeMode()) {
-          await printMergedPdfBlob(await buildMergedPdfBlob(mergeFiles));
+          const mergeCanvases = await renderMergedPagesForPrint(mergeFiles);
+          await printMergedPdfBlob(buildPencilPdfBlob(mergeCanvases.map(toBlackWhite)));
         } else if (isPencilMode()) {
-          printCanvasesInCurrentWindow(outputCanvases, buildMergedPageCanvas);
+          printCanvasesInCurrentWindow(outputCanvases.map(toBlackWhite), buildMergedPageCanvas);
         } else {
-          printCanvasesInCurrentWindow(outputCanvases, buildA4PageCanvas);
+          printCanvasesInCurrentWindow(outputCanvases.map(toBlackWhite), buildA4PageCanvas);
         }
         setStatus("印刷ダイアログを開いています。");
       } catch (error) {
@@ -2198,7 +2199,6 @@
       return new Blob([await mergedPdf.save()], { type: "application/pdf" });
     }
 
-    // Keep the original PDF data intact so thin lines and text are not rasterized for fax printing.
     function printMergedPdfBlob(blob) {
       return new Promise((resolve, reject) => {
         const url = URL.createObjectURL(blob);

@@ -612,11 +612,16 @@ const templates = [];
 const TEMPLATE_STORAGE_KEY = "simple-mitorizu-templates";
 
 const itemCatalog = {
-  bed: { name: "ベッド", type: "bed", w: 98, h: 140, cols: 3.5, rows: 5 },
-  table: { name: "テーブル", type: "table", w: 168, h: 112, cols: 6, rows: 4 },
-  chair: { name: "椅子", type: "chair", w: 60, h: 60, cols: 2.1, rows: 2.1 },
-  sofa: { name: "ソファ", type: "sofa", w: 168, h: 84, cols: 6, rows: 3 },
-  toiletItem: { name: "トイレ", type: "toiletItem", w: 84, h: 88, cols: 3, rows: 3.15 },
+  bed: { name: "ベッド", type: "bed", w: 58, h: 82, cols: 2, rows: 2.8 },
+  table: { name: "長方形テーブル", type: "table", w: 86, h: 56, cols: 3.1, rows: 2.1 },
+  roundTable: { name: "丸テーブル", type: "roundTable", w: 56, h: 56, cols: 2, rows: 2 },
+  squareTable: { name: "四角テーブル", type: "squareTable", w: 56, h: 56, cols: 2, rows: 2 },
+  ovalTable: { name: "横長丸テーブル", type: "ovalTable", w: 82, h: 54, cols: 3, rows: 2 },
+  chair: { name: "椅子", type: "chair", w: 36, h: 36, cols: 1.25, rows: 1.25 },
+  sofa: { name: "ソファ", type: "sofa", w: 88, h: 44, cols: 3.2, rows: 1.6 },
+  toiletItem: { name: "トイレ", type: "toiletItem", w: 46, h: 52, cols: 1.65, rows: 1.85 },
+  bathSquare: { name: "正方形浴槽", type: "bathSquare", w: 56, h: 56, cols: 2, rows: 2 },
+  bathRect: { name: "長方形浴槽", type: "bathRect", w: 82, h: 54, cols: 3, rows: 2 },
   door: { name: "ドア", type: "door", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: false },
   doorLeft: { name: "左開き", type: "doorLeft", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
   doorRight: { name: "右開き", type: "doorRight", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
@@ -938,6 +943,18 @@ function renderCatalogItem(group, room) {
     fill: "none", stroke, "stroke-width": line, "stroke-linecap": "round", "stroke-linejoin": "round", ...attrs
   }));
 
+  if (room.type === "roundTable") {
+    circle({ cx: room.w * 0.5, cy: room.h * 0.5, r: Math.min(room.w, room.h) * 0.42, fill: accent });
+    return;
+  }
+  if (room.type === "squareTable") {
+    rect({ x: room.w * 0.08, y: room.h * 0.08, width: room.w * 0.84, height: room.h * 0.84, rx: room.w * 0.08, fill: accent });
+    return;
+  }
+  if (room.type === "ovalTable") {
+    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.5, rx: room.w * 0.45, ry: room.h * 0.36, fill: "#fff", stroke, "stroke-width": line }));
+    return;
+  }
   if (room.type === "table") {
     rect({ x: room.w * 0.1, y: room.h * 0.12, width: room.w * 0.8, height: room.h * 0.76, rx: room.h * 0.08, fill: "#f8fbfb" });
     [0.18, 0.82].forEach((x) => [0.18, 0.82].forEach((y) => circle({ cx: room.w * x, cy: room.h * y, r: Math.min(room.w, room.h) * 0.05, fill: accent, stroke: "none" })));
@@ -1009,6 +1026,17 @@ function renderCatalogItem(group, room) {
       C ${room.w * 0.68} ${room.h * 0.77}, ${room.w * 0.6} ${room.h * 0.85}, ${room.w * 0.5} ${room.h * 0.85}
       C ${room.w * 0.4} ${room.h * 0.85}, ${room.w * 0.32} ${room.h * 0.77}, ${room.w * 0.3} ${room.h * 0.63}
       C ${room.w * 0.28} ${room.h * 0.5}, ${room.w * 0.35} ${room.h * 0.4}, ${room.w * 0.5} ${room.h * 0.4} Z`, stroke, "stroke-width": Math.max(1, line * 0.6) });
+    return;
+  }
+  if (room.type === "bathSquare" || room.type === "bathRect") {
+    const square = room.type === "bathSquare";
+    const outerY = square ? room.h * 0.05 : room.h * 0.13;
+    const outerH = square ? room.h * 0.9 : room.h * 0.74;
+    const innerY = square ? room.h * 0.16 : room.h * 0.25;
+    const innerH = square ? room.h * 0.68 : room.h * 0.5;
+    rect({ x: room.w * 0.05, y: outerY, width: room.w * 0.9, height: outerH, rx: room.h * 0.17, fill: accent });
+    rect({ x: room.w * 0.16, y: innerY, width: room.w * 0.68, height: innerH, rx: room.h * 0.22, fill: "#fff", "stroke-width": Math.max(1, line * 0.6) });
+    circle({ cx: room.w * 0.72, cy: innerY + innerH * 0.7, r: Math.min(room.w, room.h) * 0.035, fill: accent, "stroke-width": Math.max(1, line * 0.5) });
     return;
   }
   if (room.type === "bath") {

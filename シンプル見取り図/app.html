@@ -616,7 +616,7 @@ const itemCatalog = {
   table: { name: "テーブル", type: "table", w: 168, h: 112, cols: 6, rows: 4 },
   chair: { name: "椅子", type: "chair", w: 84, h: 84, cols: 3, rows: 3 },
   sofa: { name: "ソファ", type: "sofa", w: 168, h: 84, cols: 6, rows: 3 },
-  toiletItem: { name: "トイレ", type: "toiletItem", w: 70, h: 88, cols: 2.5, rows: 3.15 },
+  toiletItem: { name: "トイレ", type: "toiletItem", w: 84, h: 88, cols: 3, rows: 3.15 },
   door: { name: "ドア", type: "door", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: false },
   doorLeft: { name: "左開き", type: "doorLeft", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
   doorRight: { name: "右開き", type: "doorRight", w: 112, h: 56, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
@@ -992,21 +992,23 @@ function renderCatalogItem(group, room) {
     return;
   }
   if (room.type === "toiletItem") {
-    pathEl({ d: `M ${room.w * 0.31} ${room.h * 0.04}
-      H ${room.w * 0.69}
-      C ${room.w * 0.75} ${room.h * 0.04}, ${room.w * 0.78} ${room.h * 0.08}, ${room.w * 0.78} ${room.h * 0.14}
-      V ${room.h * 0.27}
-      C ${room.w * 0.85} ${room.h * 0.35}, ${room.w * 0.86} ${room.h * 0.47}, ${room.w * 0.84} ${room.h * 0.6}
-      C ${room.w * 0.81} ${room.h * 0.83}, ${room.w * 0.68} ${room.h * 0.96}, ${room.w * 0.5} ${room.h * 0.96}
-      C ${room.w * 0.32} ${room.h * 0.96}, ${room.w * 0.19} ${room.h * 0.83}, ${room.w * 0.16} ${room.h * 0.6}
-      C ${room.w * 0.14} ${room.h * 0.47}, ${room.w * 0.15} ${room.h * 0.35}, ${room.w * 0.22} ${room.h * 0.27}
-      V ${room.h * 0.14}
-      C ${room.w * 0.22} ${room.h * 0.08}, ${room.w * 0.25} ${room.h * 0.04}, ${room.w * 0.31} ${room.h * 0.04} Z`, stroke, "stroke-width": line });
+    group.appendChild(svgEl("path", { d: `M ${room.w * 0.28} ${room.h * 0.05}
+      H ${room.w * 0.72}
+      C ${room.w * 0.79} ${room.h * 0.05}, ${room.w * 0.82} ${room.h * 0.09}, ${room.w * 0.82} ${room.h * 0.16}
+      V ${room.h * 0.23}
+      C ${room.w * 0.82} ${room.h * 0.28}, ${room.w * 0.75} ${room.h * 0.3}, ${room.w * 0.69} ${room.h * 0.32}
+      C ${room.w * 0.82} ${room.h * 0.38}, ${room.w * 0.87} ${room.h * 0.49}, ${room.w * 0.84} ${room.h * 0.63}
+      C ${room.w * 0.81} ${room.h * 0.85}, ${room.w * 0.68} ${room.h * 0.96}, ${room.w * 0.5} ${room.h * 0.96}
+      C ${room.w * 0.32} ${room.h * 0.96}, ${room.w * 0.19} ${room.h * 0.85}, ${room.w * 0.16} ${room.h * 0.63}
+      C ${room.w * 0.13} ${room.h * 0.49}, ${room.w * 0.18} ${room.h * 0.38}, ${room.w * 0.31} ${room.h * 0.32}
+      C ${room.w * 0.25} ${room.h * 0.3}, ${room.w * 0.18} ${room.h * 0.28}, ${room.w * 0.18} ${room.h * 0.23}
+      V ${room.h * 0.16}
+      C ${room.w * 0.18} ${room.h * 0.09}, ${room.w * 0.21} ${room.h * 0.05}, ${room.w * 0.28} ${room.h * 0.05} Z`, fill: "#fff", stroke, "stroke-width": line, "stroke-linejoin": "round" }));
     pathEl({ d: `M ${room.w * 0.5} ${room.h * 0.4}
-      C ${room.w * 0.62} ${room.h * 0.4}, ${room.w * 0.68} ${room.h * 0.49}, ${room.w * 0.67} ${room.h * 0.61}
-      C ${room.w * 0.65} ${room.h * 0.74}, ${room.w * 0.59} ${room.h * 0.81}, ${room.w * 0.5} ${room.h * 0.81}
-      C ${room.w * 0.41} ${room.h * 0.81}, ${room.w * 0.35} ${room.h * 0.74}, ${room.w * 0.33} ${room.h * 0.61}
-      C ${room.w * 0.32} ${room.h * 0.49}, ${room.w * 0.38} ${room.h * 0.4}, ${room.w * 0.5} ${room.h * 0.4} Z`, stroke, "stroke-width": Math.max(1, line * 0.6) });
+      C ${room.w * 0.65} ${room.h * 0.4}, ${room.w * 0.72} ${room.h * 0.5}, ${room.w * 0.7} ${room.h * 0.63}
+      C ${room.w * 0.68} ${room.h * 0.77}, ${room.w * 0.6} ${room.h * 0.85}, ${room.w * 0.5} ${room.h * 0.85}
+      C ${room.w * 0.4} ${room.h * 0.85}, ${room.w * 0.32} ${room.h * 0.77}, ${room.w * 0.3} ${room.h * 0.63}
+      C ${room.w * 0.28} ${room.h * 0.5}, ${room.w * 0.35} ${room.h * 0.4}, ${room.w * 0.5} ${room.h * 0.4} Z`, stroke, "stroke-width": Math.max(1, line * 0.6) });
     return;
   }
   if (room.type === "bath") {

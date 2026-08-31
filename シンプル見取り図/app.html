@@ -618,7 +618,9 @@ const itemCatalog = {
   squareTable: { name: "四角テーブル", type: "squareTable", w: 56, h: 56, cols: 2, rows: 2 },
   ovalTable: { name: "横長丸テーブル", type: "ovalTable", w: 82, h: 54, cols: 3, rows: 2 },
   chair: { name: "椅子", type: "chair", w: 36, h: 36, cols: 1.25, rows: 1.25 },
-  sofa: { name: "ソファ", type: "sofa", w: 88, h: 44, cols: 3.2, rows: 1.6 },
+  sofaSingle: { name: "1人用ソファ", type: "sofaSingle", w: 50, h: 44, cols: 1.8, rows: 1.6 },
+  sofa: { name: "2人用ソファ", type: "sofa", w: 88, h: 44, cols: 3.2, rows: 1.6 },
+  sofaTriple: { name: "3人用ソファ", type: "sofaTriple", w: 126, h: 44, cols: 4.6, rows: 1.6 },
   toiletItem: { name: "トイレ", type: "toiletItem", w: 46, h: 52, cols: 1.65, rows: 1.85 },
   bathSquare: { name: "正方形浴槽", type: "bathSquare", w: 56, h: 56, cols: 2, rows: 2 },
   bathRect: { name: "長方形浴槽", type: "bathRect", w: 82, h: 54, cols: 3, rows: 2 },
@@ -966,10 +968,11 @@ function renderCatalogItem(group, room) {
     [0.25, 0.75].forEach((x) => lineEl({ x1: room.w * x, y1: room.h * 0.77, x2: room.w * x, y2: room.h * 0.94 }));
     return;
   }
-  if (room.type === "sofa") {
+  if (["sofaSingle", "sofa", "sofaTriple"].includes(room.type)) {
     rect({ x: room.w * 0.05, y: room.h * 0.32, width: room.w * 0.9, height: room.h * 0.58, rx: room.h * 0.14, fill: "#f8fbfb" });
     rect({ x: room.w * 0.15, y: room.h * 0.1, width: room.w * 0.7, height: room.h * 0.38, rx: room.h * 0.12, fill: accent });
-    lineEl({ x1: room.w * 0.5, y1: room.h * 0.39, x2: room.w * 0.5, y2: room.h * 0.88, stroke: "#b8cfcb", "stroke-width": Math.max(1, line * 0.65) });
+    const seatDividers = room.type === "sofaSingle" ? [] : room.type === "sofa" ? [0.5] : [0.38, 0.62];
+    seatDividers.forEach((x) => lineEl({ x1: room.w * x, y1: room.h * 0.39, x2: room.w * x, y2: room.h * 0.88, stroke: "#b8cfcb", "stroke-width": Math.max(1, line * 0.65) }));
     return;
   }
   if (room.type === "tv") {

@@ -1,0 +1,125 @@
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-width: 320px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; color: #e6edf7; background: #0a1019; }
+  button, input { font: inherit; }
+  .access-gate { display: flex; flex-direction: column; min-height: 100vh; padding: 24px; }
+  .access-gate-header, .access-gate-footer { display: flex; align-items: center; justify-content: space-between; width: min(1060px, 100%); margin: 0 auto; }
+  .access-gate-header { padding: 4px 2px 28px; border-bottom: 1px solid #273445; }
+  .access-gate-brand { display: inline-flex; align-items: center; gap: 11px; color: #fff; font-size: 16px; font-weight: 700; }
+  .access-gate-mark { display: grid; width: 30px; height: 30px; border: 1px solid #75b9ff; place-items: center; color: #75b9ff; font-size: 12px; font-weight: 800; }
+  .access-gate-session, .access-gate-footer, .access-gate-panel > p { color: #91a1b7; font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+  .access-gate-layout { display: grid; grid-template-columns: minmax(0, 1fr) 365px; gap: 48px; align-items: center; width: min(1060px, 100%); min-height: 620px; margin: auto; }
+  .access-gate-notice { max-width: 570px; }
+  .access-gate-eyebrow { display: flex; align-items: center; gap: 9px; margin: 0 0 22px; color: #76baff; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
+  .access-gate-eyebrow span { width: 7px; height: 7px; border-radius: 50%; background: #3ad38b; box-shadow: 0 0 0 4px rgba(58, 211, 139, .11); }
+  h1 { margin: 0; color: #fff; font-size: 38px; line-height: 1.12; letter-spacing: 0; }
+  .access-gate-divider { width: 46px; height: 2px; margin: 29px 0 25px; background: #329dff; }
+  .access-gate-intro { margin: 0; color: #b8c4d4; font-size: 14px; line-height: 1.8; }
+  .access-gate-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; margin: 28px 0 0; padding: 0; list-style: none; color: #8e9daf; font-size: 11px; letter-spacing: .04em; }
+  .access-gate-list li::before { margin-right: 8px; color: #65b2ff; content: "+"; }
+  .access-gate-panel { padding: 30px; border: 1px solid #2b394c; border-radius: 8px; background: #111a27; box-shadow: 0 18px 45px rgba(0, 0, 0, .24); }
+  .access-gate-panel > p { margin: 0 0 6px; }
+  .access-gate-panel h2 { margin: 0 0 26px; color: #fff; font-size: 22px; }
+  label { display: block; margin: 17px 0 8px; color: #a6b4c5; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
+  label span { color: #6e7e91; font-weight: 500; letter-spacing: 0; }
+  input { width: 100%; height: 44px; padding: 0 13px; border: 1px solid #405167; border-radius: 4px; outline: none; color: #edf5ff; background: #0c1420; font-size: 14px; }
+  input:focus { border-color: #75b9ff; box-shadow: 0 0 0 3px rgba(117, 185, 255, .18); }
+  input::placeholder { color: #53657a; }
+  .access-gate-verify, .access-gate-install { width: 100%; border-radius: 4px; font-size: 11px; font-weight: 800; letter-spacing: .08em; cursor: pointer; }
+  .access-gate-verify { height: 46px; margin-top: 25px; border: 0; color: #07121f; background: #74baff; }
+  .access-gate-install { height: 43px; margin-top: 12px; border: 1px solid #49637e; color: #c7e2ff; background: transparent; }
+  .access-gate-panel-foot { margin: 22px 0 0; color: #718197; font-size: 10px; line-height: 1.6; text-align: center; }
+  .access-gate-footer { padding-top: 22px; border-top: 1px solid #273445; }
+  .access-gate-footer span:first-child::before { color: #7cbcff; content: "● "; }
+  .portal { display: none; min-height: 100vh; color: #172033; background: #fff; }
+  .portal-header { width: min(1180px, calc(100% - 40px)); margin: 12px auto 0; padding: 6px 0; }
+  .portal-header img { display: block; width: 158px; height: 100px; object-fit: cover; object-position: center; }
+  .portal-main { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 18px 0 72px; }
+  .portal-main h1 { color: #172033; font-size: 28px; }
+  .app-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; margin-top: 20px; }
+  .app-card { display: flex; flex-direction: column; min-height: 246px; padding: 22px; border: 1px solid #d9e6f2; border-radius: 16px; background: #fff; box-shadow: 0 18px 45px rgba(23, 65, 110, .12); }
+  .app-card-top { display: flex; align-items: center; gap: 14px; }
+  .app-card-top img { width: 58px; height: 58px; border-radius: 18px; object-fit: cover; }
+  .app-card h2 { margin: 0; font-size: 18px; line-height: 1.35; }
+  .app-card p { flex: 1; margin: 18px 0 10px; color: #40516a; font-size: 16px; line-height: 1.7; }
+  .trial { flex: initial !important; margin: 0 0 16px !important; color: #c4541b !important; font-size: 14px !important; font-weight: 800; }
+  .app-button { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 14px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #1176d8, #45b7f5); box-shadow: 0 12px 22px rgba(17, 118, 216, .2); font-size: 16px; font-weight: 900; text-decoration: none; }
+  .app-button.disabled { color: #8fa0b3; background: #eef3f7; box-shadow: none; }
+  @media (max-width: 980px) { .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) {
+    .access-gate { min-height: 100svh; padding: 20px; }
+    .access-gate-header { padding-bottom: 20px; }
+    .access-gate-brand { gap: 8px; font-size: 12px; }
+    .access-gate-session { display: none; }
+    .access-gate-layout { grid-template-columns: 1fr; gap: 35px; min-height: auto; margin: 0; padding: 38px 0; }
+    h1 { font-size: 30px; }
+    .access-gate-list { grid-template-columns: 1fr; }
+    .access-gate-panel { padding: 25px; }
+    .access-gate-footer { gap: 10px; align-items: flex-start; flex-direction: column; }
+    .portal-header { width: calc(100% - 24px); margin-top: 6px; padding: 4px 0; }
+    .portal-header img { width: 120px; height: 76px; }
+    .portal-main { width: calc(100% - 28px); padding-top: 12px; }
+    .portal-main h1 { font-size: 24px; }
+    .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .app-card { min-height: 212px; padding: 14px; }
+    .app-card-top { gap: 10px; }
+    .app-card-top img { width: 46px; height: 46px; border-radius: 14px; }
+    .app-card h2 { font-size: 16px; }
+    .app-card p { margin: 14px 0 8px; font-size: 14px; line-height: 1.55; }
+    .app-button { min-height: 42px; padding: 10px 8px; border-radius: 12px; font-size: 14px; }
+  }
+</style>
+
+<main id="access-gate" class="access-gate">
+  <header class="access-gate-header">
+    <div class="access-gate-brand"><span class="access-gate-mark">KTM</span><span>KTM CARE APPLICATIONS</span></div>
+    <span class="access-gate-session">SECURE SESSION REQUIRED</span>
+  </header>
+  <div class="access-gate-layout">
+    <section class="access-gate-notice">
+      <p class="access-gate-eyebrow"><span></span>AUTHORIZED PERSONNEL ONLY</p>
+      <h1>RESTRICTED<br>SYSTEM ACCESS</h1>
+      <div class="access-gate-divider"></div>
+      <p class="access-gate-intro">This internal application portal is protected under administrator control. Access attempts may be monitored and verified against registered security information.</p>
+      <ul class="access-gate-list">
+        <li>ACCESS LOGGING ENABLED</li><li>SECURITY CREDENTIAL CHECK</li><li>ADMINISTRATOR CONTROLLED</li><li>UNAUTHORIZED USE PROHIBITED</li>
+      </ul>
+    </section>
+    <section class="access-gate-panel">
+      <p>KTM INTERNAL PORTAL</p><h2>VERIFY ACCESS</h2>
+      <label for="administrator-id">ADMINISTRATOR ID</label><input id="administrator-id" type="text" placeholder="Enter your ID">
+      <label for="security-key">SECURITY KEY</label><input id="security-key" type="password" placeholder="Enter your password">
+      <label for="one-time-password">ONE-TIME PASSWORD <span>(optional)</span></label><input id="one-time-password" type="text" placeholder="Enter code">
+      <button class="access-gate-verify" type="button" onclick="openPortal()">VERIFY ACCESS</button>
+      <button class="access-gate-install" type="button" onclick="openPortal()">INSTALL APPLICATIONS</button>
+      <p class="access-gate-panel-foot">By proceeding, you confirm that you are an authorized user.</p>
+    </section>
+  </div>
+  <footer class="access-gate-footer"><span>ACCESS CONTROL ACTIVE</span><span>KTM CARE · INTERNAL USE ONLY</span></footer>
+</main>
+
+<main id="portal" class="portal">
+  <header class="portal-header"><img src="./public/2207.jpg" alt="KTM Keep Trust Meaning ロゴ"></header>
+  <section class="portal-main">
+    <h1>アプリ一覧</h1>
+    <div class="app-grid">
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/genogram.png" alt=""><h2>かんたんジェノグラム</h2></div><p>家族関係を図で整理</p><a class="app-button" href="https://easy-genogram-app.vercel.app" target="_blank">このアプリを開く</a></article>
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/floor-plan.png" alt=""><h2>シンプル見取り図</h2></div><p>施設・住居の見取り図を作成</p><p class="trial">試作公開中</p><a class="app-button" href="https://easy-floor-plan.vercel.app" target="_blank">このアプリを開く</a></article>
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/assessment.svg" alt=""><h2>アセスメントシート</h2></div><p>利用者支援のアセスメントを整理</p><span class="app-button disabled">調整中</span></article>
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/pdf-converter.png" alt=""><h2>PDF変換アプリ</h2></div><p>証書PDFの変換・結合</p><a class="app-button" href="https://pdf-converter-app-six.vercel.app" target="_blank">このアプリを開く</a></article>
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/user-checklist.png" alt=""><h2>利用者チェック表</h2></div><p>利用者状況を確認・記録</p><a class="app-button" href="https://riyosha-check-app.vercel.app" target="_blank">このアプリを開く</a></article>
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/fax-address-book.png" alt=""><h2>FAXアドレス帳</h2></div><p>FAX送信先管理</p><a class="app-button" href="https://fax-address-book.vercel.app" target="_blank">このアプリを開く</a></article>
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/template-notes.png" alt=""><h2>テンプレートメモ帳</h2></div><p>文例管理</p><p class="trial">試作公開中</p><a class="app-button" href="https://template-memo.vercel.app" target="_blank">このアプリを開く</a></article>
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/shortcut-memo.svg" alt=""><h2>ショートカットメモ</h2></div><p>よく使うキーボード操作を管理</p><a class="app-button" href="https://shortcut-list.vercel.app" target="_blank">このアプリを開く</a></article>
+      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/pdf-converter.png" alt=""><h2>提供票自動振り分け</h2></div><p>提供票PDFを事業所別に振り分け</p><span class="app-button disabled">調整中</span></article>
+    </div>
+  </section>
+</main>
+
+<script>
+  function openPortal() {
+    document.getElementById('access-gate').style.display = 'none';
+    document.getElementById('portal').style.display = 'block';
+    window.scrollTo(0, 0);
+  }
+</script>

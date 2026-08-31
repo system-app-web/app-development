@@ -1890,7 +1890,7 @@
     }
 
     function releaseSingleUsePencilTool(tool) {
-      if (!["text", "blackout", "whiteout", "rect"].includes(tool)) return;
+      if (!["text", "rect"].includes(tool)) return;
       pencilTool = null;
       updatePencilPalette();
     }

@@ -1045,6 +1045,21 @@
       await loadFiles(files);
     });
 
+    document.addEventListener("paste", async (event) => {
+      if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return;
+      const clipboard = event.clipboardData;
+      const files = Array.from(clipboard?.files || []);
+      if (!files.length) {
+        files.push(...Array.from(clipboard?.items || [])
+          .filter((item) => item.kind === "file")
+          .map((item) => item.getAsFile())
+          .filter(Boolean));
+      }
+      if (!files.length) return;
+      event.preventDefault();
+      await loadFiles(files);
+    });
+
     saveBtn.addEventListener("click", async () => {
       if (isMergeMode() ? !mergeFiles.length : !outputCanvases.length) return;
       setActionButtonsDisabled(true);
@@ -1300,8 +1315,8 @@
     }
 
     function modeStatusText() {
-      if (isMergeMode()) return "複数のPDFをドラッグすると、1つのPDFに結合します。";
-      if (isPencilMode()) return "PDFをドラッグすると、文字や図形を書き込めます。";
+      if (isMergeMode()) return "PDFまたは画像をドラッグ・貼り付けすると、1つのPDFに結合します。";
+      if (isPencilMode()) return "PDFまたは画像をドラッグ・貼り付けすると、文字や図形を書き込めます。";
       return "A4白背景の中央に配置します。出力は白黒PDFのみです。";
     }
 
@@ -1325,15 +1340,13 @@
       try {
         if (isMergeMode()) {
           for (const file of files) {
-            if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
-              throw new Error("merge mode accepts only PDF files");
-            }
-            const sourcePdf = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+            const mergeFile = await prepareMergeFile(file);
+            const sourcePdf = await PDFDocument.load(await mergeFile.arrayBuffer(), { ignoreEncryption: true });
             const pageCount = sourcePdf.getPageCount();
-            mergeFiles.push(file);
+            mergeFiles.push(mergeFile);
             mergePageCount += pageCount;
             try {
-              await appendMergePreviews(file, mergeFiles.length);
+              await appendMergePreviews(mergeFile, mergeFiles.length);
             } catch (error) {
               console.warn("Failed to render merge preview.", error);
             }
@@ -1348,10 +1361,10 @@
         }
         if (isPencilMode()) {
           for (const file of files) {
-            if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
-              throw new Error("pencil mode accepts only PDF files");
-            }
-            loadedCanvases.push(...await renderPdfPages(file));
+            const sources = isPdfFile(file)
+              ? await renderPdfPages(file)
+              : [await renderImage(file)];
+            loadedCanvases.push(...sources);
           }
           pencilAnnotations = loadedCanvases.map(() => []);
           pencilCurrentPageIndex = 0;
@@ -1394,6 +1407,7 @@
         console.error(error);
         setStatus("読み込みに失敗しました。PDFの場合はインターネット接続が必要な場合があります。");
         showPlaceholder();
+        setActionButtonsDisabled(false);
       }
     }
 
@@ -1423,6 +1437,16 @@
       canvas.height = bitmap.height;
       canvas.getContext("2d").drawImage(bitmap, 0, 0);
       return canvas;
+    }
+
+    const isPdfFile = (file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+
+    async function prepareMergeFile(file) {
+      if (isPdfFile(file)) return file;
+      if (!file.type.startsWith("image/")) throw new Error("merge mode accepts only PDF or image files");
+      const imageCanvas = await renderImage(file);
+      const baseName = file.name.replace(/\.[^.]+$/, "") || "スクリーンショット";
+      return new File([buildPdfBlob(imageCanvas)], `${baseName}.pdf`, { type: "application/pdf" });
     }
 
     async function renderPdfPages(file) {

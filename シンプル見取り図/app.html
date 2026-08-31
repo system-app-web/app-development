@@ -1233,6 +1233,9 @@ function startDrag(event, id) {
   clearDrawSelection();
   const room = rooms.find((item) => item.id === id);
   if (!room) return;
+  if (isWallItem(room) && room.parentFloorPlanId) {
+    detachWallItemFromFloorPlan(room);
+  }
   selectedRoomId = id;
   renderAll(false);
   const draggedRoomIds = room.type === "floorplan"
@@ -1396,14 +1399,27 @@ function createCanvasItem(item, x, y) {
   });
 }
 
-function captureCanvasItemGrid(room) {
+function detachWallItemFromFloorPlan(room) {
+  room.parentFloorPlanId = null;
+  room.parentFloorPlanOffsetX = null;
+  room.parentFloorPlanOffsetY = null;
+  room.parentFloorPlanReady = true;
+}
+
+function captureCanvasItemGrid(room, { allowWallAttachment = true } = {}) {
   const stepX = gridStep("x");
   const stepY = gridStep("y");
-  snapWallItemToFloorPlan(room);
+  const snappedToWall = isWallItem(room) && allowWallAttachment
+    ? snapWallItemToFloorPlan(room)
+    : null;
   room.itemCols = Math.max(0.1, room.w / stepX);
   room.itemRows = Math.max(0.1, room.h / stepY);
   room.itemGridX = Math.max(0, room.x / stepX);
   room.itemGridY = Math.max(0, room.y / stepY);
+  if (isWallItem(room) && !snappedToWall) {
+    detachWallItemFromFloorPlan(room);
+    return;
+  }
   attachCanvasItemToFloorPlan(room);
 }
 
@@ -1430,7 +1446,7 @@ function pasteCanvasItem() {
     parentFloorPlanReady: false
   });
   rooms.push(room);
-  captureCanvasItemGrid(room);
+  captureCanvasItemGrid(room, { allowWallAttachment: false });
   copiedCanvasItem = { ...room };
   selectedRoomId = room.id;
   actionHistory.push(() => {
@@ -1447,9 +1463,9 @@ function isWallItem(room) {
 }
 
 function snapWallItemToFloorPlan(room) {
-  if (!isWallItem(room)) return;
+  if (!isWallItem(room)) return null;
   const svg = document.getElementById("svg-main");
-  if (!svg?.clientWidth || !svg.clientHeight) return;
+  if (!svg?.clientWidth || !svg.clientHeight) return null;
   const thresholdX = 16 * (1200 / svg.clientWidth);
   const thresholdY = 16 * (800 / svg.clientHeight);
   const candidates = [];
@@ -1468,9 +1484,9 @@ function snapWallItemToFloorPlan(room) {
   });
 
   const nearest = candidates.sort((first, second) => first.distance - second.distance)[0];
-  if (!nearest) return;
+  if (!nearest) return null;
   const limit = nearest.edge === "top" || nearest.edge === "bottom" ? thresholdY : thresholdX;
-  if (nearest.distance > limit) return;
+  if (nearest.distance > limit) return null;
 
   const { plan } = nearest;
   if (nearest.edge === "top") {
@@ -1486,6 +1502,7 @@ function snapWallItemToFloorPlan(room) {
     room.x = plan.x + plan.w - room.w;
     room.y = Math.max(plan.y, Math.min(plan.y + plan.h - room.h, room.y));
   }
+  return plan;
 }
 
 function isCanvasItem(room) {
@@ -1755,7 +1772,7 @@ function placeItemOnCanvas(event) {
   const room = createCanvasItem(item, x - w / 2, y - h / 2);
 
   rooms.push(room);
-  captureCanvasItemGrid(room);
+  captureCanvasItemGrid(room, { allowWallAttachment: false });
   actionHistory.push(() => {
     rooms = rooms.filter((item) => item.id !== room.id);
     if (selectedRoomId === room.id) selectedRoomId = null;
@@ -1777,7 +1794,7 @@ function addCanvasItem(mode) {
   const { w, h } = getItemDimensions(item);
   const room = createCanvasItem(item, (1200 - w) / 2 + offsetX, (800 - h) / 2 + offsetY);
   rooms.push(room);
-  captureCanvasItemGrid(room);
+  captureCanvasItemGrid(room, { allowWallAttachment: false });
   selectedRoomId = room.id;
   actionHistory.push(() => {
     rooms = rooms.filter((candidate) => candidate.id !== room.id);

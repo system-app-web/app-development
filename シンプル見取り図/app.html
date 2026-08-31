@@ -675,6 +675,8 @@ function createRoom(data = {}) {
   const itemGridY = Number(data.itemGridY);
   const parentFloorPlanOffsetX = Number(data.parentFloorPlanOffsetX);
   const parentFloorPlanOffsetY = Number(data.parentFloorPlanOffsetY);
+  const viewportFloorPlanOffsetX = Number(data.viewportFloorPlanOffsetX);
+  const viewportFloorPlanOffsetY = Number(data.viewportFloorPlanOffsetY);
   const layoutIndex = Number(data.layoutIndex);
   return {
     id: data.id || uid(),
@@ -697,6 +699,10 @@ function createRoom(data = {}) {
     parentFloorPlanOffsetX: Number.isFinite(parentFloorPlanOffsetX) ? parentFloorPlanOffsetX : null,
     parentFloorPlanOffsetY: Number.isFinite(parentFloorPlanOffsetY) ? parentFloorPlanOffsetY : null,
     parentFloorPlanReady: data.parentFloorPlanReady === true,
+    viewportFloorPlanId: data.viewportFloorPlanId || null,
+    viewportFloorPlanOffsetX: Number.isFinite(viewportFloorPlanOffsetX) ? viewportFloorPlanOffsetX : null,
+    viewportFloorPlanOffsetY: Number.isFinite(viewportFloorPlanOffsetY) ? viewportFloorPlanOffsetY : null,
+    viewportFloorPlanReady: data.viewportFloorPlanReady === true,
     layoutIndex: Number.isFinite(layoutIndex) ? Math.max(0, Math.round(layoutIndex)) : null,
     autoCentered: data.autoCentered === true,
     autoPlaced: data.type === "floorplan" ? data.autoPlaced !== false : false
@@ -823,7 +829,7 @@ function applyTemplate(template) {
   rooms = template.rooms.map((room) => createRoom(room));
   selectedRoomId = null;
   syncCanvasItemsToGrid();
-  renderAll();
+  syncFloorPlansToGrid();
   showToast(`${template.name} を読み込みました`);
 }
 
@@ -1254,6 +1260,10 @@ function startDrag(event, id) {
         parentFloorPlanOffsetX: item.parentFloorPlanOffsetX,
         parentFloorPlanOffsetY: item.parentFloorPlanOffsetY,
         parentFloorPlanReady: item.parentFloorPlanReady,
+        viewportFloorPlanId: item.viewportFloorPlanId,
+        viewportFloorPlanOffsetX: item.viewportFloorPlanOffsetX,
+        viewportFloorPlanOffsetY: item.viewportFloorPlanOffsetY,
+        viewportFloorPlanReady: item.viewportFloorPlanReady,
         autoCentered: item.autoCentered,
         autoPlaced: item.autoPlaced
       };
@@ -1288,6 +1298,10 @@ function startResize(event, id, corner) {
     origParentFloorPlanOffsetX: room.parentFloorPlanOffsetX,
     origParentFloorPlanOffsetY: room.parentFloorPlanOffsetY,
     origParentFloorPlanReady: room.parentFloorPlanReady,
+    origViewportFloorPlanId: room.viewportFloorPlanId,
+    origViewportFloorPlanOffsetX: room.viewportFloorPlanOffsetX,
+    origViewportFloorPlanOffsetY: room.viewportFloorPlanOffsetY,
+    origViewportFloorPlanReady: room.viewportFloorPlanReady,
     origAutoCentered: room.autoCentered,
     origAutoPlaced: room.autoPlaced
   };
@@ -1400,6 +1414,28 @@ function detachWallItemFromFloorPlan(room) {
   room.parentFloorPlanReady = true;
 }
 
+function captureViewportFloorPlanAnchor(room, plans = rooms.filter((candidate) => candidate.type === "floorplan")) {
+  if (!isCanvasItem(room) || isWallItem(room)) {
+    room.viewportFloorPlanId = null;
+    room.viewportFloorPlanOffsetX = null;
+    room.viewportFloorPlanOffsetY = null;
+    room.viewportFloorPlanReady = true;
+    return;
+  }
+  const centerX = room.itemGridX + room.itemCols / 2;
+  const centerY = room.itemGridY + room.itemRows / 2;
+  const parent = plans.find((plan) => (
+    plan.autoPlaced !== false &&
+    plan.gridX !== null && plan.gridY !== null &&
+    centerX >= plan.gridX && centerX < plan.gridX + plan.gridColumns &&
+    centerY >= plan.gridY && centerY < plan.gridY + plan.gridRows
+  ));
+  room.viewportFloorPlanId = parent?.id || null;
+  room.viewportFloorPlanOffsetX = parent ? room.itemGridX - parent.gridX : null;
+  room.viewportFloorPlanOffsetY = parent ? room.itemGridY - parent.gridY : null;
+  room.viewportFloorPlanReady = true;
+}
+
 function captureCanvasItemGrid(room, { allowWallAttachment = true } = {}) {
   const stepX = gridStep("x");
   const stepY = gridStep("y");
@@ -1415,6 +1451,7 @@ function captureCanvasItemGrid(room, { allowWallAttachment = true } = {}) {
     return;
   }
   attachCanvasItemToFloorPlan(room);
+  captureViewportFloorPlanAnchor(room);
 }
 
 function copySelectedCanvasItem() {
@@ -1538,6 +1575,17 @@ function syncAttachedCanvasItemsToFloorPlans(plans, stepX, stepY) {
     room.itemGridY = parent.gridY + room.parentFloorPlanOffsetY;
     room.x = room.itemGridX * stepX;
     room.y = room.itemGridY * stepY;
+  });
+}
+
+function syncViewportAnchoredCanvasItemsToFloorPlans(plans, stepX, stepY) {
+  rooms.filter((room) => isCanvasItem(room) && !isWallItem(room)).forEach((room) => {
+    const parent = plans.find((plan) => plan.id === room.viewportFloorPlanId && plan.autoPlaced !== false);
+    if (!parent || room.viewportFloorPlanOffsetX === null || room.viewportFloorPlanOffsetY === null) return;
+    room.itemGridX = parent.gridX + room.viewportFloorPlanOffsetX;
+    room.itemGridY = parent.gridY + room.viewportFloorPlanOffsetY;
+    room.x = Math.max(0, Math.min(1200 - room.w, room.itemGridX * stepX));
+    room.y = Math.max(0, Math.min(800 - room.h, room.itemGridY * stepY));
   });
 }
 
@@ -1935,6 +1983,9 @@ function syncFloorPlansToGrid() {
   rooms.filter((room) => isWallItem(room) && !room.parentFloorPlanReady).forEach((room) => {
     attachCanvasItemToFloorPlan(room, plans);
   });
+  rooms.filter((room) => isCanvasItem(room) && !isWallItem(room) && !room.viewportFloorPlanReady).forEach((room) => {
+    captureViewportFloorPlanAnchor(room, plans);
+  });
 
   plans.forEach((room) => {
     room.gridColumns ||= Math.max(1, Math.round(room.w / fallbackStepX));
@@ -1977,6 +2028,7 @@ function syncFloorPlansToGrid() {
     occupiedPlans.push(room);
   });
   syncAttachedCanvasItemsToFloorPlans(plans, stepX, stepY);
+  syncViewportAnchoredCanvasItemsToFloorPlans(plans, stepX, stepY);
   previousGridStepX = stepX;
   previousGridStepY = stepY;
   renderAll(false);
@@ -2213,6 +2265,10 @@ window.addEventListener("pointerup", () => {
           room.parentFloorPlanOffsetX = origin.parentFloorPlanOffsetX;
           room.parentFloorPlanOffsetY = origin.parentFloorPlanOffsetY;
           room.parentFloorPlanReady = origin.parentFloorPlanReady;
+          room.viewportFloorPlanId = origin.viewportFloorPlanId;
+          room.viewportFloorPlanOffsetX = origin.viewportFloorPlanOffsetX;
+          room.viewportFloorPlanOffsetY = origin.viewportFloorPlanOffsetY;
+          room.viewportFloorPlanReady = origin.viewportFloorPlanReady;
           room.autoCentered = origin.autoCentered;
           room.autoPlaced = origin.autoPlaced;
         });
@@ -2222,7 +2278,7 @@ window.addEventListener("pointerup", () => {
   }
   if (resizeState) {
     const room = rooms.find((item) => item.id === resizeState.id);
-    const { origX, origY, origW, origH, origGridColumns, origGridRows, origGridX, origGridY, origItemCols, origItemRows, origItemGridX, origItemGridY, origParentFloorPlanId, origParentFloorPlanOffsetX, origParentFloorPlanOffsetY, origParentFloorPlanReady, origAutoCentered, origAutoPlaced } = resizeState;
+    const { origX, origY, origW, origH, origGridColumns, origGridRows, origGridX, origGridY, origItemCols, origItemRows, origItemGridX, origItemGridY, origParentFloorPlanId, origParentFloorPlanOffsetX, origParentFloorPlanOffsetY, origParentFloorPlanReady, origViewportFloorPlanId, origViewportFloorPlanOffsetX, origViewportFloorPlanOffsetY, origViewportFloorPlanReady, origAutoCentered, origAutoPlaced } = resizeState;
     if (room && (room.x !== origX || room.y !== origY || room.w !== origW || room.h !== origH)) {
       if (room.type === "floorplan") {
         room.autoCentered = false;
@@ -2248,6 +2304,10 @@ window.addEventListener("pointerup", () => {
         room.parentFloorPlanOffsetX = origParentFloorPlanOffsetX;
         room.parentFloorPlanOffsetY = origParentFloorPlanOffsetY;
         room.parentFloorPlanReady = origParentFloorPlanReady;
+        room.viewportFloorPlanId = origViewportFloorPlanId;
+        room.viewportFloorPlanOffsetX = origViewportFloorPlanOffsetX;
+        room.viewportFloorPlanOffsetY = origViewportFloorPlanOffsetY;
+        room.viewportFloorPlanReady = origViewportFloorPlanReady;
         room.autoCentered = origAutoCentered;
         room.autoPlaced = origAutoPlaced;
         renderAll(false);

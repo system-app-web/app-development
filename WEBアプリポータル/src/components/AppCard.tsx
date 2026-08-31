@@ -12,7 +12,7 @@ export function AppCard({ app }: AppCardProps) {
     <article className="app-card">
       <div className="app-card-top">
         {app.iconImage ? (
-          <img className="app-icon-image" src={app.iconImage} alt={`${app.name}のアイコン`} loading="lazy" />
+          <img className="app-icon-image" src={`${import.meta.env.BASE_URL}${app.iconImage}`} alt={`${app.name}のアイコン`} loading="lazy" />
         ) : (
           <div className={`app-icon ${app.icon}`} aria-hidden="true">
             <span className="icon-mark" />

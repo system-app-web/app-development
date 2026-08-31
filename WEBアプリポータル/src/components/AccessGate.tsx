@@ -6,7 +6,7 @@ export function AccessGate({ onAccess }: AccessGateProps) {
   return (
     <main className="access-gate">
       <header className="access-gate-header">
-        <a className="access-gate-brand" href="/" aria-label="KTM CARE APPLICATIONS">
+        <a className="access-gate-brand" href={import.meta.env.BASE_URL} aria-label="KTM CARE APPLICATIONS">
           <span className="access-gate-mark">KTM</span>
           <span>KTM CARE APPLICATIONS</span>
         </a>

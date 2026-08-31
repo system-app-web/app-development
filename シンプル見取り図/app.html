@@ -647,6 +647,7 @@ let lineDrawState = null;
 let drawDragState = null;
 let textResizeState = null;
 let selectedDrawElement = null;
+let copiedCanvasItem = null;
 const actionHistory = [];
 const GRID_PIXELS = 28;
 let previousGridStepX = null;
@@ -1392,6 +1393,41 @@ function captureCanvasItemGrid(room) {
   room.itemGridX = Math.max(0, room.x / stepX);
   room.itemGridY = Math.max(0, room.y / stepY);
   attachCanvasItemToFloorPlan(room);
+}
+
+function copySelectedCanvasItem() {
+  const room = rooms.find((item) => item.id === selectedRoomId);
+  if (!room || !isCanvasItem(room)) return false;
+  copiedCanvasItem = { ...room };
+  return true;
+}
+
+function pasteCanvasItem() {
+  if (!copiedCanvasItem) return false;
+  const svg = document.getElementById("svg-main");
+  const offsetX = svg?.clientWidth ? 24 * (1200 / svg.clientWidth) : 24;
+  const offsetY = svg?.clientHeight ? 24 * (800 / svg.clientHeight) : 24;
+  const room = createRoom({
+    ...copiedCanvasItem,
+    id: uid(),
+    x: Math.max(0, Math.min(1200 - copiedCanvasItem.w, copiedCanvasItem.x + offsetX)),
+    y: Math.max(0, Math.min(800 - copiedCanvasItem.h, copiedCanvasItem.y + offsetY)),
+    parentFloorPlanId: null,
+    parentFloorPlanOffsetX: null,
+    parentFloorPlanOffsetY: null,
+    parentFloorPlanReady: false
+  });
+  rooms.push(room);
+  captureCanvasItemGrid(room);
+  copiedCanvasItem = { ...room };
+  selectedRoomId = room.id;
+  actionHistory.push(() => {
+    rooms = rooms.filter((item) => item.id !== room.id);
+    if (selectedRoomId === room.id) selectedRoomId = null;
+    renderAll(false);
+  });
+  renderAll(false);
+  return true;
 }
 
 function isWallItem(room) {
@@ -2467,6 +2503,14 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement || event.target.isContentEditable) return;
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c" && copySelectedCanvasItem()) {
+    event.preventDefault();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v" && pasteCanvasItem()) {
+    event.preventDefault();
+    return;
+  }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
     event.preventDefault();
     undoAction();

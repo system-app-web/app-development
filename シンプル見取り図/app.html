@@ -947,7 +947,7 @@ function renderCatalogItem(group, room) {
   }));
 
   if (room.type === "roundTable") {
-    circle({ cx: room.w * 0.5, cy: room.h * 0.5, r: Math.min(room.w, room.h) * 0.42, fill: accent });
+    group.appendChild(svgEl("ellipse", { cx: room.w * 0.5, cy: room.h * 0.5, rx: room.w * 0.42, ry: room.h * 0.42, fill: "#fff", stroke, "stroke-width": line }));
     return;
   }
   if (room.type === "squareTable") {

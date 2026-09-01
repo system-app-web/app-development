@@ -1922,6 +1922,9 @@ function syncAddClientDraft() {
 function renderAddClientModal() {
   if (!addClientDraft) addClientDraft = defaultAddClientDraft();
   modalIndex = -1;
+  const modal = document.getElementById('modal');
+  modal.classList.remove('compact-picker', 'calendar-picker', 'visit-calendar-open', 'column-editor-picker', 'fax-office-picker');
+  modal.classList.add('add-client');
   showModal('利用者を追加', '新規',
     `<input class="modal-input" id="add-name" placeholder="利用者名" value="${esc(addClientDraft.name || '')}">
      <input class="modal-input" id="add-kana" placeholder="かな" value="${esc(addClientDraft.kana || '')}">
@@ -1936,7 +1939,6 @@ function renderAddClientModal() {
      <input class="modal-input" id="add-seho-cw" placeholder="保護 例: 山田CW" value="${esc(addClientDraft.sehoCw || '')}" oninput="syncAddClientSehoDraft()">
      <button class="mact green" style="width:100%;margin-top:4px" onclick="addClient()">追加する</button>`
   );
-  document.getElementById('modal').classList.add('add-client');
   setTimeout(() => {
     const input = document.getElementById('add-name');
     if (input) input.focus();
@@ -3099,6 +3101,7 @@ function openAddClientPeriodPicker(field) {
   if (!addClientDraft) addClientDraft = defaultAddClientDraft();
   modalIndex = -1;
   const modal = document.getElementById('modal');
+  modal.classList.remove('add-client', 'compact-picker', 'visit-calendar-open', 'column-editor-picker', 'fax-office-picker');
   modal.classList.add('calendar-picker');
   const parsed = parseAnyDate(addClientDraft[field]) || { year: curYear, month: curMonth, day: null };
   visitPickerYear = parsed.year;

@@ -648,6 +648,7 @@ const itemCatalog = {
   sofaTriple: { name: "3人用ソファ", type: "sofaTriple", w: 126, h: 44, cols: 4.6, rows: 1.6 },
   door: { name: "ドア", type: "door", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
   swingDoor: { name: "開き戸", type: "swingDoor", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: true },
+  swingDoorReverse: { name: "開き戸（反転）", type: "swingDoorReverse", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: true },
   windowItem: { name: "窓", type: "windowItem", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false },
 };
 const ITEM_SCALE = 0.8;
@@ -1090,15 +1091,16 @@ function renderCatalogItem(group, room) {
     lineEl({ x1: room.w * 0.12, y1: room.h * 0.5, x2: room.w * 0.88, y2: room.h * 0.5, "stroke-width": Math.max(1, line * 0.6) });
     return;
   }
-  if (room.type === "swingDoor") {
-    const hingeX = room.w * 0.14;
+  if (room.type === "swingDoor" || room.type === "swingDoorReverse") {
+    const reversed = room.type === "swingDoorReverse";
+    const hingeX = room.w * (reversed ? 0.86 : 0.14);
     const hingeY = room.h * 0.14;
-    const leafX = room.w * 0.86;
+    const leafX = room.w * (reversed ? 0.14 : 0.86);
     const arcY = room.h * 0.86;
     group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "transparent", "pointer-events": "all", class: "canvas-item-hit-area" }));
     lineEl({ x1: hingeX, y1: room.h * 0.04, x2: hingeX, y2: room.h * 0.96, "stroke-width": Math.max(1, line * 0.82) });
     lineEl({ x1: hingeX, y1: hingeY, x2: leafX, y2: hingeY, "stroke-width": Math.max(1, line * 0.72) });
-    pathEl({ d: `M ${leafX} ${hingeY} A ${room.w * 0.72} ${room.h * 0.72} 0 0 1 ${hingeX} ${arcY}`, "stroke-width": Math.max(1, line * 0.72) });
+    pathEl({ d: `M ${leafX} ${hingeY} A ${room.w * 0.72} ${room.h * 0.72} 0 0 ${reversed ? 0 : 1} ${hingeX} ${arcY}`, "stroke-width": Math.max(1, line * 0.72) });
     return;
   }
   if (["doorLeft", "doorRight", "doorIn", "doorOut"].includes(room.type)) {
@@ -1565,7 +1567,7 @@ function pasteCanvasItem() {
 }
 
 function isWallItem(room) {
-  return room.type === "windowItem" || room.type === "door" || room.type.endsWith("Door") || room.type.startsWith("door");
+  return room.type === "windowItem" || room.type === "door" || room.type.startsWith("swingDoor") || room.type.endsWith("Door") || room.type.startsWith("door");
 }
 
 function snapWallItemToFloorPlan(room) {

@@ -365,8 +365,9 @@ header h1 {
   .canvas-edit-guide { animation: none; }
 }
 .save-tpl-btn:hover { background:#d4eaff !important; border-color:#8ab8e0 !important; color:#2a5a8a !important; }
-.drag-handle { cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='white' stroke='%23555' stroke-width='1.5' stroke-linejoin='round' d='M9 3a1 1 0 0 1 1 1v4a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1v.5a1 1 0 0 1 1-1H14a1 1 0 0 1 1 1v.5a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1V14a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") 9 0, grab; color:#ccc; font-size:11px; line-height:1; user-select:none; flex-shrink:0; position:absolute; left:0; top:10px; height:22px; display:flex; align-items:center; padding:0 1px; }
-.drag-handle:active { cursor:grabbing; }
+.drag-handle { cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='white' stroke='%23555' stroke-width='1.5' stroke-linejoin='round' d='M9 3a1 1 0 0 1 1 1v4a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1v.5a1 1 0 0 1 1-1H14a1 1 0 0 1 1 1v.5a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1V14a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") 9 0, grab; color:#5b83a1; font-size:16px; line-height:1; user-select:none; flex-shrink:0; position:absolute; left:0; top:8px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:1px solid #d4e6f1; border-radius:6px; background:#f4f9fc; box-shadow:0 1px 2px rgba(46,101,139,.14); transition:transform .15s ease, box-shadow .15s ease, background .15s ease; }
+.drag-handle:hover { background:#e8f4fa; box-shadow:0 2px 4px rgba(46,101,139,.18); transform:translateY(-1px); }
+.drag-handle:active { cursor:grabbing; background:#e2f0f8; box-shadow:inset 0 1px 2px rgba(46,101,139,.16); transform:translateY(0); }
 .p-card.drag-over { border-color:#5BA4CF; background:#ddeeff; }
 
 .p-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
@@ -815,7 +816,7 @@ function renderList() {
     card.dataset.pid = p.id;
     card.innerHTML = `
       <div class="p-hd">
-        ${!isSub ? `<span class="drag-handle" title="ドラッグして並び替え">⋮⋮</span>` : ''}
+        ${!isSub ? `<span class="drag-handle" role="button" aria-label="押したままドラッグして並び替え" title="押したままドラッグして並び替え">⠿</span>` : ''}
         <div class="p-num ${isSub?'sub':''}">${i+1}</div>
         <span class="p-label" ${isSub ? 'style="font-size:13px;font-weight:700;color:#1a3a5c;text-decoration:underline;text-underline-offset:3px"' : ''}>
           ${isSub ? '★ 本人' : (p.relation && p.relation !== '自由記述' ? `<span style="font-size:13px;font-weight:700;color:#1a3a5c;text-decoration:underline;text-underline-offset:3px">${p.relation}</span>` : '家族 ' + i)}

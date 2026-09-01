@@ -647,6 +647,7 @@ const itemCatalog = {
   sofa: { name: "2人用ソファ", type: "sofa", w: 88, h: 44, cols: 3.2, rows: 1.6 },
   sofaTriple: { name: "3人用ソファ", type: "sofaTriple", w: 126, h: 44, cols: 4.6, rows: 1.6 },
   door: { name: "ドア", type: "door", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
+  swingDoor: { name: "開き戸", type: "swingDoor", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: true },
   windowItem: { name: "窓", type: "windowItem", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false },
 };
 const ITEM_SCALE = 0.8;
@@ -1087,6 +1088,16 @@ function renderCatalogItem(group, room) {
   if (room.type === "door") {
     rect({ x: room.w * 0.03, y: room.h * 0.15, width: room.w * 0.94, height: room.h * 0.7, rx: room.h * 0.12, fill: "#f8fbfb" });
     lineEl({ x1: room.w * 0.12, y1: room.h * 0.5, x2: room.w * 0.88, y2: room.h * 0.5, "stroke-width": Math.max(1, line * 0.6) });
+    return;
+  }
+  if (room.type === "swingDoor") {
+    const hingeX = room.w * 0.14;
+    const hingeY = room.h * 0.14;
+    const leafX = room.w * 0.86;
+    const arcY = room.h * 0.86;
+    lineEl({ x1: hingeX, y1: room.h * 0.04, x2: hingeX, y2: room.h * 0.96, "stroke-width": Math.max(1, line * 0.82) });
+    lineEl({ x1: hingeX, y1: hingeY, x2: leafX, y2: hingeY, "stroke-width": Math.max(1, line * 0.72) });
+    pathEl({ d: `M ${leafX} ${hingeY} A ${room.w * 0.72} ${room.h * 0.72} 0 0 1 ${hingeX} ${arcY}`, "stroke-width": Math.max(1, line * 0.72) });
     return;
   }
   if (["doorLeft", "doorRight", "doorIn", "doorOut"].includes(room.type)) {

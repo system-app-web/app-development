@@ -2625,20 +2625,23 @@ async function exportPNG() {
   const minY = Math.min(...bounds.y) - padding;
   const width = Math.max(...bounds.x) + padding - minX;
   const height = Math.max(...bounds.y) + padding - minY;
-  exportSvg.setAttribute("width", width);
-  exportSvg.setAttribute("height", height);
+  const outputWidth = width * (sourceSvg.clientWidth / 1200);
+  const outputHeight = height * (sourceSvg.clientHeight / 800);
+  exportSvg.setAttribute("width", outputWidth);
+  exportSvg.setAttribute("height", outputHeight);
   exportSvg.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
+  exportSvg.setAttribute("preserveAspectRatio", "none");
 
   const source = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(exportSvg)], { type: "image/svg+xml;charset=utf-8" }));
   const image = new Image();
   image.onload = async () => {
     const scale = 2;
     const canvas = document.createElement("canvas");
-    canvas.width = Math.ceil(width * scale);
-    canvas.height = Math.ceil(height * scale);
+    canvas.width = Math.ceil(outputWidth * scale);
+    canvas.height = Math.ceil(outputHeight * scale);
     const context = canvas.getContext("2d");
     context.scale(scale, scale);
-    context.drawImage(image, 0, 0, width, height);
+    context.drawImage(image, 0, 0, outputWidth, outputHeight);
     URL.revokeObjectURL(source);
 
     const png = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));

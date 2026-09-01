@@ -3124,6 +3124,7 @@ function openAddClientPeriodPicker(field) {
       </div>
     </div>`
   );
+  document.querySelector('#modal .modal-close').onclick = renderAddClientModal;
   renderAddClientCalendar();
 }
 

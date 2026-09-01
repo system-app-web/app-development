@@ -727,6 +727,7 @@ function createRoom(data = {}) {
 }
 
 function toggleTemplatePanel() {
+  clearEraserMode();
   const block = document.getElementById("templateBlock");
   const isOpen = block.classList.toggle("open");
   document.querySelectorAll("[data-template-toggle], #template-toggle").forEach(button => {
@@ -844,6 +845,7 @@ function renderDoorPalette() {
 }
 
 function applyTemplate(template) {
+  clearEraserMode();
   rooms = template.rooms.map((room) => createRoom(room));
   erasedFloorPlanWalls = new Set(template.erasedFloorPlanWalls || []);
   selectedRoomId = null;
@@ -1855,6 +1857,12 @@ function startFloorPlanWallErase(event) {
   clearDrawSelection();
   if (hadSelection) renderAll(false);
   const point = pointInSvg(event);
+  const item = getCanvasItemAtClientPoint(event.clientX, event.clientY);
+  const wall = findFloorPlanWallAtPoint(point);
+  if (!item && !wall) {
+    clearEraserMode();
+    return;
+  }
   eraseState = { lastPoint: point, removed: new Set(), removedItems: new Map() };
   eraseCanvasContentsBetween(point, point);
 }
@@ -2061,6 +2069,7 @@ function placeItemOnCanvas(event) {
 function addCanvasItem(mode) {
   const item = getCanvasItem(mode);
   if (!item) return;
+  clearEraserMode();
   clearPlaceMode();
   const itemTypes = new Set(Object.values(itemCatalog).map((entry) => entry.type));
   const itemCount = rooms.filter((room) => itemTypes.has(room.type)).length;
@@ -2268,6 +2277,7 @@ function syncFloorPlansToGrid() {
 }
 
 function addFloorPlan() {
+  clearEraserMode();
   clearPlaceMode();
   currentDrawMode = "";
   document.getElementById("svg-main").style.cursor = "";
@@ -2652,6 +2662,7 @@ function clearAll() {
 function showToast() {}
 
 function togglePalette() {
+  clearEraserMode();
   const slot = document.querySelector(".item-control-slot");
   slot.classList.remove("doors-open");
   const isOpen = slot.classList.toggle("open");
@@ -2660,6 +2671,7 @@ function togglePalette() {
 }
 
 function toggleDoorPalette() {
+  clearEraserMode();
   const slot = document.querySelector(".item-control-slot");
   slot.classList.remove("open");
   const isOpen = slot.classList.toggle("doors-open");
@@ -2684,7 +2696,19 @@ function setDrawMode(mode, button) {
   showToast(currentDrawMode ? `${mode} を選択しました` : "描画モードを解除しました");
 }
 
+function clearEraserMode() {
+  if (currentDrawMode !== "erase") return false;
+  currentDrawMode = "";
+  eraseState = null;
+  clearFloorPlanWallHover();
+  document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((button) => button.classList.remove("active"));
+  document.getElementById("svg-main").style.cursor = "";
+  renderAll(false);
+  return true;
+}
+
 function setPlaceMode(mode, button) {
+  clearEraserMode();
   currentPlaceMode = currentPlaceMode === mode ? "" : mode;
   currentDrawMode = "";
   selectedRoomId = null;

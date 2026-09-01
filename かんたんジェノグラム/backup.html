@@ -1184,15 +1184,83 @@ function drawAutoEnclosure(layer) {
     .map(g => ({ x1: g.minX - PAD, x2: g.maxX + PAD, y1: g.minY - PAD, y2: g.maxY + PAD }));
 
   const grp = document.createElementNS(NS, 'g');
+  const minX = Math.min(...rows.map(row => row.x1));
+  const minY = Math.min(...rows.map(row => row.y1));
+  const maxX = Math.max(...rows.map(row => row.x2));
+  const maxY = Math.max(...rows.map(row => row.y2));
+  grp._autoBounds = { x:minX, y:minY, w:maxX-minX, h:maxY-minY };
   const pathEl = document.createElementNS(NS, 'path');
   pathEl.setAttribute('d', _buildEncPath(rows));
   pathEl.setAttribute('fill', 'none');
   pathEl.setAttribute('stroke', '#555');
   pathEl.setAttribute('stroke-width', '1.5');
   pathEl.setAttribute('stroke-dasharray', '6,4');
+  pathEl.setAttribute('class', 'enc-visible');
+  pathEl.style.pointerEvents = 'none';
+  const hitEl = document.createElementNS(NS, 'path');
+  hitEl.setAttribute('d', _buildEncPath(rows));
+  hitEl.setAttribute('fill', 'none');
+  hitEl.setAttribute('stroke', 'rgba(0,0,0,0.001)');
+  hitEl.setAttribute('stroke-width', '10');
   grp.appendChild(pathEl);
+  grp.appendChild(hitEl);
+  applyTemplateEnclosureTransform(grp);
   layer.appendChild(grp);
   grp.id = 'doukyo-auto-enc';
+  hitEl.addEventListener('mousedown', event => {
+    if (drawMode || placeMode) return;
+    event.preventDefault(); event.stopPropagation();
+    selectTemplateEnclosure(grp);
+  });
+}
+
+let templateEnclosureOffset = { x:0, y:0 };
+let templateEnclosureScale = { x:1, y:1 };
+let templateEnclosureHandles = [];
+
+function applyTemplateEnclosureTransform(grp) {
+  const b = grp._autoBounds, o = templateEnclosureOffset, s = templateEnclosureScale;
+  if (!b) return;
+  grp.setAttribute('transform', `translate(${o.x} ${o.y}) translate(${b.x} ${b.y}) scale(${s.x} ${s.y}) translate(${-b.x} ${-b.y})`);
+}
+
+function clearTemplateEnclosureHandles() { templateEnclosureHandles.forEach(handle => handle.remove()); templateEnclosureHandles = []; }
+
+function selectTemplateEnclosure(grp) {
+  if (selectedDrawEl === grp) return;
+  clearDrawElSelection();
+  const visible = grp.querySelector('.enc-visible');
+  visible.setAttribute('stroke', '#e06060');
+  selectedDrawEl = grp;
+  _clearDrawElFn = () => { if (visible.isConnected) visible.setAttribute('stroke', '#555'); clearTemplateEnclosureHandles(); selectedDrawEl = null; _clearDrawElFn = null; };
+  showTemplateEnclosureHandles(grp);
+}
+
+function showTemplateEnclosureHandles(grp) {
+  clearTemplateEnclosureHandles();
+  const b = grp._autoBounds;
+  const box = { x:b.x + templateEnclosureOffset.x, y:b.y + templateEnclosureOffset.y, w:b.w * templateEnclosureScale.x, h:b.h * templateEnclosureScale.y };
+  const defs = [[0,0,'nw-resize'],[.5,0,'n-resize'],[1,0,'ne-resize'],[1,.5,'e-resize'],[1,1,'se-resize'],[.5,1,'s-resize'],[0,1,'sw-resize'],[0,.5,'w-resize']];
+  const layer = document.getElementById('layer-handles');
+  defs.forEach(([fx,fy,cursor]) => {
+    const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    handle.setAttribute('x', box.x + fx * box.w - 5); handle.setAttribute('y', box.y + fy * box.h - 5);
+    handle.setAttribute('width', 10); handle.setAttribute('height', 10); handle.setAttribute('rx', 2); handle.setAttribute('fill', '#fff'); handle.setAttribute('stroke', '#3a6ea5'); handle.setAttribute('stroke-width', 1.5); handle.style.cursor = cursor;
+    handle.addEventListener('mousedown', event => {
+      event.preventDefault(); event.stopPropagation();
+      const start = svgPoint(event), beforeOffset = { ...templateEnclosureOffset }, beforeScale = { ...templateEnclosureScale }, startBox = { ...box };
+      const move = moveEvent => {
+        const p = svgPoint(moveEvent), dx = p.x - start.x, dy = p.y - start.y;
+        let x=startBox.x, y=startBox.y, w=startBox.w, h=startBox.h;
+        if (fx === 0) { w=Math.max(24,startBox.w-dx); x=startBox.x+startBox.w-w; } else if (fx === 1) w=Math.max(24,startBox.w+dx);
+        if (fy === 0) { h=Math.max(24,startBox.h-dy); y=startBox.y+startBox.h-h; } else if (fy === 1) h=Math.max(24,startBox.h+dy);
+        templateEnclosureOffset={x:x-b.x,y:y-b.y}; templateEnclosureScale={x:w/b.w,y:h/b.h}; applyTemplateEnclosureTransform(grp); showTemplateEnclosureHandles(grp);
+      };
+      const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); pushUndo(() => { templateEnclosureOffset=beforeOffset; templateEnclosureScale=beforeScale; updateDoukyoEnclosure(); }); };
+      document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    });
+    layer.appendChild(handle); templateEnclosureHandles.push(handle);
+  });
 }
 
 function _buildEncPath(rows) {

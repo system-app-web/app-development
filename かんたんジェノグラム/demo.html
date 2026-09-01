@@ -1408,8 +1408,13 @@ function drawAutoEnclosure(layer) {
   const grp = document.createElementNS(NS, 'g');
   grp.setAttribute('class', 'enc-group');
   grp.id = 'doukyo-auto-enc';
-  const off = autoEnclosureOffset;
-  const d = _translatePathD(_buildEncPath(rows), off.dx, off.dy);
+  const d = _buildEncPath(rows);
+  const minX = Math.min(...rows.map(row => row.x1));
+  const minY = Math.min(...rows.map(row => row.y1));
+  const maxX = Math.max(...rows.map(row => row.x2));
+  const maxY = Math.max(...rows.map(row => row.y2));
+  grp._autoBounds = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  applyAutoEnclosureTransform(grp);
   const pathEl = document.createElementNS(NS, 'path');
   pathEl.setAttribute('d', d);
   pathEl.setAttribute('fill', 'none');
@@ -1493,6 +1498,63 @@ const deletedSegments = new Map(); // relId -> Set<segIdx(0|1|2)> 削除済み�
 const segmentOverrides = new Map(); // relId -> {segIdx: {x1,y1,x2,y2}} 手動移動後の座標
 const relLineOffsets = new Map(); // relId -> {dx,dy} 婚姻線の手動移動オフセット
 let autoEnclosureOffset = { dx: 0, dy: 0 };
+let autoEnclosureScale = { x: 1, y: 1 };
+let autoEnclosureHandleEls = [];
+
+function applyAutoEnclosureTransform(grp) {
+  const b = grp._autoBounds;
+  if (!b) return;
+  const o = autoEnclosureOffset, s = autoEnclosureScale;
+  grp.setAttribute('transform', `translate(${o.dx} ${o.dy}) translate(${b.x} ${b.y}) scale(${s.x} ${s.y}) translate(${-b.x} ${-b.y})`);
+}
+
+function clearAutoEnclosureHandles() {
+  autoEnclosureHandleEls.forEach(handle => handle.remove());
+  autoEnclosureHandleEls = [];
+}
+
+function showAutoEnclosureHandles(grp) {
+  clearAutoEnclosureHandles();
+  const b = grp._autoBounds;
+  if (!b) return;
+  const d = { x: b.x + autoEnclosureOffset.dx, y: b.y + autoEnclosureOffset.dy, w: b.w * autoEnclosureScale.x, h: b.h * autoEnclosureScale.y };
+  const defs = [
+    {fx:0,fy:0,cursor:'nw-resize'},{fx:.5,fy:0,cursor:'n-resize'},{fx:1,fy:0,cursor:'ne-resize'},
+    {fx:1,fy:.5,cursor:'e-resize'},{fx:1,fy:1,cursor:'se-resize'},{fx:.5,fy:1,cursor:'s-resize'},
+    {fx:0,fy:1,cursor:'sw-resize'},{fx:0,fy:.5,cursor:'w-resize'},
+  ];
+  const layer = document.getElementById('layer-handles');
+  defs.forEach(def => {
+    const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    handle.setAttribute('x', d.x + def.fx * d.w - 5);
+    handle.setAttribute('y', d.y + def.fy * d.h - 5);
+    handle.setAttribute('width', 10); handle.setAttribute('height', 10); handle.setAttribute('rx', 2);
+    handle.setAttribute('fill', '#fff'); handle.setAttribute('stroke', '#3a6ea5'); handle.setAttribute('stroke-width', 1.5);
+    handle.style.cursor = def.cursor;
+    handle.addEventListener('mousedown', event => {
+      event.preventDefault(); event.stopPropagation();
+      const start = svgPoint(event), beforeOffset = { ...autoEnclosureOffset }, beforeScale = { ...autoEnclosureScale }, startBox = { ...d };
+      const move = moveEvent => {
+        const p = svgPoint(moveEvent), dx = p.x - start.x, dy = p.y - start.y;
+        let x = startBox.x, y = startBox.y, w = startBox.w, h = startBox.h;
+        if (def.fx === 0) { w = Math.max(24, startBox.w - dx); x = startBox.x + startBox.w - w; }
+        if (def.fx === 1) w = Math.max(24, startBox.w + dx);
+        if (def.fy === 0) { h = Math.max(24, startBox.h - dy); y = startBox.y + startBox.h - h; }
+        if (def.fy === 1) h = Math.max(24, startBox.h + dy);
+        autoEnclosureOffset = { dx: x - b.x, dy: y - b.y };
+        autoEnclosureScale = { x: w / b.w, y: h / b.h };
+        applyAutoEnclosureTransform(grp);
+        showAutoEnclosureHandles(grp);
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+        pushUndo(() => { autoEnclosureOffset = beforeOffset; autoEnclosureScale = beforeScale; updateDoukyoEnclosure(); });
+      };
+      document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    });
+    layer.appendChild(handle); autoEnclosureHandleEls.push(handle);
+  });
+}
 
 function clearRelSelection() {
   if (_clearRelFn) _clearRelFn();
@@ -1560,9 +1622,11 @@ function selectAutoEnclosureGrp(grp) {
   _clearDrawElFn = () => {
     const v = grp.querySelector('.enc-visible');
     if (v) v.setAttribute('stroke', '#555');
+    clearAutoEnclosureHandles();
     selectedDrawEl = null;
     _clearDrawElFn = null;
   };
+  showAutoEnclosureHandles(grp);
 }
 
 function selectRelLine(relId, visEl) {

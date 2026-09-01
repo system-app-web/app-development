@@ -553,7 +553,7 @@ let pid = 1;
 let rid = 1;
 
 const NW = 56, NH = 56;
-const GEN_H = 112, H_SP = 84; // H_SP=6×14px — 半マススナップで偶数・奇数とも中央揃え
+const GEN_H = 112, H_SP = 112; // 全ての人物中心・関係線を28px方眼に揃える
 
 const REL_GEN = {
   '曾祖父':-3,'曾祖母':-3,
@@ -912,10 +912,8 @@ function autoLayout() {
   const minG = gens[0], maxG = gens[gens.length-1];
   const topY = 120;
   const G = 28;
-  const G2 = 14; // 半マス単位（偶数人数でも中央に揃える）
-
-  // 全世代共通のcenterXを半マス単位で計算
-  const centerX = Math.round((W / 2 - 28) / G2) * G2;
+  // ノードの左上・中心・関係線がすべて方眼に重なるようにする
+  const centerX = Math.round((W / 2 - 28) / G) * G;
 
   gens.forEach(g => {
     const grp = genMap[g];
@@ -945,7 +943,7 @@ function autoLayout() {
     }
     const n = grp.length;
     // 共通centerXを基準にstartXをグリッドスナップ
-    const startX = Math.round((centerX - (n - 1) * H_SP / 2) / G2) * G2;
+    const startX = Math.round((centerX - (n - 1) * H_SP / 2) / G) * G;
     const y = Math.round((topY + (g - minG) * GEN_H) / G) * G;
     grp.forEach((p, i) => { p._x = startX + i * H_SP; p._y = y; });
   });
@@ -964,8 +962,8 @@ function autoLayout() {
     if (!targetPerson || targetPerson._x == null) return;
     const fa = p.relation === '父' ? p : sameTarget;
     const mo = p.relation === '母' ? p : sameTarget;
-    fa._x = Math.round((targetPerson._x - H_SP / 2) / G2) * G2;
-    mo._x = Math.round((targetPerson._x + H_SP / 2) / G2) * G2;
+    fa._x = Math.round((targetPerson._x - H_SP / 2) / G) * G;
+    mo._x = Math.round((targetPerson._x + H_SP / 2) / G) * G;
     // 縦線を2マスにするため父母を本人の直上2マス分の位置に配置
     const parentY = Math.round((targetPerson._y - NH - G) / G) * G;
     fa._y = parentY;
@@ -1164,7 +1162,7 @@ function drawAutoEnclosure(layer) {
   const positions = targets.map(p => nodePositions[p.id]).filter(Boolean);
   if (!positions.length) return;
 
-  const PAD = 22;
+  const PAD = 28;
   const G = 28;
 
   // 世代（Y座標）ごとにターゲットノードの横幅を集計

@@ -1300,6 +1300,7 @@ function generateGenogram({ silent = false } = {}) {
   document.getElementById('canvasHint').style.display = 'none';
   const hasDrawn = document.getElementById('layer-draw').children.length > 0;
   deletedSegments.clear();
+  erasedRelationCells.clear();
   segmentOverrides.clear();
   relLineOffsets.clear();
   autoLayout();
@@ -1635,8 +1636,8 @@ function selectRelLine(relId, visEl) {
   if (selectedRelId === relId) return;
   clearRelSelection();
   selectedRelId = relId;
-  visEl.setAttribute('stroke', '#e06060');
-  _clearRelFn = () => { if (visEl.isConnected) visEl.setAttribute('stroke', '#000'); };
+  setRelationStroke(visEl, '#e06060');
+  _clearRelFn = () => { if (visEl.isConnected) setRelationStroke(visEl, '#000'); };
 }
 
 function renderLines() {
@@ -1661,14 +1662,70 @@ function renderLines() {
     }
     // Re-apply selection highlight after DOM rebuild (e.g. after drag)
     if (visEl && r.id === selectedRelId) {
-      visEl.setAttribute('stroke', '#e06060');
-      _clearRelFn = () => { if (visEl.isConnected) visEl.setAttribute('stroke', '#000'); };
+      setRelationStroke(visEl, '#e06060');
+      _clearRelFn = () => { if (visEl.isConnected) setRelationStroke(visEl, '#000'); };
     }
   });
 }
 
 function cx(pos) { return pos.x + NW/2; }
 function cy(pos) { return pos.y + NH/2; }
+
+const erasedRelationCells = new Set();
+
+function relationGridCells(x1, y1, x2, y2) {
+  const horizontal = Math.abs(y1 - y2) < 0.01;
+  const vertical = Math.abs(x1 - x2) < 0.01;
+  const length = horizontal ? Math.abs(x2 - x1) : Math.abs(y2 - y1);
+  if ((!horizontal && !vertical) || length < 0.01 || Math.abs(length / 28 - Math.round(length / 28)) > 0.01) return [];
+  const steps = Math.round(length / 28);
+  const dx = horizontal ? Math.sign(x2 - x1) * 28 : 0;
+  const dy = vertical ? Math.sign(y2 - y1) * 28 : 0;
+  return Array.from({ length: steps }, (_, step) => {
+    const ax = x1 + dx * step, ay = y1 + dy * step;
+    return { x1: ax, y1: ay, x2: ax + dx, y2: ay + dy };
+  });
+}
+
+function relationCellKey({ x1, y1, x2, y2 }) {
+  return x1 < x2 || (x1 === x2 && y1 <= y2)
+    ? `${x1},${y1}:${x2},${y2}`
+    : `${x2},${y2}:${x1},${y1}`;
+}
+
+function drawRelationGridLine(layer, x1, y1, x2, y2, attrs = {}) {
+  const group = el('g', { style: 'pointer-events:none' });
+  const cells = relationGridCells(x1, y1, x2, y2);
+  const parts = cells.length ? cells.filter(cell => !erasedRelationCells.has(relationCellKey(cell))) : [{ x1, y1, x2, y2 }];
+  parts.forEach(part => group.appendChild(el('line', { ...attrs, ...part })));
+  layer.appendChild(group);
+  return group;
+}
+
+function setRelationStroke(visEl, stroke) {
+  if (visEl.matches?.('line')) visEl.setAttribute('stroke', stroke);
+  else visEl.querySelectorAll('line').forEach(line => line.setAttribute('stroke', stroke));
+}
+
+function eraseRelationGridCell(hitLine, point) {
+  const cells = relationGridCells(
+    parseFloat(hitLine.getAttribute('x1')), parseFloat(hitLine.getAttribute('y1')),
+    parseFloat(hitLine.getAttribute('x2')), parseFloat(hitLine.getAttribute('y2')),
+  );
+  let closest = null;
+  cells.forEach(cell => {
+    const dist = ptSegDist(point.x, point.y, cell.x1, cell.y1, cell.x2, cell.y2);
+    if (!closest || dist < closest.dist) closest = { cell, dist };
+  });
+  if (!closest || closest.dist > 12) return false;
+  const key = relationCellKey(closest.cell);
+  if (erasedRelationCells.has(key)) return false;
+  erasedRelationCells.add(key);
+  clearCanvasSelections();
+  renderLines();
+  pushUndo(() => { erasedRelationCells.delete(key); renderLines(); });
+  return true;
+}
 
 function drawMarriage(layer, fp, tp, rel) {
   const off = relLineOffsets.get(rel.id) || { dx: 0, dy: 0 };
@@ -1681,13 +1738,11 @@ function drawMarriage(layer, fp, tp, rel) {
     'data-rel-id': rel.id, style: 'cursor:move',
   });
   layer.appendChild(hitLine);
-  const visLine = el('line', {
-    x1, y1, x2, y2,
+  const visLine = drawRelationGridLine(layer, x1, y1, x2, y2, {
     stroke: '#000', 'stroke-width': '3',
     'stroke-dasharray': rel.style === 'dashed' ? '6,4' : 'none',
-    'data-rel-id': rel.id, style: 'pointer-events:none',
+    'data-rel-id': rel.id,
   });
-  layer.appendChild(visLine);
 
   hitLine.addEventListener('click', e => {
     if (drawMode || placeMode) return;
@@ -1712,8 +1767,7 @@ function drawMarriage(layer, fp, tp, rel) {
       dragged = true;
       const nx1 = cx(fp)+baseDx+dx, ny1 = cy(fp)+baseDy+dy;
       const nx2 = cx(tp)+baseDx+dx, ny2 = cy(tp)+baseDy+dy;
-      visLine.setAttribute('x1', nx1); visLine.setAttribute('y1', ny1);
-      visLine.setAttribute('x2', nx2); visLine.setAttribute('y2', ny2);
+      visLine.setAttribute('transform', `translate(${dx},${dy})`);
       hitLine.setAttribute('x1', nx1); hitLine.setAttribute('y1', ny1);
       hitLine.setAttribute('x2', nx2); hitLine.setAttribute('y2', ny2);
     };
@@ -1733,8 +1787,8 @@ function drawMarriage(layer, fp, tp, rel) {
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
-  hitLine.addEventListener('mouseover', () => { if (rel.id !== selectedRelId) visLine.setAttribute('stroke', '#5BA4CF'); });
-  hitLine.addEventListener('mouseout', () => { if (rel.id !== selectedRelId) visLine.setAttribute('stroke', '#000'); });
+  hitLine.addEventListener('mouseover', () => { if (rel.id !== selectedRelId) setRelationStroke(visLine, '#5BA4CF'); });
+  hitLine.addEventListener('mouseout', () => { if (rel.id !== selectedRelId) setRelationStroke(visLine, '#000'); });
 
   // Divorce slashes
   if (rel.style === 'divorced') {
@@ -1794,10 +1848,9 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
     let x1 = ov ? ov.x1 : ax1, y1 = ov ? ov.y1 : ay1;
     let x2 = ov ? ov.x2 : ax2, y2 = ov ? ov.y2 : ay2;
     if (x1 === x2 && y1 === y2) return;
-    const visLine = el('line', { x1, y1, x2, y2, stroke:'#000', 'stroke-width':'3', style:'pointer-events:none' });
-    layer.appendChild(visLine);
+    const visLine = drawRelationGridLine(layer, x1, y1, x2, y2, { stroke:'#000', 'stroke-width':'3' });
     if (!firstVis) firstVis = visLine;
-    const hitLine = el('line', { x1, y1, x2, y2, stroke:'transparent', 'stroke-width':'14', style:'cursor:move' });
+    const hitLine = el('line', { x1, y1, x2, y2, stroke:'transparent', 'stroke-width':'14', 'data-rel-id':relId, style:'cursor:move' });
     layer.appendChild(hitLine);
     hitLine.addEventListener('click', e => {
       if (drawMode || placeMode) return;
@@ -1808,8 +1861,8 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
       clearRelSelection();
       selectedRelId = relId;
       selectedSegmentEls = { vis: visLine, hit: hitLine, relId, segIdx };
-      visLine.setAttribute('stroke', '#e06060');
-      _clearRelFn = () => { if (visLine.isConnected) visLine.setAttribute('stroke', '#000'); };
+      setRelationStroke(visLine, '#e06060');
+      _clearRelFn = () => { if (visLine.isConnected) setRelationStroke(visLine, '#000'); };
     });
     hitLine.addEventListener('mousedown', e => {
       if (drawMode === 'line' || drawMode === 'dash-line') {
@@ -1828,8 +1881,7 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
         const dx = mv.clientX - startCX, dy = mv.clientY - startCY;
         if (!dragged && Math.hypot(dx, dy) < 3) return;
         dragged = true;
-        visLine.setAttribute('x1', ox1+dx); visLine.setAttribute('y1', oy1+dy);
-        visLine.setAttribute('x2', ox2+dx); visLine.setAttribute('y2', oy2+dy);
+        visLine.setAttribute('transform', `translate(${dx},${dy})`);
         hitLine.setAttribute('x1', ox1+dx); hitLine.setAttribute('y1', oy1+dy);
         hitLine.setAttribute('x2', ox2+dx); hitLine.setAttribute('y2', oy2+dy);
       };
@@ -1851,8 +1903,8 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     });
-    hitLine.addEventListener('mouseover', () => { if (relId !== selectedRelId) visLine.setAttribute('stroke', '#5BA4CF'); });
-    hitLine.addEventListener('mouseout',  () => { if (relId !== selectedRelId) visLine.setAttribute('stroke', '#000'); });
+    hitLine.addEventListener('mouseover', () => { if (relId !== selectedRelId) setRelationStroke(visLine, '#5BA4CF'); });
+    hitLine.addEventListener('mouseout',  () => { if (relId !== selectedRelId) setRelationStroke(visLine, '#000'); });
   });
   return firstVis;
 }
@@ -2579,6 +2631,8 @@ function eraseCanvasAtEvent(event) {
   const node = event.target.closest?.('#layer-nodes [data-id]');
   if (node) return eraseCanvasNode(node);
   const point = svgPoint(event);
+  const relation = event.target.closest?.('#layer-lines [data-rel-id]');
+  if (relation && eraseRelationGridCell(relation, point)) return true;
   if (eraseDrawElement(event.target, point)) return true;
   clearCanvasSelections();
   return false;

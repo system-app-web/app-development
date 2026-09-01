@@ -2287,9 +2287,31 @@ window.addEventListener("pointermove", (event) => {
     }
     const pointerX = resizeState.origX + deltaX * scaleX;
     const pointerY = resizeState.origY + deltaY * scaleY;
-    const nextX = isItem ? pointerX : snapToGrid(pointerX, "x");
-    const nextY = isItem ? pointerY : snapToGrid(pointerY, "y");
 
+    if (isItem) {
+      const fixedX = resizeState.corner.includes("w") ? resizeState.origX + resizeState.origW : resizeState.origX;
+      const fixedY = resizeState.corner.includes("n") ? resizeState.origY + resizeState.origH : resizeState.origY;
+      const proposedWidth = resizeState.origW + (resizeState.corner.includes("w") ? -1 : 1) * deltaX * scaleX;
+      const proposedHeight = resizeState.origH + (resizeState.corner.includes("n") ? -1 : 1) * deltaY * scaleY;
+      const widthScale = proposedWidth / resizeState.origW;
+      const heightScale = proposedHeight / resizeState.origH;
+      const requestedScale = Math.abs(widthScale - 1) >= Math.abs(heightScale - 1) ? widthScale : heightScale;
+      const minScale = Math.max(minW / resizeState.origW, minH / resizeState.origH);
+      const maxWidth = resizeState.corner.includes("w") ? fixedX : 1200 - fixedX;
+      const maxHeight = resizeState.corner.includes("n") ? fixedY : 800 - fixedY;
+      const maxScale = Math.min(maxWidth / resizeState.origW, maxHeight / resizeState.origH);
+      const nextScale = Math.max(minScale, Math.min(maxScale, requestedScale));
+
+      room.w = resizeState.origW * nextScale;
+      room.h = resizeState.origH * nextScale;
+      room.x = resizeState.corner.includes("w") ? fixedX - room.w : fixedX;
+      room.y = resizeState.corner.includes("n") ? fixedY - room.h : fixedY;
+      renderAll(false);
+      return;
+    }
+
+    const nextX = snapToGrid(pointerX, "x");
+    const nextY = snapToGrid(pointerY, "y");
     if (resizeState.corner.includes("w")) left = Math.max(0, Math.min(right - minW, nextX));
     if (resizeState.corner.includes("e")) right = Math.min(1200, Math.max(left + minW, nextX + resizeState.origW));
     if (resizeState.corner.includes("n")) top = Math.max(0, Math.min(bottom - minH, nextY));

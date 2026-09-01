@@ -217,8 +217,17 @@ header h1 {
 .p-card:hover .del-btn { opacity: 1; }
 .preset-btn:hover { background:#d4eaff !important; border-color:#8ab8e0 !important; }
 .save-tpl-btn:hover { background:#d4eaff !important; border-color:#8ab8e0 !important; color:#2a5a8a !important; }
-.drag-handle { cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='white' stroke='%23555' stroke-width='1.5' stroke-linejoin='round' d='M9 3a1 1 0 0 1 1 1v4a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1v.5a1 1 0 0 1 1-1H14a1 1 0 0 1 1 1v.5a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1V14a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") 9 0, grab; color:#ccc; font-size:11px; line-height:1; user-select:none; flex-shrink:0; position:absolute; left:0; top:10px; height:22px; display:flex; align-items:center; padding:0 1px; }
-.drag-handle:active { cursor:grabbing; }
+.template-hero-btn { position:relative; display:flex; align-items:center; justify-content:space-between; padding:18px 30px 14px 16px; min-height:68px; cursor:pointer; user-select:none; background:linear-gradient(135deg,#348fbd,#64bea8); border-radius:10px; margin:34px 8px 8px; border:1px solid #6aaecb; box-shadow:0 8px 22px rgba(91,164,207,.26),0 0 0 3px rgba(91,164,207,.12); transition:transform .15s,box-shadow .15s,filter .15s; }
+.template-hero-btn:hover { transform:translateY(-1px); box-shadow:0 11px 28px rgba(91,164,207,.32),0 0 0 5px rgba(91,164,207,.16); filter:brightness(1.03); }
+.template-hero-cta { position:absolute; top:-28px; left:10px; padding:5px 13px 6px; border-radius:14px; background:rgba(255,255,255,.88); color:#276f7b; font-size:13px; font-weight:800; letter-spacing:.3px; border:1px solid rgba(255,255,255,.86); box-shadow:0 8px 18px rgba(46,116,132,.18); white-space:nowrap; }
+.template-hero-label { font-size:18px; font-weight:800; color:#fff; letter-spacing:.4px; white-space:nowrap; }
+.template-hero-sub { margin-top:4px; font-size:11px; font-weight:600; color:rgba(255,255,255,.84); letter-spacing:.2px; }
+.template-hero-arrow { position:absolute; right:13px; top:29px; width:11px; height:11px; border-right:3px solid #fff; border-bottom:3px solid #fff; transform:rotate(45deg); }
+.template-block.tpl-open .template-hero-cta { display:none; }
+.drag-handle { cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='white' stroke='%23555' stroke-width='1.5' stroke-linejoin='round' d='M9 3a1 1 0 0 1 1 1v4a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1v.5a1 1 0 0 1 1-1H14a1 1 0 0 1 1 1v.5a1 1 0 0 1 1-1h.5a1 1 0 0 1 1 1V14a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") 9 0, grab; user-select:none; flex-shrink:0; position:absolute; z-index:1; left:-4px; top:6px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border:1px solid #9bc9e4; border-radius:7px; background:#e2f2fb; box-shadow:0 2px 4px rgba(46,101,139,.18); transition:transform .15s ease,box-shadow .15s ease,background .15s ease; }
+.drag-handle::before { content:""; width:4px; height:4px; border-radius:50%; background:#3d84b3; box-shadow:8px 0 #3d84b3,0 7px #3d84b3,8px 7px #3d84b3,0 14px #3d84b3,8px 14px #3d84b3; }
+.drag-handle:hover { background:#d5ecf9; box-shadow:0 3px 6px rgba(46,101,139,.22); transform:translateY(-1px); }
+.drag-handle:active { cursor:grabbing; background:#cce7f6; box-shadow:inset 0 1px 3px rgba(46,101,139,.2); transform:translateY(0); }
 .p-card.drag-over { border-color:#5BA4CF; background:#ddeeff; }
 
 .p-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
@@ -400,12 +409,14 @@ header h1 {
 <div class="main">
   <!-- Input panel -->
   <div class="input-panel">
-    <div style="background:#eef6ff;border-bottom:2px solid #5BA4CF;">
-      <div onclick="toggleTemplatePanel()" style="position:relative;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;user-select:none;background:linear-gradient(135deg,#deeef8,#eef6ff);border-radius:6px;margin:5px 8px;border:1.5px solid #b8d4ea;transition:background 0.15s;" onmouseover="this.style.background='linear-gradient(135deg,#cce0f0,#e0f0ff)'" onmouseout="this.style.background='linear-gradient(135deg,#deeef8,#eef6ff)'">
-        <span style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:13px;font-weight:700;color:#1a4a7a;letter-spacing:0.5px;">テンプレートを選択</span>
+    <div id="templateBlock" class="template-block" style="background:#eef6ff;border-bottom:2px solid #5BA4CF;">
+      <div onclick="toggleTemplatePanel()" class="template-hero-btn">
+        <span class="template-hero-cta">最初にここを選択👇</span>
+        <span style="display:flex;flex-direction:column;align-items:flex-start;gap:0;">
+          <span class="template-hero-label">テンプレートを選ぶ</span>
+          <span class="template-hero-sub">選ぶだけでジェノグラムを作成</span>
         </span>
-        <span id="tpl-arrow" style="display:inline-block;width:8px;height:8px;border-right:2px solid #5a8ab0;border-bottom:2px solid #5a8ab0;transform:rotate(45deg);margin-bottom:3px;"></span>
+        <span id="tpl-arrow" class="template-hero-arrow"></span>
       </div>
       <div id="tpl-panel" style="overflow:hidden;max-height:0;transition:max-height 0.3s ease,padding 0.3s;">
         <div style="padding:0 10px 8px;display:flex;flex-direction:column;gap:6px;">
@@ -600,7 +611,7 @@ function renderList() {
     card.dataset.pid = p.id;
     card.innerHTML = `
       <div class="p-hd">
-        ${!isSub ? `<span class="drag-handle" title="ドラッグして並び替え">⋮⋮</span>` : ''}
+        ${!isSub ? `<span class="drag-handle" role="button" aria-label="押したままドラッグして並び替え" title="押したままドラッグして並び替え"></span>` : ''}
         <div class="p-num ${isSub?'sub':''}">${i+1}</div>
         <span class="p-label" ${isSub ? 'style="font-size:13px;font-weight:700;color:#1a3a5c;text-decoration:underline;text-underline-offset:3px"' : ''}>
           ${isSub ? '★ 本人' : (p.relation && p.relation !== '自由記述' ? `<span style="font-size:13px;font-weight:700;color:#1a3a5c;text-decoration:underline;text-underline-offset:3px">${p.relation}</span>` : '家族 ' + i)}
@@ -749,8 +760,10 @@ function getSavedTemplates() {
 
 function toggleTemplatePanel() {
   const panel = document.getElementById('tpl-panel');
+  const block = document.getElementById('templateBlock');
   const isOpen = panel.style.maxHeight !== '0px' && panel.style.maxHeight !== '';
   panel.style.maxHeight = isOpen ? '0' : panel.scrollHeight + 'px';
+  if (block) block.classList.toggle('tpl-open', !isOpen);
 }
 
 function renderTemplateBtns() {

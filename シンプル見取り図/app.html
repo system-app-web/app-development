@@ -2520,47 +2520,154 @@ function setTextDir(dir) {
   }
 }
 
+function getSavedFolderHandle() {
+  return new Promise((resolve) => {
+    const request = indexedDB.open("simple-mitorizu-prefs", 1);
+    request.onupgradeneeded = (event) => event.target.result.createObjectStore("data");
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+      const get = db.transaction("data", "readonly").objectStore("data").get("lastSaveHandle");
+      get.onsuccess = () => { db.close(); resolve(get.result || null); };
+      get.onerror = () => { db.close(); resolve(null); };
+    };
+    request.onerror = () => resolve(null);
+  });
+}
+
+function saveFolderHandle(handle) {
+  return new Promise((resolve) => {
+    const request = indexedDB.open("simple-mitorizu-prefs", 1);
+    request.onupgradeneeded = (event) => event.target.result.createObjectStore("data");
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+      const transaction = db.transaction("data", "readwrite");
+      transaction.objectStore("data").put(handle, "lastSaveHandle");
+      transaction.oncomplete = () => { db.close(); resolve(); };
+      transaction.onerror = () => { db.close(); resolve(); };
+    };
+    request.onerror = () => resolve();
+  });
+}
+
+function appendExportText(svg, bounds) {
+  const sourceSvg = document.getElementById("svg-main");
+  const scaleX = 1200 / sourceSvg.clientWidth;
+  const scaleY = 800 / sourceSvg.clientHeight;
+  document.querySelectorAll("#text-overlay .canvas-text").forEach((element) => {
+    const text = element.textContent.trim();
+    if (!text) return;
+    const x = (parseFloat(element.style.left) || 0) * scaleX;
+    const y = (parseFloat(element.style.top) || 0) * scaleY;
+    const fontSize = (Number(element.dataset.fontSize) || currentTextSize) * scaleY;
+    const vertical = element.dataset.direction === "v";
+    const svgText = svgEl("text", {
+      x: x + fontSize * 0.08,
+      y: y + fontSize,
+      "font-size": fontSize,
+      "font-family": "Hiragino Sans, Yu Gothic UI, Meiryo, sans-serif",
+      "font-weight": "400",
+      fill: "#000"
+    });
+    if (vertical) svgText.setAttribute("writing-mode", "vertical-rl");
+    text.split("\n").forEach((line, index) => {
+      const span = svgEl("tspan", vertical
+        ? { x: x + fontSize * 0.08, dy: index === 0 ? "0" : `${fontSize * 1.2}` }
+        : { x: x + fontSize * 0.08, dy: index === 0 ? "0" : "1.3em" });
+      span.textContent = line;
+      svgText.appendChild(span);
+    });
+    svg.appendChild(svgText);
+    const width = (element.offsetWidth || fontSize / scaleX) * scaleX;
+    const height = (element.offsetHeight || fontSize / scaleY) * scaleY;
+    bounds.x.push(x, x + width);
+    bounds.y.push(y, y + height);
+  });
+}
+
 async function exportPNG() {
-  const svg = document.getElementById("svg-main");
-  const xml = new XMLSerializer().serializeToString(svg);
-  const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const img = new Image();
+  const selectedRoom = selectedRoomId;
+  const selectedDraw = selectedDrawElement;
+  selectedRoomId = null;
+  clearDrawSelection();
+  renderAll(false);
 
-  img.onload = async () => {
+  const sourceSvg = document.getElementById("svg-main");
+  const bounds = { x: [], y: [] };
+  ["layer-lines", "layer-nodes", "layer-draw"].forEach((id) => {
+    const layer = document.getElementById(id);
+    if (!layer) return;
+    try {
+      const box = layer.getBBox();
+      if (box.width > 0 || box.height > 0) {
+        bounds.x.push(box.x, box.x + box.width);
+        bounds.y.push(box.y, box.y + box.height);
+      }
+    } catch {}
+  });
+
+  const exportSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  exportSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  exportSvg.setAttribute("font-family", "Hiragino Sans, Yu Gothic UI, Meiryo, sans-serif");
+  ["layer-lines", "layer-nodes", "layer-draw"].forEach((id) => {
+    const layer = document.getElementById(id);
+    if (layer) exportSvg.appendChild(layer.cloneNode(true));
+  });
+  appendExportText(exportSvg, bounds);
+
+  selectedRoomId = selectedRoom;
+  if (selectedDraw) activateDrawSelection(selectedDraw);
+  else renderAll(false);
+
+  if (!bounds.x.length || !bounds.y.length) return;
+  const padding = 10;
+  const minX = Math.min(...bounds.x) - padding;
+  const minY = Math.min(...bounds.y) - padding;
+  const width = Math.max(...bounds.x) + padding - minX;
+  const height = Math.max(...bounds.y) + padding - minY;
+  exportSvg.setAttribute("width", width);
+  exportSvg.setAttribute("height", height);
+  exportSvg.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
+
+  const source = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(exportSvg)], { type: "image/svg+xml;charset=utf-8" }));
+  const image = new Image();
+  image.onload = async () => {
+    const scale = 2;
     const canvas = document.createElement("canvas");
-    canvas.width = 1200;
-    canvas.height = 800;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    URL.revokeObjectURL(url);
+    canvas.width = Math.ceil(width * scale);
+    canvas.height = Math.ceil(height * scale);
+    const context = canvas.getContext("2d");
+    context.scale(scale, scale);
+    context.drawImage(image, 0, 0, width, height);
+    URL.revokeObjectURL(source);
 
-    const fileName = `見取り図_${new Date().toISOString().slice(0, 10)}.png`;
+    const png = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!png) return;
+    const fileName = "見取り図.png";
     try {
       if (window.showSaveFilePicker) {
         const handle = await window.showSaveFilePicker({
           suggestedName: fileName,
+          startIn: (await getSavedFolderHandle()) || "desktop",
           types: [{ description: "PNG画像", accept: { "image/png": [".png"] } }]
         });
         const writable = await handle.createWritable();
-        const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-        await writable.write(pngBlob);
+        await writable.write(png);
         await writable.close();
-        showToast("見取り図を保存しました");
+        await saveFolderHandle(handle);
       } else {
-        const a = document.createElement("a");
-        a.href = canvas.toDataURL("image/png");
-        a.download = fileName;
-        a.click();
-        showToast("見取り図をダウンロードしました");
+        const link = document.createElement("a");
+        const downloadUrl = URL.createObjectURL(png);
+        link.href = downloadUrl;
+        link.download = fileName;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
       }
     } catch (error) {
-      if (error && error.name !== "AbortError") alert("保存に失敗しました。");
+      if (error?.name !== "AbortError") alert("保存に失敗しました。");
     }
   };
-  img.src = url;
+  image.onerror = () => URL.revokeObjectURL(source);
+  image.src = source;
 }
 
 renderTemplateButtons();

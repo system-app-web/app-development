@@ -264,7 +264,7 @@ h1 {
 }
 .canvas-rotate-trigger {
   position: absolute;
-  top: 54px;
+  top: 98px;
   left: 10px;
   z-index: 36;
   padding: 0;
@@ -279,6 +279,13 @@ h1 {
   z-index: 36;
   padding: 0;
 }
+.canvas-eraser-trigger {
+  position: absolute;
+  top: 54px;
+  left: 10px;
+  z-index: 36;
+  padding: 0;
+}
 .canvas-text-trigger,
 .canvas-delete-trigger,
 .canvas-undo-trigger {
@@ -287,9 +294,9 @@ h1 {
   z-index: 36;
   padding: 0;
 }
-.canvas-text-trigger { top: 98px; }
-.canvas-delete-trigger { top: 142px; }
-.canvas-undo-trigger { top: 186px; font-size: 14px; }
+.canvas-text-trigger { top: 142px; }
+.canvas-delete-trigger { top: 186px; }
+.canvas-undo-trigger { top: 230px; font-size: 14px; }
 #layer-nodes g.selected > *[stroke] { stroke: #2daec0; }
 #layer-nodes g.selected > text { fill: #247a8a; }
 #layer-draw .selected-draw { stroke: #2daec0; }
@@ -585,6 +592,9 @@ h1 {
     <button id="dtool-line" class="dtool-btn canvas-line-trigger" type="button" onclick="setDrawMode('line', this)" title="直線" aria-label="直線">
       <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><line x1="3" y1="19" x2="19" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
+    <button id="dtool-eraser" class="dtool-btn canvas-eraser-trigger" type="button" onclick="setDrawMode('erase', this)" title="枠線消しゴム" aria-label="枠線消しゴム">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="m7 17-2-2a2 2 0 0 1 0-2.8l6.1-6.1a2 2 0 0 1 2.8 0l3.1 3.1a2 2 0 0 1 0 2.8L12 17H7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m11.2 8.8 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
     <button id="rotate-selected" class="dtool-btn canvas-rotate-trigger" type="button" onclick="rotateSelectedItem()" title="選択したアイテムを回転" aria-label="選択したアイテムを回転">回転</button>
     <button id="dtool-text" class="dtool-btn canvas-text-trigger" type="button" onclick="setDrawMode('text', this)" title="テキスト" aria-label="テキスト"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><text x="3" y="16" font-size="15" font-weight="700" fill="currentColor" font-family="sans-serif">A</text><line x1="2" y1="19" x2="20" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <button class="dtool-btn canvas-delete-trigger" type="button" onclick="deleteSelected()" title="選択した要素を削除" aria-label="選択した要素を削除"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><polyline points="2,4 16,4" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><path d="M5 4V3a1 1 0 011-1h6a1 1 0 011 1v1" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><rect x="3.5" y="4" width="11" height="11" rx="1.5" stroke="#c44" stroke-width="1.8"/><line x1="7" y1="7.5" x2="7" y2="12" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/><line x1="11" y1="7.5" x2="11" y2="12" stroke="#c44" stroke-width="1.8" stroke-linecap="round"/></svg></button>
@@ -644,6 +654,8 @@ let rooms = [];
 let dragState = null;
 const LINE_STROKE_WIDTH = 4;
 const FLOOR_PLAN_STROKE_WIDTH = 4;
+let erasedFloorPlanWalls = new Set();
+let eraseState = null;
 let currentDrawMode = "";
 let currentPlaceMode = "";
 let currentTextSize = 28;
@@ -764,7 +776,8 @@ function saveTemplate() {
   saved.push({
     id: uid(),
     name: name.trim(),
-    rooms: rooms.map((room) => ({ ...room }))
+    rooms: rooms.map((room) => ({ ...room })),
+    erasedFloorPlanWalls: Array.from(erasedFloorPlanWalls)
   });
   localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(saved));
   renderTemplateButtons();
@@ -828,6 +841,7 @@ function renderDoorPalette() {
 
 function applyTemplate(template) {
   rooms = template.rooms.map((room) => createRoom(room));
+  erasedFloorPlanWalls = new Set(template.erasedFloorPlanWalls || []);
   selectedRoomId = null;
   syncCanvasItemsToGrid();
   syncFloorPlansToGrid();
@@ -848,7 +862,7 @@ function renderSVG(showHint = true) {
     const visualRotation = room.type === "floorplan" ? 0 : room.rotation;
     group.setAttribute("transform", getVisualItemTransform(room, visualRotation));
     group.dataset.id = room.id;
-    group.style.cursor = "grab";
+    group.style.cursor = currentDrawMode ? "crosshair" : "grab";
     group.classList.toggle("selected", room.id === selectedRoomId);
     group.classList.toggle("floorplan", room.type === "floorplan");
 
@@ -1113,19 +1127,64 @@ function renderCatalogItem(group, room) {
   }
 }
 
+function floorPlanWallSegments(room) {
+  const columns = room.gridColumns || Math.max(1, Math.round(room.w / gridStep("x")));
+  const rows = room.gridRows || Math.max(1, Math.round(room.h / gridStep("y")));
+  const cellWidth = room.w / columns;
+  const cellHeight = room.h / rows;
+  const segments = [];
+
+  for (let column = 0; column < columns; column += 1) {
+    const x1 = room.x + column * cellWidth;
+    const x2 = x1 + cellWidth;
+    segments.push(
+      { key: `${room.id}:top:${column}`, orientation: "horizontal", x1, y1: room.y, x2, y2: room.y },
+      { key: `${room.id}:bottom:${column}`, orientation: "horizontal", x1, y1: room.y + room.h, x2, y2: room.y + room.h }
+    );
+  }
+  for (let row = 0; row < rows; row += 1) {
+    const y1 = room.y + row * cellHeight;
+    const y2 = y1 + cellHeight;
+    segments.push(
+      { key: `${room.id}:left:${row}`, orientation: "vertical", x1: room.x, y1, x2: room.x, y2 },
+      { key: `${room.id}:right:${row}`, orientation: "vertical", x1: room.x + room.w, y1, x2: room.x + room.w, y2 }
+    );
+  }
+  return segments;
+}
+
+function getFloorPlanWallSegments() {
+  return rooms.filter((room) => room.type === "floorplan").flatMap(floorPlanWallSegments);
+}
+
 function renderFloorPlan(group, room) {
-  const outline = svgEl("rect", {
-    width: room.w,
-    height: room.h,
-    fill: "transparent",
-    stroke: "#000",
-    "stroke-width": FLOOR_PLAN_STROKE_WIDTH,
-    "vector-effect": "non-scaling-stroke",
-    class: "floor-plan-outline"
+  floorPlanWallSegments(room).forEach((segment) => {
+    if (erasedFloorPlanWalls.has(segment.key)) return;
+    group.appendChild(svgEl("line", {
+      x1: segment.x1 - room.x,
+      y1: segment.y1 - room.y,
+      x2: segment.x2 - room.x,
+      y2: segment.y2 - room.y,
+      stroke: "#000",
+      "stroke-width": FLOOR_PLAN_STROKE_WIDTH,
+      "stroke-linecap": "butt",
+      "vector-effect": "non-scaling-stroke",
+      class: "floor-plan-wall"
+    }));
   });
-  group.appendChild(outline);
 
   if (room.id === selectedRoomId) {
+    const outline = svgEl("rect", {
+      width: room.w,
+      height: room.h,
+      fill: "transparent",
+      stroke: "#f15f69",
+      "stroke-width": FLOOR_PLAN_STROKE_WIDTH,
+      "stroke-dasharray": "16 12",
+      "vector-effect": "non-scaling-stroke",
+      class: "floor-plan-outline"
+    });
+    group.appendChild(outline);
     const handleW = gridStep("x") * 0.36;
     const handleH = gridStep("y") * 0.36;
     const halfW = handleW / 2;
@@ -1637,6 +1696,77 @@ function nearestGridEdge(point) {
   return { x1: x, y1: row * stepY, x2: x, y2: (row + 1) * stepY };
 }
 
+function findFloorPlanWallAtPoint(point) {
+  const svg = document.getElementById("svg-main");
+  const thresholdX = svg?.clientWidth ? 12 * (1200 / svg.clientWidth) : 12;
+  const thresholdY = svg?.clientHeight ? 12 * (800 / svg.clientHeight) : 12;
+  let closest = null;
+
+  getFloorPlanWallSegments().forEach((segment) => {
+    const isHorizontal = segment.orientation === "horizontal";
+    const start = isHorizontal ? segment.x1 : segment.y1;
+    const end = isHorizontal ? segment.x2 : segment.y2;
+    const value = isHorizontal ? point.x : point.y;
+    const perpendicular = isHorizontal ? Math.abs(point.y - segment.y1) / thresholdY : Math.abs(point.x - segment.x1) / thresholdX;
+    const overflow = value < start ? (start - value) / (isHorizontal ? thresholdX : thresholdY) : value > end ? (value - end) / (isHorizontal ? thresholdX : thresholdY) : 0;
+    const distance = Math.max(perpendicular, overflow);
+    if (distance > 1 || (closest && distance >= closest.distance)) return;
+    closest = { segment, distance };
+  });
+
+  return closest?.segment || null;
+}
+
+function getMatchingFloorPlanWalls(target) {
+  const precision = 0.01;
+  return getFloorPlanWallSegments().filter((segment) => {
+    if (segment.orientation !== target.orientation) return false;
+    if (segment.orientation === "horizontal") {
+      return Math.abs(segment.y1 - target.y1) < precision && Math.abs(segment.x1 - target.x1) < precision && Math.abs(segment.x2 - target.x2) < precision;
+    }
+    return Math.abs(segment.x1 - target.x1) < precision && Math.abs(segment.y1 - target.y1) < precision && Math.abs(segment.y2 - target.y2) < precision;
+  });
+}
+
+function eraseFloorPlanWallAtPoint(point) {
+  const target = findFloorPlanWallAtPoint(point);
+  if (!target) return false;
+  let changed = false;
+  getMatchingFloorPlanWalls(target).forEach((segment) => {
+    if (erasedFloorPlanWalls.has(segment.key)) return;
+    erasedFloorPlanWalls.add(segment.key);
+    eraseState?.removed.add(segment.key);
+    changed = true;
+  });
+  if (changed) renderAll(false);
+  return changed;
+}
+
+function eraseFloorPlanWallsBetween(start, end) {
+  const steps = Math.max(1, Math.ceil(Math.max(
+    Math.abs(end.x - start.x) / gridStep("x"),
+    Math.abs(end.y - start.y) / gridStep("y")
+  ) * 4));
+  for (let index = 0; index <= steps; index += 1) {
+    const ratio = index / steps;
+    eraseFloorPlanWallAtPoint({
+      x: start.x + (end.x - start.x) * ratio,
+      y: start.y + (end.y - start.y) * ratio
+    });
+  }
+}
+
+function startFloorPlanWallErase(event) {
+  if (currentDrawMode !== "erase" || event.button !== 0) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  selectedRoomId = null;
+  clearDrawSelection();
+  const point = pointInSvg(event);
+  eraseState = { lastPoint: point, removed: new Set() };
+  eraseFloorPlanWallAtPoint(point);
+}
+
 function startLineDraw(event) {
   if (currentDrawMode !== "line" || event.button !== 0) return;
   event.preventDefault();
@@ -2039,7 +2169,7 @@ function addFloorPlan() {
   clearPlaceMode();
   currentDrawMode = "";
   document.getElementById("svg-main").style.cursor = "";
-  document.getElementById("dtool-line").classList.remove("active");
+  document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((button) => button.classList.remove("active"));
   const stepX = gridStep("x");
   const stepY = gridStep("y");
   const width = stepX * 6;
@@ -2076,6 +2206,12 @@ function addFloorPlan() {
 }
 
 window.addEventListener("pointermove", (event) => {
+  if (eraseState) {
+    const point = pointInSvg(event);
+    eraseFloorPlanWallsBetween(eraseState.lastPoint, point);
+    eraseState.lastPoint = point;
+    return;
+  }
   const svg = document.getElementById("svg-main");
   const svgBounds = svg.getBoundingClientRect();
   const scaleX = 1200 / svgBounds.width;
@@ -2224,6 +2360,16 @@ window.addEventListener("pointermove", (event) => {
 });
 
 window.addEventListener("pointerup", () => {
+  if (eraseState) {
+    const removed = Array.from(eraseState.removed);
+    if (removed.length) {
+      actionHistory.push(() => {
+        removed.forEach((key) => erasedFloorPlanWalls.delete(key));
+        renderAll(false);
+      });
+    }
+    eraseState = null;
+  }
   if (lineDrawState) {
     if (!lineDrawState.moved) {
       const edge = nearestGridEdge(lineDrawState.start);
@@ -2359,6 +2505,8 @@ window.addEventListener("resize", () => {
 
 function clearAll() {
   rooms = [];
+  erasedFloorPlanWalls.clear();
+  eraseState = null;
   selectedRoomId = null;
   clearDrawSelection();
   actionHistory.length = 0;
@@ -2688,6 +2836,7 @@ const canvasResizeObserver = new ResizeObserver(() => {
   syncFloorPlansToGrid();
 });
 canvasResizeObserver.observe(canvas);
+canvas.addEventListener("pointerdown", startFloorPlanWallErase);
 canvas.addEventListener("pointerdown", startLineDraw);
 canvas.addEventListener("pointerdown", startTextDraw);
 canvas.addEventListener("pointerdown", placeItemOnCanvas);

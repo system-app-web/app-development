@@ -1899,34 +1899,6 @@ function mergeClientRecord(base, extra) {
   return normalizeSehoFields(merged);
 }
 
-function resolveKanaForName(name) {
-  const trimmed = String(name || '').trim();
-  if (!trimmed) return '';
-  if (NAME_YOMI[trimmed]) return String(NAME_YOMI[trimmed]);
-  const normalized = trimmed.replace(/\s+/g, '');
-  const fromCurrent = currentData.find(item => {
-    const itemName = String(item.name || '').trim();
-    const itemBaseName = String(item.baseName || '').trim();
-    return itemName === trimmed || itemBaseName === trimmed || itemName.replace(/\s+/g, '') === normalized || itemBaseName.replace(/\s+/g, '') === normalized;
-  });
-  if (fromCurrent && String(fromCurrent.kana || '').trim()) return String(fromCurrent.kana).trim();
-  const fromDefaults = DEFAULT_CLIENTS.find(item => {
-    const itemName = String(item.name || '').trim();
-    const itemBaseName = String(item.baseName || '').trim();
-    return itemName === trimmed || itemBaseName === trimmed || itemName.replace(/\s+/g, '') === normalized || itemBaseName.replace(/\s+/g, '') === normalized;
-  });
-  if (fromDefaults && String(fromDefaults.kana || '').trim()) return String(fromDefaults.kana).trim();
-  return '';
-}
-
-function fillKanaIfKnown(nameInputId, kanaInputId) {
-  const nameInput = document.getElementById(nameInputId);
-  const kanaInput = document.getElementById(kanaInputId);
-  if (!nameInput || !kanaInput) return;
-  const autoKana = resolveKanaForName(nameInput.value);
-  if (autoKana) kanaInput.value = autoKana;
-}
-
 function defaultAddClientDraft() {
   return {
     name: '',
@@ -1951,12 +1923,12 @@ function renderAddClientModal() {
   if (!addClientDraft) addClientDraft = defaultAddClientDraft();
   modalIndex = -1;
   showModal('利用者を追加', '新規',
-    `<input class="modal-input" id="add-name" placeholder="利用者名" value="${esc(addClientDraft.name || '')}" oninput="fillKanaIfKnown('add-name','add-kana')" onchange="fillKanaIfKnown('add-name','add-kana')" onblur="fillKanaIfKnown('add-name','add-kana')">
+    `<input class="modal-input" id="add-name" placeholder="利用者名" value="${esc(addClientDraft.name || '')}">
      <input class="modal-input" id="add-kana" placeholder="かな" value="${esc(addClientDraft.kana || '')}">
-     <input class="modal-input" id="add-yuko" placeholder="有効期限 例: R9.10.31" value="${esc(shortDate(addClientDraft.yuko) || '')}" readonly ondblclick="syncAddClientDraft();openAddClientPeriodPicker('yuko')" onclick="this.blur()">
-     <input class="modal-input" id="add-level" placeholder="介護度" value="${esc(addClientDraft.level || '')}" readonly ondblclick="syncAddClientDraft();openAddClientLevelPicker()" onclick="this.blur()">
-     <input class="modal-input" id="add-planL" placeholder="長期 例: R9.10.31" value="${esc(shortDate(addClientDraft.planL) || '')}" readonly ondblclick="syncAddClientDraft();openAddClientPeriodPicker('planL')" onclick="this.blur()">
-     <input class="modal-input" id="add-planS" placeholder="短期 例: R9.4.30" value="${esc(shortDate(addClientDraft.planS) || '')}" readonly ondblclick="syncAddClientDraft();openAddClientPeriodPicker('planS')" onclick="this.blur()">
+     <input class="modal-input" id="add-yuko" placeholder="有効期限 例: R9.10.31" value="${esc(shortDate(addClientDraft.yuko) || '')}" readonly onclick="syncAddClientDraft();openAddClientPeriodPicker('yuko')">
+     <input class="modal-input" id="add-level" placeholder="介護度" value="${esc(addClientDraft.level || '')}" readonly onclick="syncAddClientDraft();openAddClientLevelPicker()">
+     <input class="modal-input" id="add-planL" placeholder="長期 例: R9.10.31" value="${esc(shortDate(addClientDraft.planL) || '')}" readonly onclick="syncAddClientDraft();openAddClientPeriodPicker('planL')">
+     <input class="modal-input" id="add-planS" placeholder="短期 例: R9.4.30" value="${esc(shortDate(addClientDraft.planS) || '')}" readonly onclick="syncAddClientDraft();openAddClientPeriodPicker('planS')">
      <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #b3e89a;border-radius:10px;background:#f9fef5;margin-top:2px;cursor:pointer">
        <input type="checkbox" id="add-seho-mark" ${addClientDraft.seho ? 'checked' : ''} onchange="syncAddClientSehoDraft()" style="width:18px;height:18px;accent-color:#65b842">
        <span style="font-size:13px;font-weight:700;color:#1a4d0e">生活保護あり</span>
@@ -1968,7 +1940,6 @@ function renderAddClientModal() {
   setTimeout(() => {
     const input = document.getElementById('add-name');
     if (input) input.focus();
-    wireKanaAutoTransfer('add-name', 'add-kana');
   }, 100);
 }
 
@@ -1976,53 +1947,6 @@ function syncAddClientSehoDraft() {
   if (!addClientDraft) addClientDraft = defaultAddClientDraft();
   addClientDraft.seho = document.getElementById('add-seho-mark')?.checked ? '○' : '';
   addClientDraft.sehoCw = (document.getElementById('add-seho-cw')?.value || '').trim();
-}
-
-function wireKanaAutoTransfer(nameInputId, kanaInputId) {
-  const nameInput = document.getElementById(nameInputId);
-  const kanaInput = document.getElementById(kanaInputId);
-  if (!nameInput || !kanaInput || nameInput.dataset.kanaWired === '1') return;
-
-  let kanaTouched = false;
-  const toKanaCandidate = value => {
-    const text = String(value || '').trim();
-    if (!text) return '';
-    return /^[ぁ-んァ-ヶー\s　]+$/.test(text) ? text : '';
-  };
-  const updateKana = value => {
-    if (kanaTouched) return;
-    const text = toKanaCandidate(value);
-    if (!text) return;
-    kanaInput.value = text;
-  };
-
-  kanaInput.addEventListener('input', () => {
-    kanaTouched = true;
-  });
-
-  nameInput.addEventListener('compositionupdate', event => {
-    updateKana(event.data || '');
-  });
-
-  nameInput.addEventListener('compositionend', event => {
-    const knownKana = resolveKanaForName(nameInput.value);
-    if (knownKana) {
-      updateKana(knownKana);
-      return;
-    }
-    updateKana(toKanaCandidate(event.data || ''));
-  });
-
-  nameInput.addEventListener('input', () => {
-    const knownKana = resolveKanaForName(nameInput.value);
-    if (knownKana) {
-      updateKana(knownKana);
-      return;
-    }
-    updateKana(toKanaCandidate(nameInput.value));
-  });
-
-  nameInput.dataset.kanaWired = '1';
 }
 
 function dedupeClients(data) {
@@ -2964,12 +2888,12 @@ function savePeriodData(field) {
   saveMonthData(curYear, curMonth, currentData, options);
 }
 
-function bindDateCell(td, onClick, onDoubleClick) {
-  td.addEventListener('dblclick', event => {
+function bindDateCell(td, onClick, singleTap = false) {
+  td.addEventListener(singleTap ? 'click' : 'dblclick', event => {
     event.stopPropagation();
     clearTimeout(pendingDateClick);
     pendingDateClick = null;
-    (onDoubleClick || onClick)();
+    onClick();
   });
 }
 
@@ -3148,7 +3072,7 @@ function addClient() {
   }
   currentData.push(newClientData({
     name,
-    kana: String(addClientDraft?.kana || '').trim() || resolveKanaForName(name),
+    kana: String(addClientDraft?.kana || '').trim(),
     customAdded: true,
     noNumber: !name,
     baseName: '',
@@ -3332,7 +3256,7 @@ function openNameEditor(i) {
   modalIndex = i;
   const item = currentData[i];
   showModal('氏名', item.name,
-    `<input class="modal-input" id="edit-name-input" placeholder="氏名" value="${esc(item.name || '')}" oninput="fillKanaIfKnown('edit-name-input','edit-kana-input')" onchange="fillKanaIfKnown('edit-name-input','edit-kana-input')" onblur="fillKanaIfKnown('edit-name-input','edit-kana-input')">
+    `<input class="modal-input" id="edit-name-input" placeholder="氏名" value="${esc(item.name || '')}">
      <input class="modal-input" id="edit-kana-input" placeholder="かな" value="${esc(item.kana || '')}">
      <button class="mact green" style="width:100%;margin-top:8px" onclick="saveNameEditor()">保存する</button>
      <button class="mact red" style="width:100%;margin-top:8px" onclick="confirmDelete(modalIndex)">削除</button>`
@@ -3341,7 +3265,6 @@ function openNameEditor(i) {
   setTimeout(() => {
     const input = document.getElementById('edit-name-input');
     if (input) input.focus();
-    wireKanaAutoTransfer('edit-name-input', 'edit-kana-input');
   }, 100);
 }
 
@@ -3490,7 +3413,7 @@ function saveNameEditor() {
     return;
   }
   currentData[modalIndex].name = name;
-  currentData[modalIndex].kana = (document.getElementById('edit-kana-input')?.value || '').trim() || resolveKanaForName(name);
+  currentData[modalIndex].kana = (document.getElementById('edit-kana-input')?.value || '').trim();
   saveMonthData(curYear, curMonth, currentData);
   closeModal();
   render();
@@ -4359,14 +4282,14 @@ function render() {
     const yukoStatusClass = yukoStatus === 'done' ? ' expiring-done' : (yukoStatus === 'soon' ? ' expiring' : '');
     yukoTd.className = `td-date${yukoStatusClass}`;
     yukoTd.textContent = yukoStatus === 'blank' ? '' : shortDate(item.yuko);
-    bindDateCell(yukoTd, () => openPeriodDatePicker(originalIndex, 'yuko', getPeriodFieldLabel('yuko')));
+    bindDateCell(yukoTd, () => openPeriodDatePicker(originalIndex, 'yuko', getPeriodFieldLabel('yuko')), true);
     columnCells.yuko = yukoTd;
 
     const lvTd = document.createElement('td');
     lvTd.dataset.colKey = 'level';
     lvTd.className = 'td-lv is-clickable';
     lvTd.textContent = item.level;
-    lvTd.addEventListener('dblclick', event => {
+    lvTd.addEventListener('click', event => {
       event.stopPropagation();
       openLevelPicker(originalIndex);
     });
@@ -4376,14 +4299,14 @@ function render() {
     planLTd.dataset.colKey = 'planL';
     planLTd.className = `td-date${yukoStatus === 'done' ? ' expiring-done' : (isCurrentLongPlan(item.planL) ? ' plan-long-current' : '')}`;
     planLTd.textContent = yukoStatus === 'blank' ? '' : shortDate(item.planL);
-    bindDateCell(planLTd, () => openPeriodDatePicker(originalIndex, 'planL', getPeriodFieldLabel('planL')));
+    bindDateCell(planLTd, () => openPeriodDatePicker(originalIndex, 'planL', getPeriodFieldLabel('planL')), true);
     columnCells.planL = planLTd;
 
     const planSTd = document.createElement('td');
     planSTd.dataset.colKey = 'planS';
     planSTd.className = `td-date${yukoStatus === 'done' ? ' expiring-done' : (isCurrentShortPlan(item.planS) ? ' plan-current' : '')}`;
     planSTd.textContent = yukoStatus === 'blank' ? '' : shortDate(item.planS);
-    bindDateCell(planSTd, () => openPeriodDatePicker(originalIndex, 'planS', getPeriodFieldLabel('planS')));
+    bindDateCell(planSTd, () => openPeriodDatePicker(originalIndex, 'planS', getPeriodFieldLabel('planS')), true);
     columnCells.planS = planSTd;
 
     const visitTd = document.createElement('td');

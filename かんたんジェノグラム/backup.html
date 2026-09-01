@@ -1514,7 +1514,8 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
   }
 
   const endX = cx(tp), endY = tp.y;
-  const midY = startY + (endY - startY) * 0.5;
+  // 世代間が奇数マスでも、分岐位置は必ず方眼線に置く
+  const midY = Math.round(((startY + endY) / 2) / 28) * 28;
 
   // T字形（startX===endX）は縦線が重複するため1本に統合
   const segments = startX === endX
@@ -1564,8 +1565,8 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
       if (selectedRelId !== relId || selectedSegmentEls?.segIdx !== segIdx) return; // 選択済みのみドラッグ
       e.preventDefault(); e.stopPropagation();
       const startCX = e.clientX, startCY = e.clientY;
-      const ox1 = parseFloat(visLine.getAttribute('x1')), oy1 = parseFloat(visLine.getAttribute('y1'));
-      const ox2 = parseFloat(visLine.getAttribute('x2')), oy2 = parseFloat(visLine.getAttribute('y2'));
+      const ox1 = parseFloat(hitLine.getAttribute('x1')), oy1 = parseFloat(hitLine.getAttribute('y1'));
+      const ox2 = parseFloat(hitLine.getAttribute('x2')), oy2 = parseFloat(hitLine.getAttribute('y2'));
       let dragged = false;
       const onMove = mv => {
         const dx = mv.clientX - startCX, dy = mv.clientY - startCY;

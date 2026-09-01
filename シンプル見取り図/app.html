@@ -1095,6 +1095,7 @@ function renderCatalogItem(group, room) {
     const hingeY = room.h * 0.14;
     const leafX = room.w * 0.86;
     const arcY = room.h * 0.86;
+    group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "transparent", "pointer-events": "all", class: "canvas-item-hit-area" }));
     lineEl({ x1: hingeX, y1: room.h * 0.04, x2: hingeX, y2: room.h * 0.96, "stroke-width": Math.max(1, line * 0.82) });
     lineEl({ x1: hingeX, y1: hingeY, x2: leafX, y2: hingeY, "stroke-width": Math.max(1, line * 0.72) });
     pathEl({ d: `M ${leafX} ${hingeY} A ${room.w * 0.72} ${room.h * 0.72} 0 0 1 ${hingeX} ${arcY}`, "stroke-width": Math.max(1, line * 0.72) });

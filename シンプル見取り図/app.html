@@ -1756,6 +1756,10 @@ function updateFloorPlanWallHover(event) {
     clearFloorPlanWallHover();
     return;
   }
+  if (getCanvasItemAtClientPoint(event.clientX, event.clientY)) {
+    clearFloorPlanWallHover();
+    return;
+  }
   const target = findFloorPlanWallAtPoint(pointInSvg(event));
   const nextKeys = new Set(target ? getMatchingFloorPlanWalls(target).map((segment) => segment.key) : []);
   const unchanged = nextKeys.size === hoveredFloorPlanWallKeys.size && Array.from(nextKeys).every((key) => hoveredFloorPlanWallKeys.has(key));
@@ -1798,15 +1802,61 @@ function eraseFloorPlanWallsBetween(start, end) {
   }
 }
 
+function getCanvasItemAtClientPoint(clientX, clientY) {
+  const target = document.elementFromPoint(clientX, clientY);
+  const group = target?.closest?.("#layer-nodes > g");
+  const room = group?.dataset.id ? rooms.find((item) => item.id === group.dataset.id) : null;
+  return room && room.type !== "floorplan" && isCanvasItem(room) ? room : null;
+}
+
+function isPointInsideErasedItem(point) {
+  return Array.from(eraseState?.removedItems.values() || []).some(({ room }) => (
+    point.x >= room.x && point.x <= room.x + room.w && point.y >= room.y && point.y <= room.y + room.h
+  ));
+}
+
+function eraseCanvasItem(room) {
+  if (!eraseState || eraseState.removedItems.has(room.id)) return false;
+  eraseState.removedItems.set(room.id, { room: { ...room }, index: rooms.findIndex((item) => item.id === room.id) });
+  rooms = rooms.filter((item) => item.id !== room.id);
+  if (selectedRoomId === room.id) selectedRoomId = null;
+  renderAll(false);
+  return true;
+}
+
+function eraseCanvasContentsBetween(start, end) {
+  const steps = Math.max(1, Math.ceil(Math.max(
+    Math.abs(end.x - start.x) / gridStep("x"),
+    Math.abs(end.y - start.y) / gridStep("y")
+  ) * 4));
+  const svg = document.getElementById("svg-main");
+  const bounds = svg.getBoundingClientRect();
+  for (let index = 0; index <= steps; index += 1) {
+    const ratio = index / steps;
+    const point = {
+      x: start.x + (end.x - start.x) * ratio,
+      y: start.y + (end.y - start.y) * ratio
+    };
+    const room = getCanvasItemAtClientPoint(
+      bounds.left + point.x * (bounds.width / 1200),
+      bounds.top + point.y * (bounds.height / 800)
+    );
+    if (room) eraseCanvasItem(room);
+    else if (!isPointInsideErasedItem(point)) eraseFloorPlanWallAtPoint(point);
+  }
+}
+
 function startFloorPlanWallErase(event) {
   if (currentDrawMode !== "erase" || event.button !== 0) return;
   event.preventDefault();
   event.stopImmediatePropagation();
+  const hadSelection = Boolean(selectedRoomId || selectedDrawElement);
   selectedRoomId = null;
   clearDrawSelection();
+  if (hadSelection) renderAll(false);
   const point = pointInSvg(event);
-  eraseState = { lastPoint: point, removed: new Set() };
-  eraseFloorPlanWallAtPoint(point);
+  eraseState = { lastPoint: point, removed: new Set(), removedItems: new Map() };
+  eraseCanvasContentsBetween(point, point);
 }
 
 function clearCanvasSelection(event) {
@@ -2260,7 +2310,7 @@ function addFloorPlan() {
 window.addEventListener("pointermove", (event) => {
   if (eraseState) {
     const point = pointInSvg(event);
-    eraseFloorPlanWallsBetween(eraseState.lastPoint, point);
+    eraseCanvasContentsBetween(eraseState.lastPoint, point);
     eraseState.lastPoint = point;
     return;
   }
@@ -2436,9 +2486,13 @@ window.addEventListener("pointermove", (event) => {
 window.addEventListener("pointerup", () => {
   if (eraseState) {
     const removed = Array.from(eraseState.removed);
-    if (removed.length) {
+    const removedItems = Array.from(eraseState.removedItems.values());
+    if (removed.length || removedItems.length) {
       actionHistory.push(() => {
         removed.forEach((key) => erasedFloorPlanWalls.delete(key));
+        removedItems.sort((first, second) => first.index - second.index).forEach(({ room, index }) => {
+          rooms.splice(Math.min(index, rooms.length), 0, createRoom(room));
+        });
         renderAll(false);
       });
     }
@@ -2617,6 +2671,10 @@ function setDrawMode(mode, button) {
   currentDrawMode = currentDrawMode === mode ? "" : mode;
   clearPlaceMode();
   clearDrawSelection();
+  if (selectedRoomId) {
+    selectedRoomId = null;
+    renderAll(false);
+  }
   clearFloorPlanWallHover();
   document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));

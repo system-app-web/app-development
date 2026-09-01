@@ -510,6 +510,7 @@ header h1 {
     <div id="draw-toolbar" style="position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:4px;z-index:10">
       <button id="palette-toggle" onclick="togglePalette()" title="アイテムメニュー" class="dtool-btn"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="0" y1="2" x2="18" y2="2" stroke="#555" stroke-width="2" stroke-linecap="round"/><line x1="0" y1="7" x2="18" y2="7" stroke="#555" stroke-width="2" stroke-linecap="round"/><line x1="0" y1="12" x2="18" y2="12" stroke="#555" stroke-width="2" stroke-linecap="round"/></svg></button>
       <button class="dtool-btn" id="dtool-line" onclick="setDrawMode('line')" title="直線"><svg width="22" height="22" viewBox="0 0 22 22"><line x1="3" y1="19" x2="19" y2="3" stroke="#555" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <button class="dtool-btn" id="dtool-erase" onclick="setDrawMode('erase')" title="消しゴム"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="m7 17-2-2a2 2 0 0 1 0-2.8l6.1-6.1a2 2 0 0 1 2.8 0l3.1 3.1a2 2 0 0 1 0 2.8L12 17H7Z" stroke="#555" stroke-width="1.8" stroke-linejoin="round"/><path d="m11.2 8.8 4 4" stroke="#555" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="dtool-btn" id="dtool-enclose" onclick="setDrawMode('enclose')" title="楕円"><svg width="22" height="22" viewBox="0 0 22 22"><ellipse cx="11" cy="11" rx="9" ry="5" fill="none" stroke="#555" stroke-width="2" transform="rotate(-35,11,11)"/></svg></button>
       <button class="dtool-btn" id="dtool-rect-enc" onclick="setDrawMode('rect-enc')" title="四角囲い（点線）"><svg width="22" height="22" viewBox="0 0 22 22"><rect x="2" y="5" width="18" height="12" rx="3" fill="none" stroke="#555" stroke-width="2" stroke-dasharray="4,2.5"/></svg></button>
       <button class="dtool-btn" id="dtool-pen"  onclick="setDrawMode('pen')"  title="ペン">✏️</button>
@@ -2145,6 +2146,120 @@ function addEraseListener(elem) {
   });
 }
 
+function getGridLineSegments(points) {
+  const segments = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const from = points[i], to = points[i + 1];
+    const horizontal = Math.abs(from.y - to.y) < 0.01;
+    const vertical = Math.abs(from.x - to.x) < 0.01;
+    const length = horizontal ? Math.abs(to.x - from.x) : Math.abs(to.y - from.y);
+    if ((!horizontal && !vertical) || length < 0.01 || Math.abs(length / 28 - Math.round(length / 28)) > 0.01) return [];
+    const steps = Math.round(length / 28);
+    const dx = horizontal ? Math.sign(to.x - from.x) * 28 : 0;
+    const dy = vertical ? Math.sign(to.y - from.y) * 28 : 0;
+    for (let step = 0; step < steps; step++) {
+      const start = { x: from.x + dx * step, y: from.y + dy * step };
+      segments.push([start, { x: start.x + dx, y: start.y + dy }]);
+    }
+  }
+  return segments;
+}
+
+function makeGridLineSegment(source, from, to) {
+  const seg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  ['fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'transform'].forEach(name => {
+    const value = source.getAttribute(name);
+    if (value !== null) seg.setAttribute(name, value);
+  });
+  seg.setAttribute('d', buildLinearPath([from, to]));
+  seg.setAttribute('data-draw-kind', 'grid-line');
+  seg.setAttribute('data-draw-id', ++drawIdCounter);
+  addEraseListener(seg);
+  return seg;
+}
+
+function materializeGridLine(source) {
+  if (source.getAttribute('data-draw-kind') === 'grid-line') return [source];
+  const segments = getGridLineSegments(parseLinearPath(source.getAttribute('d') || ''));
+  if (!segments.length) return [source];
+  const parent = source.parentNode;
+  const before = source.nextSibling;
+  const created = segments.map(([from, to]) => makeGridLineSegment(source, from, to));
+  source.remove();
+  created.forEach(seg => parent.insertBefore(seg, before));
+  return created;
+}
+
+function eraseGridLineAtPoint(path, point) {
+  const candidates = materializeGridLine(path);
+  let closest = null;
+  candidates.forEach(candidate => {
+    const pts = parseLinearPath(candidate.getAttribute('d') || '');
+    if (pts.length < 2) return;
+    const transform = candidate.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-\d.]+)[,\s]+([-\d.]+)\s*\)/);
+    const local = match
+      ? { x: point.x - parseFloat(match[1]), y: point.y - parseFloat(match[2]) }
+      : point;
+    const dist = ptSegDist(local.x, local.y, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+    if (!closest || dist < closest.dist) closest = { candidate, dist };
+  });
+  if (!closest || closest.dist > 12) return false;
+  const { candidate } = closest;
+  const parent = candidate.parentNode;
+  const before = candidate.nextSibling;
+  if (selectedDrawEl === candidate) clearDrawElSelection();
+  candidate.remove();
+  pushUndo(() => parent.insertBefore(candidate, before));
+  return true;
+}
+
+function eraseDrawElement(target, point) {
+  const path = target.closest?.('#layer-draw > path');
+  if (path) {
+    const gridSegments = getGridLineSegments(parseLinearPath(path.getAttribute('d') || ''));
+    if (path.getAttribute('data-draw-kind') === 'grid-line' || gridSegments.length) {
+      return eraseGridLineAtPoint(path, point);
+    }
+  }
+  const item = target.closest?.('#layer-draw > foreignObject, #layer-draw > g.enc-group, #layer-draw > text, #layer-draw > path');
+  if (!item) return false;
+  const parent = item.parentNode;
+  const before = item.nextSibling;
+  if (selectedDrawEl === item) clearDrawElSelection();
+  item.remove();
+  pushUndo(() => parent.insertBefore(item, before));
+  return true;
+}
+
+function eraseCanvasNode(node) {
+  const id = parseInt(node.getAttribute('data-id'));
+  const beforePersons = persons.slice();
+  const beforePosition = nodePositions[id] && { ...nodePositions[id] };
+  if (!beforePersons.some(person => person.id === id)) return false;
+  clearCanvasSelections();
+  persons = persons.filter(person => person.id !== id);
+  delete nodePositions[id];
+  renderList();
+  renderSVG();
+  pushUndo(() => {
+    persons = beforePersons;
+    if (beforePosition) nodePositions[id] = beforePosition;
+    renderList();
+    renderSVG();
+  });
+  return true;
+}
+
+function eraseCanvasAtEvent(event) {
+  const node = event.target.closest?.('#layer-nodes [data-id]');
+  if (node) return eraseCanvasNode(node);
+  const point = svgPoint(event);
+  if (eraseDrawElement(event.target, point)) return true;
+  clearCanvasSelections();
+  return false;
+}
+
 // ── foreignObject テキストボックス ──
 let fobjHandleEls = [];
 let editingFobj = null;
@@ -2297,6 +2412,14 @@ function nearestGridEdge(x, y) {
   const svg = document.getElementById('svg-main');
   const layer = () => document.getElementById('layer-draw');
 
+  // 消しゴム中は他の選択・ドラッグ処理より先に、クリック位置の要素だけを消す。
+  svg.addEventListener('mousedown', e => {
+    if (drawMode !== 'erase' || e.button !== 0) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    eraseCanvasAtEvent(e);
+  }, true);
+
   // グリッド辺ホバーヒント
   let gridHint = null;
   function showGridHint(x, y) {
@@ -2438,8 +2561,8 @@ function nearestGridEdge(x, y) {
           const edge = nearestGridEdge(p.x, p.y);
           lineLive.setAttribute('d', `M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`);
         }
-        lineLive.setAttribute('data-draw-id', ++drawIdCounter);
-        const _ll = lineLive; pushUndo(() => _ll.remove());
+        const created = materializeGridLine(lineLive);
+        pushUndo(() => created.forEach(segment => segment.remove()));
       }
       lineLive = null; lineStart = null; penPoints = [];
       showGridHint(svgPoint(e).x, svgPoint(e).y);

@@ -299,6 +299,7 @@ h1 {
 .canvas-undo-trigger { top: 230px; font-size: 14px; }
 #layer-nodes g.selected > *[stroke] { stroke: #2daec0; }
 #layer-nodes g.selected > text { fill: #247a8a; }
+#layer-nodes .floor-plan-wall.eraser-hover { stroke: #ef5c68; }
 #layer-draw .selected-draw { stroke: #2daec0; }
 #layer-draw text.selected-draw { fill: #247a8a; stroke: none; }
 #text-overlay {
@@ -656,6 +657,7 @@ const LINE_STROKE_WIDTH = 4;
 const FLOOR_PLAN_STROKE_WIDTH = 4;
 let erasedFloorPlanWalls = new Set();
 let eraseState = null;
+let hoveredFloorPlanWallKeys = new Set();
 let currentDrawMode = "";
 let currentPlaceMode = "";
 let currentTextSize = 28;
@@ -1169,6 +1171,7 @@ function renderFloorPlan(group, room) {
       "stroke-width": FLOOR_PLAN_STROKE_WIDTH,
       "stroke-linecap": "butt",
       "vector-effect": "non-scaling-stroke",
+      "data-wall-key": segment.key,
       class: "floor-plan-wall"
     }));
   });
@@ -1728,6 +1731,28 @@ function getMatchingFloorPlanWalls(target) {
   });
 }
 
+function clearFloorPlanWallHover() {
+  if (!hoveredFloorPlanWallKeys.size) return;
+  document.querySelectorAll(".floor-plan-wall.eraser-hover").forEach((wall) => wall.classList.remove("eraser-hover"));
+  hoveredFloorPlanWallKeys.clear();
+}
+
+function updateFloorPlanWallHover(event) {
+  if (currentDrawMode !== "erase") {
+    clearFloorPlanWallHover();
+    return;
+  }
+  const target = findFloorPlanWallAtPoint(pointInSvg(event));
+  const nextKeys = new Set(target ? getMatchingFloorPlanWalls(target).map((segment) => segment.key) : []);
+  const unchanged = nextKeys.size === hoveredFloorPlanWallKeys.size && Array.from(nextKeys).every((key) => hoveredFloorPlanWallKeys.has(key));
+  if (unchanged) return;
+
+  document.querySelectorAll(".floor-plan-wall").forEach((wall) => {
+    wall.classList.toggle("eraser-hover", nextKeys.has(wall.dataset.wallKey));
+  });
+  hoveredFloorPlanWallKeys = nextKeys;
+}
+
 function eraseFloorPlanWallAtPoint(point) {
   const target = findFloorPlanWallAtPoint(point);
   if (!target) return false;
@@ -1738,7 +1763,10 @@ function eraseFloorPlanWallAtPoint(point) {
     eraseState?.removed.add(segment.key);
     changed = true;
   });
-  if (changed) renderAll(false);
+  if (changed) {
+    hoveredFloorPlanWallKeys.clear();
+    renderAll(false);
+  }
   return changed;
 }
 
@@ -1765,6 +1793,16 @@ function startFloorPlanWallErase(event) {
   const point = pointInSvg(event);
   eraseState = { lastPoint: point, removed: new Set() };
   eraseFloorPlanWallAtPoint(point);
+}
+
+function clearCanvasSelection(event) {
+  const clickedCanvasElement = event.target.closest?.("#layer-nodes > g, #layer-draw");
+  if (clickedCanvasElement || currentPlaceMode || currentDrawMode) return;
+  clearDrawSelection();
+  if (selectedRoomId) {
+    selectedRoomId = null;
+    renderAll(false);
+  }
 }
 
 function startLineDraw(event) {
@@ -2507,6 +2545,7 @@ function clearAll() {
   rooms = [];
   erasedFloorPlanWalls.clear();
   eraseState = null;
+  clearFloorPlanWallHover();
   selectedRoomId = null;
   clearDrawSelection();
   actionHistory.length = 0;
@@ -2542,6 +2581,7 @@ function setDrawMode(mode, button) {
   currentDrawMode = currentDrawMode === mode ? "" : mode;
   clearPlaceMode();
   clearDrawSelection();
+  clearFloorPlanWallHover();
   document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
   if (currentDrawMode && button) button.classList.add("active");
@@ -2555,6 +2595,7 @@ function setPlaceMode(mode, button) {
   currentDrawMode = "";
   selectedRoomId = null;
   clearDrawSelection();
+  clearFloorPlanWallHover();
   renderAll(false);
   document.querySelectorAll(".item-btn").forEach((el) => el.classList.remove("active"));
   document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((el) => el.classList.remove("active"));
@@ -2840,6 +2881,9 @@ canvas.addEventListener("pointerdown", startFloorPlanWallErase);
 canvas.addEventListener("pointerdown", startLineDraw);
 canvas.addEventListener("pointerdown", startTextDraw);
 canvas.addEventListener("pointerdown", placeItemOnCanvas);
+canvas.addEventListener("pointerdown", clearCanvasSelection);
+canvas.addEventListener("pointermove", updateFloorPlanWallHover);
+canvas.addEventListener("pointerleave", clearFloorPlanWallHover);
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
   adjustCanvasZoom(event.deltaY < 0 ? 0.1 : -0.1);

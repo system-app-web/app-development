@@ -411,6 +411,9 @@ header h1 {
   isolation: isolate;
 }
 #svg-main {
+  --grid-size: 28px;
+  --grid-offset-x: 0px;
+  --grid-offset-y: 0px;
   position: relative;
   z-index: 1;
   width: 100%;
@@ -419,8 +422,41 @@ header h1 {
   background-image:
     linear-gradient(to right, #d8e2ea 1px, transparent 1px),
     linear-gradient(to bottom, #d8e2ea 1px, transparent 1px);
-  background-size: 28px 28px;
+  background-size: var(--grid-size) var(--grid-size);
+  background-position: var(--grid-offset-x) var(--grid-offset-y);
   background-color: transparent;
+}
+.canvas-zoom-controls {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid #d4e8ef;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 3px 12px rgba(68, 111, 136, 0.12);
+}
+.canvas-zoom-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #c8e5ee;
+  border-radius: 9px;
+  background: #fff;
+  color: #367b94;
+  font: 700 25px/1 inherit;
+  cursor: pointer;
+}
+.canvas-zoom-btn:hover { background: #edf9fc; }
+#canvas-zoom-level {
+  min-width: 54px;
+  color: #4c7180;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
 }
 
 /* ── Hint ── */
@@ -627,6 +663,11 @@ body.template-selected .canvas-edit-guide {
   <div class="canvas-wrap" id="canvasWrap">
     <button onclick="exportPNG(false)" style="position:absolute;bottom:94px;left:50%;transform:translateX(-50%);z-index:20;padding:8px 20px;border:none;border-radius:999px;background:rgba(91,164,207,0.15);color:#2a6a9a;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.2s;letter-spacing:0.4px;" onmouseover="this.style.background='rgba(91,164,207,0.3)'" onmouseout="this.style.background='rgba(91,164,207,0.15)'">＋ フォルダ保存</button>
     <button onclick="saveTemplate()" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:20;padding:8px 20px;border:none;border-radius:999px;background:rgba(91,164,207,0.15);color:#2a6a9a;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:all 0.2s;letter-spacing:0.4px;" onmouseover="this.style.background='rgba(91,164,207,0.3)'" onmouseout="this.style.background='rgba(91,164,207,0.15)'">＋ テンプレートに追加</button>
+    <div class="canvas-zoom-controls" aria-label="方眼の拡大縮小">
+      <button type="button" class="canvas-zoom-btn" onclick="adjustCanvasZoom(-0.1)" aria-label="縮小">−</button>
+      <span id="canvas-zoom-level">100%</span>
+      <button type="button" class="canvas-zoom-btn" onclick="adjustCanvasZoom(0.1)" aria-label="拡大">＋</button>
+    </div>
     <div class="canvas-hint" id="canvasHint">
 <div class="txt">左パネルのテンプレート選択<br>または家族を追加で自動反映されます</div>
     </div>
@@ -1805,7 +1846,7 @@ function drawMarriage(layer, fp, tp, rel) {
     const baseDx = off.dx, baseDy = off.dy;
     let dragged = false;
     const onMove = mv => {
-      const dx = mv.clientX - startCX, dy = mv.clientY - startCY;
+      const { x: dx, y: dy } = canvasDragDelta(mv, startCX, startCY);
       if (!dragged && Math.hypot(dx, dy) < 3) return;
       dragged = true;
       const nx1 = cx(fp)+baseDx+dx, ny1 = cy(fp)+baseDy+dy;
@@ -1819,7 +1860,8 @@ function drawMarriage(layer, fp, tp, rel) {
       document.removeEventListener('mouseup', onUp);
       if (!dragged) return;
       const prevOff = relLineOffsets.get(rel.id);
-      const newOff = { dx: baseDx + uev.clientX - startCX, dy: baseDy + uev.clientY - startCY };
+      const { x: dx, y: dy } = canvasDragDelta(uev, startCX, startCY);
+      const newOff = { dx: baseDx + dx, dy: baseDy + dy };
       relLineOffsets.set(rel.id, newOff);
       pushUndo(() => {
         if (prevOff) relLineOffsets.set(rel.id, prevOff);
@@ -1922,7 +1964,7 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
       const ox2 = parseFloat(hitLine.getAttribute('x2')), oy2 = parseFloat(hitLine.getAttribute('y2'));
       let dragged = false;
       const onMove = mv => {
-        const dx = mv.clientX - startCX, dy = mv.clientY - startCY;
+        const { x: dx, y: dy } = canvasDragDelta(mv, startCX, startCY);
         if (!dragged && Math.hypot(dx, dy) < 3) return;
         dragged = true;
         visLine.setAttribute('transform', `translate(${dx},${dy})`);
@@ -1933,7 +1975,7 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
         if (!dragged) return;
-        const dx = uev.clientX - startCX, dy = uev.clientY - startCY;
+        const { x: dx, y: dy } = canvasDragDelta(uev, startCX, startCY);
         const prevOv = (segmentOverrides.get(relId) || {})[segIdx];
         if (!segmentOverrides.has(relId)) segmentOverrides.set(relId, {});
         segmentOverrides.get(relId)[segIdx] = { x1: ox1+dx, y1: oy1+dy, x2: ox2+dx, y2: oy2+dy };
@@ -2301,11 +2343,8 @@ function setPlaceMode(mode) {
 document.getElementById('svg-main').addEventListener('click', e => {
   if (!placeMode) return;
 
-  const svgEl = document.getElementById('svg-main');
-  const rect = svgEl.getBoundingClientRect();
   const GRID = 28;
-  const rawX = e.clientX - rect.left;
-  const rawY = e.clientY - rect.top;
+  const { x: rawX, y: rawY } = svgPoint(e);
   const snapX = Math.round(rawX / GRID) * GRID - NW / 2;
   const snapY = Math.round(rawY / GRID) * GRID - NH / 2;
 
@@ -2512,7 +2551,7 @@ function addEraseListener(elem) {
       const segIdx = selectedPathSeg.segIdx;
       const origPts = parseLinearPath(elem.getAttribute('d') || '').map(p => ({ ...p }));
       const onMove = mv => {
-        const dx = mv.clientX - startCX, dy = mv.clientY - startCY;
+        const { x: dx, y: dy } = canvasDragDelta(mv, startCX, startCY);
         if (!dragged && Math.hypot(dx, dy) < 3) return;
         dragged = true;
         const newPts = origPts.map(p => ({ ...p }));
@@ -2539,7 +2578,7 @@ function addEraseListener(elem) {
     const m = origTransform.match(/translate\(\s*([-\d.]+)[,\s]+([-\d.]+)\s*\)/);
     const [otx, oty] = m ? [parseFloat(m[1]), parseFloat(m[2])] : [0, 0];
     const onMove = mv => {
-      const dx = mv.clientX - startCX, dy = mv.clientY - startCY;
+      const { x: dx, y: dy } = canvasDragDelta(mv, startCX, startCY);
       if (!dragged && Math.hypot(dx, dy) < 3) return;
       dragged = true;
       elem.setAttribute('transform', `translate(${otx + dx},${oty + dy})`);
@@ -2804,11 +2843,49 @@ function showFobjHandles(fo) {
 function showTextHandles(t) { /* 旧実装 — 使用しない */ }
 
 let _canvasOffX = 0, _canvasOffY = 0, _svgW0 = 0, _svgH0 = 0, _resizeRegenTimer = null;
+let canvasZoom = 1;
+
+function applyCanvasZoom() {
+  const svg = document.getElementById('svg-main');
+  const group = document.getElementById('canvas-offset');
+  if (!svg || !group) return;
+  const centerX = svg.clientWidth / 2;
+  const centerY = svg.clientHeight / 2;
+  group.setAttribute('transform', `translate(${_canvasOffX + centerX * (1 - canvasZoom)},${_canvasOffY + centerY * (1 - canvasZoom)}) scale(${canvasZoom})`);
+  svg.style.setProperty('--grid-size', `${28 * canvasZoom}px`);
+  svg.style.setProperty('--grid-offset-x', `${centerX * (1 - canvasZoom)}px`);
+  svg.style.setProperty('--grid-offset-y', `${centerY * (1 - canvasZoom)}px`);
+  const level = document.getElementById('canvas-zoom-level');
+  if (level) level.textContent = `${Math.round(canvasZoom * 100)}%`;
+}
+
+function setCanvasZoom(nextZoom) {
+  canvasZoom = Math.max(0.6, Math.min(1.8, Math.round(nextZoom * 10) / 10));
+  applyCanvasZoom();
+}
+
+function adjustCanvasZoom(amount) {
+  setCanvasZoom(canvasZoom + amount);
+}
+
+function canvasDragDelta(event, startX, startY) {
+  return { x: (event.clientX - startX) / canvasZoom, y: (event.clientY - startY) / canvasZoom };
+}
+
+function svgDisplayPoint(x, y) {
+  const svg = document.getElementById('svg-main');
+  const rect = svg.getBoundingClientRect();
+  return {
+    x: rect.left + _canvasOffX + svg.clientWidth / 2 * (1 - canvasZoom) + x * canvasZoom,
+    y: rect.top + _canvasOffY + svg.clientHeight / 2 * (1 - canvasZoom) + y * canvasZoom,
+  };
+}
 
 function _initCanvasOffset() {
   const svg = document.getElementById('svg-main');
   _svgW0 = svg.clientWidth;
   _svgH0 = svg.clientHeight;
+  applyCanvasZoom();
 }
 
 function _updateCanvasOffset() {
@@ -2819,8 +2896,7 @@ function _updateCanvasOffset() {
   _svgW0 = newW; _svgH0 = newH;
   _canvasOffX = 0;
   _canvasOffY = 0;
-  const g = document.getElementById('canvas-offset');
-  if (g) g.setAttribute('transform', `translate(${_canvasOffX},${_canvasOffY})`);
+  applyCanvasZoom();
   if (!resized || !persons.length || !Object.keys(nodePositions).length) return;
   if (_resizeRegenTimer) clearTimeout(_resizeRegenTimer);
   _resizeRegenTimer = setTimeout(() => generateGenogram({ silent: true }), 80);
@@ -2837,8 +2913,18 @@ function _updateCanvasOffset() {
 function svgPoint(e) {
   const svg = document.getElementById('svg-main');
   const rect = svg.getBoundingClientRect();
-  return { x: e.clientX - rect.left - _canvasOffX, y: e.clientY - rect.top - _canvasOffY };
+  const centerX = svg.clientWidth / 2;
+  const centerY = svg.clientHeight / 2;
+  return {
+    x: (e.clientX - rect.left - _canvasOffX - centerX * (1 - canvasZoom)) / canvasZoom,
+    y: (e.clientY - rect.top - _canvasOffY - centerY * (1 - canvasZoom)) / canvasZoom,
+  };
 }
+
+document.getElementById('svg-main').addEventListener('wheel', event => {
+  event.preventDefault();
+  adjustCanvasZoom(event.deltaY < 0 ? 0.1 : -0.1);
+}, { passive: false });
 
 function snapG(v) { return Math.round(v / 28) * 28; }
 
@@ -3746,8 +3832,6 @@ function updateSvgTextEl(t, val, editorWidth) {
 }
 
 function openTextToolEditor(svgTextEl, x, y, onCommit) {
-  const svgEl = document.getElementById('svg-main');
-  const svgRect = svgEl.getBoundingClientRect();
   const editor = document.getElementById('text-tool-editor');
   // 既存テキスト編集時はそのフォントサイズ、新規は現在のdrawTextSize
   const fs = svgTextEl
@@ -3756,8 +3840,9 @@ function openTextToolEditor(svgTextEl, x, y, onCommit) {
   editor.style.fontSize = fs + 'px';
   editor.value = svgTextEl ? getSvgTextContent(svgTextEl) : '';
   editor.style.minHeight = '32px';
-  editor.style.left = (svgRect.left + x - 10) + 'px';
-  editor.style.top  = (svgRect.top  + y - 28) + 'px';
+  const displayPoint = svgDisplayPoint(x, y);
+  editor.style.left = (displayPoint.x - 10) + 'px';
+  editor.style.top  = (displayPoint.y - 28) + 'px';
   editor.style.display = 'block';
   editor.focus();
   if (svgTextEl) editor.select();
@@ -3771,7 +3856,7 @@ function openTextToolEditor(svgTextEl, x, y, onCommit) {
     editor.removeEventListener('blur', onBlur);
     editor.removeEventListener('keydown', onKey);
     const val = editor.value.trim();
-    const capturedWidth = editor.clientWidth;
+    const capturedWidth = editor.clientWidth / canvasZoom;
     hide();
     onCommit(val, capturedWidth);
   };
@@ -3813,15 +3898,13 @@ function setupTextDrag(t) {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
-    const svgEl = document.getElementById('svg-main');
-    const svgRect = svgEl.getBoundingClientRect();
     let ox = parseFloat(t.getAttribute('x'));
     let oy = parseFloat(t.getAttribute('y'));
     const startCX = e.clientX, startCY = e.clientY;
     let moved = false;
     t.style.cursor = 'grabbing';
     const move = e2 => {
-      const dx = e2.clientX - startCX, dy = e2.clientY - startCY;
+      const { x: dx, y: dy } = canvasDragDelta(e2, startCX, startCY);
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
       const nx = ox + dx, ny = oy + dy;
       t.setAttribute('x', nx); t.setAttribute('y', ny);
@@ -4009,16 +4092,13 @@ function selectEllipse(el, e) {
       h.addEventListener('mousedown', ev => {
         ev.stopPropagation();
         const startX = ev.clientX, startY = ev.clientY;
-        const svg = document.getElementById('svg-main');
-        const svgRect = svg.getBoundingClientRect();
         const orig = getAttrs();
         const origAng = getAngle();
 
         const onMove = mv => {
-          const dx = mv.clientX - startX, dy = mv.clientY - startY;
+          const { x: dx, y: dy } = canvasDragDelta(mv, startX, startY);
           if (type === 'rotate') {
-            const svgX = mv.clientX - svgRect.left;
-            const svgY = mv.clientY - svgRect.top;
+            const { x: svgX, y: svgY } = svgPoint(mv);
             const newAng = Math.atan2(svgY - orig.cy, svgX - orig.cx) * 180 / Math.PI + 90;
             setAngle(newAng);
           } else if (type === 'move') {
@@ -4133,7 +4213,8 @@ function setupDrag(g, id) {
     if (drawMode) return;
     e.preventDefault();
     const pos = nodePositions[id];
-    const sx = e.clientX - pos.x, sy = e.clientY - pos.y;
+    const startPoint = svgPoint(e);
+    const sx = startPoint.x - pos.x, sy = startPoint.y - pos.y;
     g.style.cursor = 'grabbing';
 
     const GRID = 28;
@@ -4143,10 +4224,11 @@ function setupDrag(g, id) {
     const prevX = pos.x, prevY = pos.y; // 移動前の位置を記録
 
     const move = e2 => {
-      const ddx = e2.clientX - startX, ddy = e2.clientY - startY;
+      const point = svgPoint(e2);
+      const ddx = point.x - startPoint.x, ddy = point.y - startPoint.y;
       dragDist = Math.sqrt(ddx * ddx + ddy * ddy);
-      pos.x = Math.round((e2.clientX - sx) / GRID) * GRID;
-      pos.y = Math.round((e2.clientY - sy) / GRID) * GRID;
+      pos.x = Math.round((point.x - sx) / GRID) * GRID;
+      pos.y = Math.round((point.y - sy) / GRID) * GRID;
       g.setAttribute('transform', `translate(${pos.x},${pos.y})`);
       const ol = document.getElementById('node-sel-outline');
       if (ol) { ol.setAttribute('x', pos.x - 4); ol.setAttribute('y', pos.y - 4); }
@@ -4252,12 +4334,12 @@ document.getElementById('app-title').addEventListener('contextmenu', e => {
 // ─────────────────────────────────────
 function openLabelEditor(e, p, textEl) {
   const editor = document.getElementById('label-editor');
-  const svgRect = document.getElementById('svg-main').getBoundingClientRect();
   const pos = nodePositions[p.id];
+  const displayPoint = svgDisplayPoint(pos.x + NW / 2, pos.y + NH / 2);
 
   editor.value = p.label || p.relation;
-  editor.style.left = (svgRect.left + pos.x + NW/2 - 36) + 'px';
-  editor.style.top  = (svgRect.top  + pos.y + NH/2 - 12) + 'px';
+  editor.style.left = (displayPoint.x - 36) + 'px';
+  editor.style.top  = (displayPoint.y - 12) + 'px';
   editor.style.display = 'block';
   editor.focus();
   editor.select();
@@ -4279,11 +4361,11 @@ function openLabelEditor(e, p, textEl) {
 
 function openMemoEditor(e, p, textEl) {
   const editor = document.getElementById('label-editor');
-  const svgRect = document.getElementById('svg-main').getBoundingClientRect();
   const pos = nodePositions[p.id];
+  const displayPoint = svgDisplayPoint(pos.x + NW / 2, pos.y + NH + 4);
   editor.value = p.memo || '';
-  editor.style.left = (svgRect.left + pos.x + NW/2 - 50) + 'px';
-  editor.style.top  = (svgRect.top  + pos.y + NH + 4) + 'px';
+  editor.style.left = (displayPoint.x - 50) + 'px';
+  editor.style.top  = displayPoint.y + 'px';
   editor.style.width = '100px';
   editor.style.display = 'block';
   editor.focus(); editor.select();
@@ -4307,11 +4389,11 @@ function openMemoEditor(e, p, textEl) {
 
 function openKpLabelEditor(e, p, textEl) {
   const editor = document.getElementById('label-editor');
-  const svgRect = document.getElementById('svg-main').getBoundingClientRect();
   const pos = nodePositions[p.id];
+  const displayPoint = svgDisplayPoint(pos.x + NW / 2, pos.y + NH / 2);
   editor.value = p.kpLabel || '(KP)';
-  editor.style.left = (svgRect.left + pos.x + NW/2 - 36) + 'px';
-  editor.style.top  = (svgRect.top  + pos.y + NH/2 + 8) + 'px';
+  editor.style.left = (displayPoint.x - 36) + 'px';
+  editor.style.top  = (displayPoint.y + 8) + 'px';
   editor.style.display = 'block';
   editor.focus(); editor.select();
   const commit = () => {

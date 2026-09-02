@@ -943,10 +943,12 @@ function autoLayout() {
       grp.splice(0, grp.length, ...paired);
     }
     const n = grp.length;
+    // 子だけが3人の段は、人物間を方眼3マスにして横幅を詰める
+    const spacing = g === 1 && n === 3 && grp.every(p => p.relation !== '子の配偶者') ? 84 : H_SP;
     // 共通centerXを基準にstartXをグリッドスナップ
-    const startX = Math.round((centerX - (n - 1) * H_SP / 2) / G) * G;
+    const startX = Math.round((centerX - (n - 1) * spacing / 2) / G) * G;
     const y = Math.round((topY + (g - minG) * GEN_H) / G) * G;
-    grp.forEach((p, i) => { p._x = startX + i * H_SP; p._y = y; });
+    grp.forEach((p, i) => { p._x = startX + i * spacing; p._y = y; });
   });
 
   // 父・母のペアを対象者（本人 or connectedTo）の真上中央に再配置してT字型接続に

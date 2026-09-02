@@ -1719,7 +1719,7 @@ function closestRelationGridCell(hitLine, point) {
   const cells = relationGridCells(
     parseFloat(hitLine.getAttribute('x1')), parseFloat(hitLine.getAttribute('y1')),
     parseFloat(hitLine.getAttribute('x2')), parseFloat(hitLine.getAttribute('y2')),
-  );
+  ).filter(cell => !erasedRelationCells.has(relationCellKey(cell)));
   let closest = null;
   cells.forEach(cell => {
     const dist = ptSegDist(point.x, point.y, cell.x1, cell.y1, cell.x2, cell.y2);

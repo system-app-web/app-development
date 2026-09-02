@@ -1674,6 +1674,7 @@ function cx(pos) { return pos.x + NW/2; }
 function cy(pos) { return pos.y + NH/2; }
 
 const erasedRelationCells = new Set();
+let eraserGridHover = null;
 
 function relationGridCells(x1, y1, x2, y2) {
   const horizontal = Math.abs(y1 - y2) < 0.01;
@@ -1709,7 +1710,7 @@ function setRelationStroke(visEl, stroke) {
   else visEl.querySelectorAll('line').forEach(line => line.setAttribute('stroke', stroke));
 }
 
-function eraseRelationGridCell(hitLine, point) {
+function closestRelationGridCell(hitLine, point) {
   const cells = relationGridCells(
     parseFloat(hitLine.getAttribute('x1')), parseFloat(hitLine.getAttribute('y1')),
     parseFloat(hitLine.getAttribute('x2')), parseFloat(hitLine.getAttribute('y2')),
@@ -1719,10 +1720,41 @@ function eraseRelationGridCell(hitLine, point) {
     const dist = ptSegDist(point.x, point.y, cell.x1, cell.y1, cell.x2, cell.y2);
     if (!closest || dist < closest.dist) closest = { cell, dist };
   });
-  if (!closest || closest.dist > 12) return false;
-  const key = relationCellKey(closest.cell);
+  return closest && closest.dist <= 12 ? closest.cell : null;
+}
+
+function clearEraserGridHover() {
+  if (eraserGridHover) { eraserGridHover.remove(); eraserGridHover = null; }
+}
+
+function showEraserGridHover(cell) {
+  if (!eraserGridHover) {
+    eraserGridHover = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    eraserGridHover.setAttribute('stroke', '#e06060');
+    eraserGridHover.setAttribute('stroke-width', '5');
+    eraserGridHover.setAttribute('stroke-linecap', 'round');
+    eraserGridHover.style.pointerEvents = 'none';
+    document.getElementById('layer-handles').appendChild(eraserGridHover);
+  }
+  eraserGridHover.setAttribute('x1', cell.x1); eraserGridHover.setAttribute('y1', cell.y1);
+  eraserGridHover.setAttribute('x2', cell.x2); eraserGridHover.setAttribute('y2', cell.y2);
+}
+
+function updateEraserGridHover(event) {
+  if (drawMode !== 'erase') { clearEraserGridHover(); return; }
+  const hitLine = event.target.closest?.('#layer-lines [data-rel-id]');
+  const cell = hitLine && closestRelationGridCell(hitLine, svgPoint(event));
+  if (cell) showEraserGridHover(cell);
+  else clearEraserGridHover();
+}
+
+function eraseRelationGridCell(hitLine, point) {
+  const cell = closestRelationGridCell(hitLine, point);
+  if (!cell) return false;
+  const key = relationCellKey(cell);
   if (erasedRelationCells.has(key)) return false;
   erasedRelationCells.add(key);
+  clearEraserGridHover();
   clearCanvasSelections();
   renderLines();
   pushUndo(() => { erasedRelationCells.delete(key); renderLines(); });
@@ -1789,8 +1821,8 @@ function drawMarriage(layer, fp, tp, rel) {
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
-  hitLine.addEventListener('mouseover', () => { if (rel.id !== selectedRelId) setRelationStroke(visLine, '#5BA4CF'); });
-  hitLine.addEventListener('mouseout', () => { if (rel.id !== selectedRelId) setRelationStroke(visLine, '#000'); });
+  hitLine.addEventListener('mouseover', () => { if (drawMode !== 'erase' && rel.id !== selectedRelId) setRelationStroke(visLine, '#5BA4CF'); });
+  hitLine.addEventListener('mouseout', () => { if (drawMode !== 'erase' && rel.id !== selectedRelId) setRelationStroke(visLine, '#000'); });
 
   // Divorce slashes
   if (rel.style === 'divorced') {
@@ -1906,8 +1938,8 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     });
-    hitLine.addEventListener('mouseover', () => { if (relId !== selectedRelId) setRelationStroke(visLine, '#5BA4CF'); });
-    hitLine.addEventListener('mouseout',  () => { if (relId !== selectedRelId) setRelationStroke(visLine, '#000'); });
+    hitLine.addEventListener('mouseover', () => { if (drawMode !== 'erase' && relId !== selectedRelId) setRelationStroke(visLine, '#5BA4CF'); });
+    hitLine.addEventListener('mouseout',  () => { if (drawMode !== 'erase' && relId !== selectedRelId) setRelationStroke(visLine, '#000'); });
   });
   return firstVis;
 }
@@ -2145,6 +2177,10 @@ function clearCanvasSelections() {
 
 function setDrawMode(mode) {
   drawMode = drawMode === mode ? null : mode;
+  if (drawMode === 'erase') {
+    document.querySelectorAll('#layer-draw > path').forEach(path => materializeGridLine(path));
+  }
+  if (drawMode !== 'erase') clearEraserGridHover();
   placeMode = null;
   clearCanvasSelections();
   document.querySelectorAll('.item-btn').forEach(b => b.classList.remove('active'));
@@ -2631,6 +2667,7 @@ function eraseCanvasNode(node) {
 }
 
 function eraseCanvasAtEvent(event) {
+  clearEraserGridHover();
   const node = event.target.closest?.('#layer-nodes [data-id]');
   if (node) return eraseCanvasNode(node);
   const point = svgPoint(event);
@@ -2881,6 +2918,10 @@ function nearestGridEdge(x, y) {
   });
 
   svg.addEventListener('mousemove', e => {
+    if (drawMode === 'erase') {
+      updateEraserGridHover(e);
+      return;
+    }
     if (drawMode === 'pen' && penPath) {
       const p = svgPoint(e);
       penPoints.push(p);

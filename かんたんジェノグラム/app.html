@@ -3460,6 +3460,11 @@ document.addEventListener('mousedown', e => {
   setDrawMode(null);
 });
 
+document.addEventListener('mousedown', e => {
+  if (e.target.closest?.('#svg-main')) return;
+  clearCanvasSelections();
+});
+
 // ─────────────────────────────────────
 // foreignObject テキストボックス 関数群
 // ─────────────────────────────────────

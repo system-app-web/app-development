@@ -1707,7 +1707,7 @@ function drawRelationGridLine(layer, x1, y1, x2, y2, attrs = {}) {
   const cells = relationGridCells(x1, y1, x2, y2);
   const relationId = attrs['data-rel-id'] || '';
   const parts = cells.length ? cells.filter(cell => !erasedRelationCells.has(relationCellKey(cell, relationId))) : [{ x1, y1, x2, y2 }];
-  parts.forEach(part => group.appendChild(el('line', { ...attrs, ...part })));
+  parts.forEach(part => group.appendChild(el('line', { ...attrs, ...part, 'stroke-linecap': attrs['stroke-linecap'] || 'square' })));
   layer.appendChild(group);
   return group;
 }

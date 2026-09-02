@@ -3460,8 +3460,11 @@ document.addEventListener('mousedown', e => {
 });
 
 document.addEventListener('mousedown', e => {
-  if (e.target.closest?.('#svg-main')) return;
-  clearCanvasSelections();
+  if (e.target.closest?.('#svg-main, #draw-toolbar, [data-sw], #text-size-picker, #item-palette')) return;
+  if (drawMode) setDrawMode(null);
+  else if (placeMode) setPlaceMode(null);
+  else clearCanvasSelections();
+  document.querySelectorAll('[data-sw]').forEach(button => button.classList.remove('active'));
 });
 
 // ─────────────────────────────────────

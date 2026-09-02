@@ -2309,6 +2309,22 @@ function eraseGridLineAtPoint(path, point) {
   return true;
 }
 
+function eraseGridLineNearPoint(point) {
+  let closest = null;
+  document.querySelectorAll('#layer-draw > path[data-draw-kind="grid-line"]').forEach(path => {
+    const pts = parseLinearPath(path.getAttribute('d') || '');
+    if (pts.length < 2) return;
+    const transform = path.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-\d.]+)[,\s]+([-\d.]+)\s*\)/);
+    const local = match
+      ? { x: point.x - parseFloat(match[1]), y: point.y - parseFloat(match[2]) }
+      : point;
+    const dist = ptSegDist(local.x, local.y, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+    if (!closest || dist < closest.dist) closest = { path, dist };
+  });
+  return closest && closest.dist <= 12 ? eraseGridLineAtPoint(closest.path, point) : false;
+}
+
 function eraseDrawElement(target, point) {
   const path = target.closest?.('#layer-draw > path');
   if (path) {
@@ -2362,6 +2378,7 @@ function eraseCanvasAtEvent(event) {
   const relation = event.target.closest?.('#layer-lines [data-rel-id]');
   if (relation && eraseRelationGridCell(relation, point)) return true;
   if (eraseDrawElement(event.target, point)) return true;
+  if (eraseGridLineNearPoint(point)) return true;
   clearCanvasSelections();
   return false;
 }

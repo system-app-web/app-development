@@ -2842,7 +2842,7 @@ function showFobjHandles(fo) {
 }
 function showTextHandles(t) { /* 旧実装 — 使用しない */ }
 
-let _canvasOffX = 0, _canvasOffY = 0, _svgW0 = 0, _svgH0 = 0, _resizeRegenTimer = null;
+let _canvasOffX = 0, _canvasOffY = 0, _svgW0 = 0, _svgH0 = 0;
 let canvasZoom = 1;
 
 function applyCanvasZoom() {
@@ -2892,14 +2892,10 @@ function _updateCanvasOffset() {
   const svg = document.getElementById('svg-main');
   const newW = svg.clientWidth, newH = svg.clientHeight;
   if (_svgW0 === 0) { _svgW0 = newW; _svgH0 = newH; return; }
-  const resized = newW !== _svgW0 || newH !== _svgH0;
   _svgW0 = newW; _svgH0 = newH;
   _canvasOffX = 0;
   _canvasOffY = 0;
   applyCanvasZoom();
-  if (!resized || !persons.length || !Object.keys(nodePositions).length) return;
-  if (_resizeRegenTimer) clearTimeout(_resizeRegenTimer);
-  _resizeRegenTimer = setTimeout(() => generateGenogram({ silent: true }), 80);
 }
 
 (function() {

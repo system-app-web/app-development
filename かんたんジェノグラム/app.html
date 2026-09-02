@@ -1303,6 +1303,7 @@ function generateGenogram({ silent = false } = {}) {
   const hasDrawn = document.getElementById('layer-draw').children.length > 0;
   deletedSegments.clear();
   erasedRelationCells.clear();
+  autoEnclosureHidden = false;
   segmentOverrides.clear();
   relLineOffsets.clear();
   autoLayout();
@@ -1374,6 +1375,7 @@ function updateDoukyoEnclosure() {
 }
 
 function drawAutoEnclosure(layer) {
+  if (autoEnclosureHidden) return;
   const NS = 'http://www.w3.org/2000/svg';
   const subject = persons.find(p => p.relation === '本人');
   if (!subject) return;
@@ -1502,6 +1504,7 @@ const relLineOffsets = new Map(); // relId -> {dx,dy} 婚姻線の手動移動�
 let autoEnclosureOffset = { dx: 0, dy: 0 };
 let autoEnclosureScale = { x: 1, y: 1 };
 let autoEnclosureHandleEls = [];
+let autoEnclosureHidden = false;
 
 function applyAutoEnclosureTransform(grp) {
   const b = grp._autoBounds;
@@ -2197,6 +2200,7 @@ function setDrawMode(mode) {
   palBtn.style.background = ''; palBtn.style.borderColor = '';
   const svg = document.getElementById('svg-main');
   svg.style.cursor = drawMode ? 'crosshair' : '';
+  document.getElementById('layer-enclosure').style.pointerEvents = drawMode === 'erase' ? 'auto' : 'none';
   document.getElementById('layer-nodes').classList.toggle('enc-mode', drawMode === 'enclose' || drawMode === 'rect-enc');
   updateEncHitState();
   // 直線・囲い線・ペン選択時に太さピッカー、テキスト選択時に文字サイズピッカーを表示
@@ -2669,6 +2673,14 @@ function eraseCanvasNode(node) {
 
 function eraseCanvasAtEvent(event) {
   clearEraserGridHover();
+  const autoEnclosure = event.target.closest?.('#doukyo-auto-enc');
+  if (autoEnclosure) {
+    autoEnclosureHidden = true;
+    clearCanvasSelections();
+    autoEnclosure.remove();
+    pushUndo(() => { autoEnclosureHidden = false; updateDoukyoEnclosure(); });
+    return true;
+  }
   const node = event.target.closest?.('#layer-nodes [data-id]');
   if (node) return eraseCanvasNode(node);
   const point = svgPoint(event);

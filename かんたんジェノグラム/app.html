@@ -3861,7 +3861,7 @@ const disconnectedNodes = new Set();
 let snapTargetId = null;
 
 function updateEncHitState() {
-  const disabled = !!placeMode || !!drawMode || selectedNodeId !== null;
+  const disabled = !!placeMode || (drawMode && drawMode !== 'erase') || selectedNodeId !== null;
   document.querySelectorAll('.enc-hit').forEach(h => {
     h.style.pointerEvents = disabled ? 'none' : '';
   });

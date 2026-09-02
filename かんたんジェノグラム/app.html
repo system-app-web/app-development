@@ -4068,13 +4068,12 @@ function addSelectListener(el) {
   });
 }
 
-// SVGクリックで選択解除
-document.getElementById('svg-main').addEventListener('click', () => {
-  if (selectedEl) {
-    selectedEl.removeAttribute('stroke-dasharray');
-    clearSelection();
-  }
-  clearNodeSelection();
+// 何もない方眼をクリックしたら選択解除
+document.getElementById('svg-main').addEventListener('click', e => {
+  if (drawMode || placeMode) return;
+  const canvasItem = e.target.closest?.('#layer-nodes > g, #layer-lines [data-rel-id], #layer-draw > *, #layer-enclosure > *');
+  if (canvasItem) return;
+  clearCanvasSelections();
 });
 
 function douglasPeucker(pts, epsilon) {

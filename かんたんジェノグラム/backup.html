@@ -2540,7 +2540,7 @@ function nearestGridEdge(x, y) {
     if (drawMode !== 'erase' || e.button !== 0) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    eraseCanvasAtEvent(e);
+    if (!eraseCanvasAtEvent(e)) setDrawMode(null);
   }, true);
 
   // グリッド辺ホバーヒント
@@ -3119,6 +3119,11 @@ function nearestGridEdge(x, y) {
   window._placeEllipse = placeEllipse;
   window.hideGridHint = hideGridHint;
 })();
+
+document.addEventListener('mousedown', e => {
+  if (drawMode !== 'erase' || e.button !== 0 || e.target.closest?.('#svg-main')) return;
+  setDrawMode(null);
+});
 
 // ─────────────────────────────────────
 // foreignObject テキストボックス 関数群

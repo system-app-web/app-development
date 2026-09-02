@@ -1395,16 +1395,18 @@ function relationGridCells(x1, y1, x2, y2) {
   });
 }
 
-function relationCellKey({ x1, y1, x2, y2 }) {
-  return x1 < x2 || (x1 === x2 && y1 <= y2)
+function relationCellKey({ x1, y1, x2, y2 }, relationId = '') {
+  const coordinates = x1 < x2 || (x1 === x2 && y1 <= y2)
     ? `${x1},${y1}:${x2},${y2}`
     : `${x2},${y2}:${x1},${y1}`;
+  return `${relationId}|${coordinates}`;
 }
 
 function drawRelationGridLine(layer, x1, y1, x2, y2, attrs = {}) {
   const group = el('g', { style: 'pointer-events:none' });
   const cells = relationGridCells(x1, y1, x2, y2);
-  const parts = cells.length ? cells.filter(cell => !erasedRelationCells.has(relationCellKey(cell))) : [{ x1, y1, x2, y2 }];
+  const relationId = attrs['data-rel-id'] || '';
+  const parts = cells.length ? cells.filter(cell => !erasedRelationCells.has(relationCellKey(cell, relationId))) : [{ x1, y1, x2, y2 }];
   parts.forEach(part => group.appendChild(el('line', { ...attrs, ...part })));
   layer.appendChild(group);
   return group;
@@ -1416,10 +1418,11 @@ function setRelationStroke(visEl, stroke) {
 }
 
 function closestRelationGridCell(hitLine, point) {
+  const relationId = hitLine.getAttribute('data-rel-id') || '';
   const cells = relationGridCells(
     parseFloat(hitLine.getAttribute('x1')), parseFloat(hitLine.getAttribute('y1')),
     parseFloat(hitLine.getAttribute('x2')), parseFloat(hitLine.getAttribute('y2')),
-  ).filter(cell => !erasedRelationCells.has(relationCellKey(cell)));
+  ).filter(cell => !erasedRelationCells.has(relationCellKey(cell, relationId)));
   let closest = null;
   cells.forEach(cell => {
     const dist = ptSegDist(point.x, point.y, cell.x1, cell.y1, cell.x2, cell.y2);
@@ -1456,7 +1459,7 @@ function updateEraserGridHover(event) {
 function eraseRelationGridCell(hitLine, point) {
   const cell = closestRelationGridCell(hitLine, point);
   if (!cell) return false;
-  const key = relationCellKey(cell);
+  const key = relationCellKey(cell, hitLine.getAttribute('data-rel-id') || '');
   if (erasedRelationCells.has(key)) return false;
   erasedRelationCells.add(key);
   clearEraserGridHover();

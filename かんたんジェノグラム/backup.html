@@ -1081,6 +1081,7 @@ function generateGenogram() {
   const hasDrawn = document.getElementById('layer-draw').children.length > 0;
   deletedSegments.clear();
   erasedRelationCells.clear();
+  erasedNodeIds.clear();
   autoEnclosureHidden = false;
   segmentOverrides.clear();
   relLineOffsets.clear();
@@ -1326,6 +1327,7 @@ const deletedSegments = new Map(); // relId -> Set<segIdx(0|1|2)> 削除済み�
 const segmentOverrides = new Map(); // relId -> {segIdx: {x1,y1,x2,y2}} 手動移動後の座標
 const relLineOffsets = new Map(); // relId -> {dx,dy} 婚姻線の手動移動オフセット
 let autoEnclosureHidden = false;
+const erasedNodeIds = new Set();
 
 function clearRelSelection() {
   if (_clearRelFn) _clearRelFn();
@@ -1641,6 +1643,7 @@ function renderNodes() {
   const layer = document.getElementById('layer-nodes');
   layer.innerHTML = '';
   persons.forEach(p => {
+    if (erasedNodeIds.has(p.id)) return;
     const pos = nodePositions[p.id];
     if (!pos) return;
     const g = el('g', { transform: `translate(${pos.x},${pos.y})`, cursor:'grab', 'data-id': p.id });
@@ -2345,19 +2348,13 @@ function eraseDrawElement(target, point) {
 
 function eraseCanvasNode(node) {
   const id = parseInt(node.getAttribute('data-id'));
-  const beforePersons = persons.slice();
-  const beforePosition = nodePositions[id] && { ...nodePositions[id] };
-  if (!beforePersons.some(person => person.id === id)) return false;
+  if (!persons.some(person => person.id === id)) return false;
   clearCanvasSelections();
-  persons = persons.filter(person => person.id !== id);
-  delete nodePositions[id];
-  renderList();
-  renderSVG();
+  erasedNodeIds.add(id);
+  node.remove();
   pushUndo(() => {
-    persons = beforePersons;
-    if (beforePosition) nodePositions[id] = beforePosition;
-    renderList();
-    renderSVG();
+    erasedNodeIds.delete(id);
+    renderNodes();
   });
   return true;
 }

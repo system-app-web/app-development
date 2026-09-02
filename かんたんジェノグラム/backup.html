@@ -1168,7 +1168,7 @@ function drawAutoEnclosure(layer) {
   const positions = targets.map(p => nodePositions[p.id]).filter(Boolean);
   if (!positions.length) return;
 
-  const PAD = 28;
+  const PAD = 14;
   const G = 28;
 
   // 世代（Y座標）ごとにターゲットノードの横幅を集計

@@ -638,6 +638,8 @@ const itemCatalog = {
   toiletItem: { name: "トイレ", type: "toiletItem", w: 46, h: 52, cols: 1.65, rows: 1.85 },
   kitchenMedium: { name: "キッチン（中）", type: "kitchenMedium", w: 58, h: 122, cols: 2, rows: 4.25 },
   kitchenLarge: { name: "キッチン（大）", type: "kitchenLarge", w: 72, h: 150, cols: 2.5, rows: 5.2 },
+  washbasin: { name: "洗面台", type: "washbasin", w: 64, h: 52, cols: 2.3, rows: 1.9 },
+  washer: { name: "洗濯機", type: "washer", w: 56, h: 56, cols: 2, rows: 2 },
   bathSquare: { name: "正方形浴槽", type: "bathSquare", w: 56, h: 56, cols: 2, rows: 2 },
   bathRect: { name: "長方形浴槽", type: "bathRect", w: 82, h: 54, cols: 3, rows: 2 },
   table: { name: "長方形テーブル", type: "table", w: 86, h: 56, cols: 3.1, rows: 2.1 },
@@ -1093,9 +1095,9 @@ function renderCatalogItem(group, room) {
     rect({ x: room.w * 0.16, y: room.h * 0.28, width: room.w * 0.68, height: room.h * 0.42, rx: room.h * 0.2, fill: accent, stroke: "#b8cfcb", "stroke-width": Math.max(1, line * 0.6) });
     return;
   }
-  if (room.type === "sink" || room.type === "stove") {
+  if (room.type === "sink" || room.type === "washbasin" || room.type === "stove") {
     rect({ x: room.w * 0.04, y: room.h * 0.08, width: room.w * 0.92, height: room.h * 0.82, rx: room.h * 0.08, fill: "#f8fbfb" });
-    if (room.type === "sink") {
+    if (room.type === "sink" || room.type === "washbasin") {
       group.appendChild(svgEl("ellipse", { cx: room.w * 0.43, cy: room.h * 0.53, rx: room.w * 0.24, ry: room.h * 0.23, fill: "#fff", stroke, "stroke-width": Math.max(1, line * 0.7) }));
       lineEl({ x1: room.w * 0.7, y1: room.h * 0.22, x2: room.w * 0.7, y2: room.h * 0.42, "stroke-width": Math.max(1, line * 0.65) });
     } else {

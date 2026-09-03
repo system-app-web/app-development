@@ -646,7 +646,7 @@ const itemCatalog = {
   sofaSingle: { name: "1人用ソファ", type: "sofaSingle", w: 50, h: 44, cols: 1.8, rows: 1.6 },
   sofa: { name: "2人用ソファ", type: "sofa", w: 88, h: 44, cols: 3.2, rows: 1.6 },
   sofaTriple: { name: "3人用ソファ", type: "sofaTriple", w: 126, h: 44, cols: 4.6, rows: 1.6 },
-  door: { name: "ドア", type: "door", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false, showInDoorPalette: true },
+  door: { name: "ドア", type: "door", w: 88, h: 18, cols: 3, rows: 0.65, showInPalette: false, showInDoorPalette: true },
   swingDoor: { name: "開き戸", type: "swingDoor", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: true },
   swingDoorReverse: { name: "開き戸（反転）", type: "swingDoorReverse", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: true },
   windowItem: { name: "窓", type: "windowItem", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false },
@@ -1089,8 +1089,7 @@ function renderCatalogItem(group, room) {
     return;
   }
   if (room.type === "door") {
-    rect({ x: room.w * 0.03, y: room.h * 0.15, width: room.w * 0.94, height: room.h * 0.7, rx: room.h * 0.12, fill: "#f8fbfb" });
-    lineEl({ x1: room.w * 0.12, y1: room.h * 0.5, x2: room.w * 0.88, y2: room.h * 0.5, "stroke-width": Math.max(1, line * 0.6) });
+    rect({ x: room.w * 0.04, y: room.h * 0.12, width: room.w * 0.92, height: room.h * 0.76, rx: Math.max(1, room.h * 0.06), fill: "#fff", "stroke-width": Math.max(1, line * 0.62) });
     return;
   }
   if (room.type === "swingDoor" || room.type === "swingDoorReverse") {

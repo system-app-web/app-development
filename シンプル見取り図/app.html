@@ -1095,14 +1095,14 @@ function renderCatalogItem(group, room) {
   }
   if (room.type === "swingDoor" || room.type === "swingDoorReverse") {
     const reversed = room.type === "swingDoorReverse";
-    const hingeX = room.w * (reversed ? 0.86 : 0.14);
-    const hingeY = room.h * 0.14;
-    const leafX = room.w * (reversed ? 0.14 : 0.86);
-    const arcY = room.h * 0.86;
+    const contactTop = room.h * 0.04;
+    const hingeX = room.w * (reversed ? 0.04 : 0.96);
+    const leafX = room.w * (reversed ? 0.96 : 0.04);
+    const arcY = room.h * 0.96;
     group.appendChild(svgEl("rect", { width: room.w, height: room.h, fill: "transparent", "pointer-events": "all", class: "canvas-item-hit-area" }));
-    lineEl({ x1: hingeX, y1: room.h * 0.04, x2: hingeX, y2: room.h * 0.96, "stroke-width": Math.max(1, line * 0.82) });
-    lineEl({ x1: hingeX, y1: hingeY, x2: leafX, y2: hingeY, "stroke-width": Math.max(1, line * 0.72) });
-    pathEl({ d: `M ${leafX} ${hingeY} A ${room.w * 0.72} ${room.h * 0.72} 0 0 ${reversed ? 0 : 1} ${hingeX} ${arcY}`, "stroke-width": Math.max(1, line * 0.72) });
+    lineEl({ x1: hingeX, y1: contactTop, x2: hingeX, y2: arcY, "stroke-width": Math.max(1, line * 0.72) });
+    lineEl({ x1: hingeX, y1: contactTop, x2: leafX, y2: contactTop, "stroke-width": Math.max(1, line * 0.72) });
+    pathEl({ d: `M ${leafX} ${contactTop} A ${room.w * 0.92} ${room.h * 0.92} 0 0 ${reversed ? 0 : 1} ${hingeX} ${arcY}`, "stroke-width": Math.max(1, line * 0.72) });
     return;
   }
   if (["doorLeft", "doorRight", "doorIn", "doorOut"].includes(room.type)) {

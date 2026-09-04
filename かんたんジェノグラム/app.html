@@ -1934,7 +1934,9 @@ function drawParentChild(layer, fp, tp, fromId, marriageRels, relId, drawnSeg0Ke
     let x1 = ov ? ov.x1 : ax1, y1 = ov ? ov.y1 : ay1;
     let x2 = ov ? ov.x2 : ax2, y2 = ov ? ov.y2 : ay2;
     if (x1 === x2 && y1 === y2) return;
-    const visLine = drawRelationGridLine(layer, x1, y1, x2, y2, { stroke:'#000', 'stroke-width':'3' });
+    const visLine = drawRelationGridLine(layer, x1, y1, x2, y2, {
+      stroke:'#000', 'stroke-width':'3', 'data-rel-id':relId,
+    });
     if (!firstVis) firstVis = visLine;
     const hitLine = el('line', { x1, y1, x2, y2, stroke:'transparent', 'stroke-width':'14', 'data-rel-id':relId, style:'cursor:move' });
     layer.appendChild(hitLine);

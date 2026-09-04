@@ -3344,6 +3344,11 @@ function openNameEditor(i) {
 
 function setNameEditorRowColor(value) {
   nameEditorRowColor = normalizeRowColor(value);
+  if (modalIndex >= 0 && currentData[modalIndex]) {
+    currentData[modalIndex].rowColor = nameEditorRowColor;
+    saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
+    render();
+  }
   document.querySelectorAll('#name-row-color-picker [data-row-color]').forEach(button => {
     button.classList.toggle('is-selected', button.dataset.rowColor === nameEditorRowColor);
   });

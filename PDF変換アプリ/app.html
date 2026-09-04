@@ -1036,7 +1036,6 @@
     function openPencilTextEditor(initialText, onSubmit, { copyEnabled = false, closeOnly = false } = {}) {
       pencilTextSubmit = onSubmit;
       pencilTextInput.value = initialText;
-      pencilTextInput.readOnly = closeOnly;
       pencilTextCancelBtn.textContent = closeOnly ? "閉じる" : "キャンセル";
       pencilTextCopyBtn.classList.toggle("hidden", !copyEnabled);
       pencilTextSaveBtn.classList.toggle("hidden", closeOnly);
@@ -1050,7 +1049,6 @@
     function closePencilTextEditor() {
       pencilTextDialog.classList.add("hidden");
       pencilTextSubmit = null;
-      pencilTextInput.readOnly = false;
       pencilTextCancelBtn.textContent = "キャンセル";
       pencilTextCopyBtn.classList.add("hidden");
       pencilTextSaveBtn.classList.remove("hidden");

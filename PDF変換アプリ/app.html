@@ -921,6 +921,11 @@
         : "文字の読み取りを中止しました。");
     });
 
+    document.addEventListener("click", (event) => {
+      if (!pencilOcrMode || drop.contains(event.target) || event.target.closest("#pencilOcrBtn")) return;
+      stopPencilOcrMode();
+    });
+
     document.addEventListener("keydown", (event) => {
       if (event.target === pencilTextInput) return;
       if (!isPencilMode() || event.key.toLowerCase() !== "z" || (!event.ctrlKey && !event.metaKey)) return;
@@ -1020,6 +1025,12 @@
       pencilTextDialog.classList.add("hidden");
       pencilTextSubmit = null;
       pencilTextCopyBtn.classList.add("hidden");
+    }
+
+    function stopPencilOcrMode() {
+      pencilOcrMode = false;
+      pencilOcrDraft = null;
+      if (isPencilMode()) updatePencilPalette();
     }
 
     async function updateContrastPreview() {
@@ -2169,7 +2180,6 @@
         pencilOcrDraft.h = point.y - pencilOcrDraft.y;
         const selection = normalizedPencilRect(pencilOcrDraft);
         pencilOcrDraft = null;
-        pencilOcrMode = false;
         showPencilEditor();
         if (selection.w < 0.01 || selection.h < 0.01) {
           setStatus("文字を読み取る範囲をドラッグしてください。");

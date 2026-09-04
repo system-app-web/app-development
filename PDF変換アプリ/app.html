@@ -1906,7 +1906,9 @@
         setStatus("文字を読み取る準備をしています。");
         const worker = await getJapaneseOcrWorker();
         const { data } = await worker.recognize(cropPencilPageForOcr(selection));
-        const text = data.text.trim();
+        const text = data.text
+          .replace(/[ \t\u00a0\u3000]+/g, "")
+          .trim();
         if (!text) {
           setStatus("文字を読み取れませんでした。範囲を大きめに選んでください。");
           return;

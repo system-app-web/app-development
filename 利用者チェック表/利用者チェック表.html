@@ -678,16 +678,17 @@ tbody tr:nth-child(even) { background: #f8fcff; }
 tbody tr:nth-child(odd) { background: white; }
 tbody tr { transition: background-color 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease, opacity 0.12s ease; }
 tbody tr.done-row { background: #f0fdf4 !important; }
-tbody tr.row-tone-sage { background: #e1f5e4 !important; }
+tbody tr.row-tone-sage { background: #edf2f5 !important; }
 tbody tr.row-tone-blue { background: #e1f3ff !important; }
 tbody tr.row-tone-sand { background: #fff5d5 !important; }
 tbody tr.row-tone-lavender { background: #f0e8ff !important; }
 tbody tr.row-tone-rose { background: #ffe8ef !important; }
 tbody tr.row-tone-aqua { background: #ddf6f3 !important; }
 tbody tr.row-tone-peach { background: #ffebdc !important; }
-tbody tr.row-tone-lime { background: #edf7d9 !important; }
+tbody tr.row-tone-lime { background: #f4eaf5 !important; }
 tbody tr.row-tone-periwinkle { background: #e7edff !important; }
 tbody tr.row-tone-coral { background: #ffe8e3 !important; }
+tbody tr.row-tone-greige { background: #f3eee7 !important; }
 tbody tr.row-selected {
   background: #dcfce7 !important;
   box-shadow: inset 0 0 0 2px #65b842;
@@ -782,16 +783,17 @@ td.td-name {
   cursor: pointer;
   flex: none;
 }
-.row-color-swatch.sage { background: #bde9c4; }
+.row-color-swatch.sage { background: #d7e0e6; }
 .row-color-swatch.blue { background: #b8e0f7; }
 .row-color-swatch.sand { background: #f5df98; }
 .row-color-swatch.lavender { background: #d8c6f1; }
 .row-color-swatch.rose { background: #f3c1d0; }
 .row-color-swatch.aqua { background: #b8e7e2; }
 .row-color-swatch.peach { background: #f4c9a6; }
-.row-color-swatch.lime { background: #cfe8a5; }
+.row-color-swatch.lime { background: #dec6e0; }
 .row-color-swatch.periwinkle { background: #c4d1f4; }
 .row-color-swatch.coral { background: #f4c2b6; }
+.row-color-swatch.greige { background: #ded1c2; }
 .row-color-swatch.is-selected,
 .row-color-clear.is-selected {
   border-color: #2d7a1a;
@@ -1531,16 +1533,17 @@ function monthKey(y, m) { return `${y}-${String(m).padStart(2, '0')}`; }
 
 const DEFAULT_CLIENTS = [];
 const ROW_COLOR_CHOICES = [
-  { value: 'sage', label: 'ミント' },
+  { value: 'sage', label: 'ライトグレー' },
   { value: 'blue', label: 'スカイ' },
   { value: 'sand', label: 'レモン' },
   { value: 'lavender', label: 'ラベンダー' },
   { value: 'rose', label: 'ローズ' },
   { value: 'aqua', label: 'アクア' },
   { value: 'peach', label: 'ピーチ' },
-  { value: 'lime', label: 'ライム' },
+  { value: 'lime', label: 'モーヴ' },
   { value: 'periwinkle', label: 'アイスブルー' },
-  { value: 'coral', label: 'コーラル' }
+  { value: 'coral', label: 'コーラル' },
+  { value: 'greige', label: 'グレージュ' }
 ];
 
 function normalizeRowColor(value) {

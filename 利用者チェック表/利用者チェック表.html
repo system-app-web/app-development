@@ -678,6 +678,11 @@ tbody tr:nth-child(even) { background: #f8fcff; }
 tbody tr:nth-child(odd) { background: white; }
 tbody tr { transition: background-color 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease, opacity 0.12s ease; }
 tbody tr.done-row { background: #f0fdf4 !important; }
+tbody tr.row-tone-sage { background: #e4f0df !important; }
+tbody tr.row-tone-blue { background: #e2edf2 !important; }
+tbody tr.row-tone-sand { background: #f3eadb !important; }
+tbody tr.row-tone-lavender { background: #ece5f0 !important; }
+tbody tr.row-tone-rose { background: #f3e4e4 !important; }
 tbody tr.row-selected {
   background: #dcfce7 !important;
   box-shadow: inset 0 0 0 2px #65b842;
@@ -741,6 +746,48 @@ td.td-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.row-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 8px;
+  padding: 8px 10px;
+  border: 1.5px solid #d4f0c4;
+  border-radius: 10px;
+  background: #fbfef9;
+}
+.row-color-picker-label {
+  color: #4b6b45;
+  font-size: 11px;
+  font-weight: 700;
+  margin-right: auto;
+}
+.row-color-swatch,
+.row-color-clear {
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid rgba(45, 92, 42, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  flex: none;
+}
+.row-color-swatch.sage { background: #c9dfc2; }
+.row-color-swatch.blue { background: #c8dce5; }
+.row-color-swatch.sand { background: #e8d5b8; }
+.row-color-swatch.lavender { background: #d9c9e1; }
+.row-color-swatch.rose { background: #e5caca; }
+.row-color-swatch.is-selected,
+.row-color-clear.is-selected {
+  border-color: #2d7a1a;
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #65b842;
+}
+.row-color-clear {
+  background: white;
+  color: #7b8f77;
+  font-size: 18px;
+  line-height: 20px;
+  font-weight: 500;
 }
 .name-main {
   font-size: 11px;
@@ -1468,6 +1515,18 @@ let curMonth = now.getMonth() + 1;
 function monthKey(y, m) { return `${y}-${String(m).padStart(2, '0')}`; }
 
 const DEFAULT_CLIENTS = [];
+const ROW_COLOR_CHOICES = [
+  { value: 'sage', label: 'セージ' },
+  { value: 'blue', label: '青みグレー' },
+  { value: 'sand', label: 'ベージュ' },
+  { value: 'lavender', label: 'ラベンダー' },
+  { value: 'rose', label: 'くすみローズ' }
+];
+
+function normalizeRowColor(value) {
+  const color = String(value || '');
+  return ROW_COLOR_CHOICES.some(choice => choice.value === color) ? color : '';
+}
 
 function makeRowId(base) {
   if (base.rowId) return String(base.rowId);
@@ -1489,6 +1548,7 @@ function newClientData(base) {
     deleted: Boolean(base.deleted),
     manualOrder: Number.isFinite(base.manualOrder) ? base.manualOrder : null,
     kana: base.kana || '',
+    rowColor: normalizeRowColor(base.rowColor),
     facility: base.facility || '',
     kosin: base.kosin || '',
     yuko: base.yuko || '',
@@ -1619,6 +1679,7 @@ let pendingDateClick = null;
 let pendingVisitClick = null;
 let orderMode = 'name';
 let addClientDraft = null;
+let nameEditorRowColor = '';
 let customColumns = [];
 let columnLabels = {};
 let columnOrder = [...BASE_MOVABLE_COLUMN_KEYS];
@@ -2188,7 +2249,7 @@ function syncFutureClientStructure(all, sourceKey, sourceList) {
 
 // Keep profile information current in later months, without changing monthly work records.
 function syncFutureProfileFields(all, sourceKey, sourceList) {
-  const profileFields = ['kana', 'kosin', 'yuko', 'level', 'planL', 'planS', 'seho', 'sehoCw', 'biko'];
+  const profileFields = ['kana', 'rowColor', 'kosin', 'yuko', 'level', 'planL', 'planS', 'seho', 'sehoCw', 'biko'];
   Object.keys(all)
     .filter(key => key > sourceKey && Array.isArray(all[key]))
     .sort()
@@ -3259,9 +3320,18 @@ function saveNewFacility() {
 function openNameEditor(i) {
   modalIndex = i;
   const item = currentData[i];
+  nameEditorRowColor = normalizeRowColor(item.rowColor);
+  const colorPicker = orderMode === 'custom'
+    ? `<div class="row-color-picker" id="name-row-color-picker">
+         <span class="row-color-picker-label">行の色</span>
+         ${ROW_COLOR_CHOICES.map(choice => `<button type="button" class="row-color-swatch ${choice.value}${nameEditorRowColor === choice.value ? ' is-selected' : ''}" data-row-color="${choice.value}" onclick="setNameEditorRowColor('${choice.value}')" title="${choice.label}" aria-label="${choice.label}"></button>`).join('')}
+         <button type="button" class="row-color-clear${nameEditorRowColor ? '' : ' is-selected'}" data-row-color="" onclick="setNameEditorRowColor('')" title="色なし" aria-label="色なし">×</button>
+       </div>`
+    : '';
   showModal('氏名', item.name,
     `<input class="modal-input" id="edit-name-input" placeholder="氏名" value="${esc(item.name || '')}">
      <input class="modal-input" id="edit-kana-input" placeholder="かな" value="${esc(item.kana || '')}">
+     ${colorPicker}
      <button class="mact green" style="width:100%;margin-top:8px" onclick="saveNameEditor()">保存する</button>
      <button class="mact red" style="width:100%;margin-top:8px" onclick="confirmDelete(modalIndex)">削除</button>`
   );
@@ -3270,6 +3340,13 @@ function openNameEditor(i) {
     const input = document.getElementById('edit-name-input');
     if (input) input.focus();
   }, 100);
+}
+
+function setNameEditorRowColor(value) {
+  nameEditorRowColor = normalizeRowColor(value);
+  document.querySelectorAll('#name-row-color-picker [data-row-color]').forEach(button => {
+    button.classList.toggle('is-selected', button.dataset.rowColor === nameEditorRowColor);
+  });
 }
 
 function bindRowSelection(cell, i) {
@@ -3418,7 +3495,8 @@ function saveNameEditor() {
   }
   currentData[modalIndex].name = name;
   currentData[modalIndex].kana = (document.getElementById('edit-kana-input')?.value || '').trim();
-  saveMonthData(curYear, curMonth, currentData);
+  currentData[modalIndex].rowColor = nameEditorRowColor;
+  saveMonthData(curYear, curMonth, currentData, { syncFutureProfileFields: true });
   closeModal();
   render();
 }
@@ -4250,6 +4328,8 @@ function render() {
     const tr = document.createElement('tr');
     tr.dataset.sourceIndex = String(originalIndex);
     tr.dataset.rowId = item.rowId || '';
+    const rowColor = orderMode === 'custom' ? normalizeRowColor(item.rowColor) : '';
+    if (rowColor) tr.classList.add(`row-tone-${rowColor}`);
     if (CHK.every(key => isCheckComplete(item, key))) tr.classList.add('done-row');
     if (selectedRowId && selectedRowId === (item.rowId || '')) tr.classList.add('row-selected');
     bindRowTapSelection(tr);

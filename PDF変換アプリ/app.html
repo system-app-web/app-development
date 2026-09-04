@@ -400,7 +400,7 @@
       color: #40505d;
     }
 
-    .pencil-text-copy.hidden {
+    .pencil-text-dialog-button.hidden {
       display: none;
     }
 
@@ -922,7 +922,7 @@
     });
 
     document.addEventListener("click", (event) => {
-      if (!pencilOcrMode || drop.contains(event.target) || event.target.closest("#pencilOcrBtn")) return;
+      if (!pencilOcrMode || drop.contains(event.target) || pencilTextDialog.contains(event.target) || event.target.closest("#pencilOcrBtn")) return;
       stopPencilOcrMode();
     });
 
@@ -1010,10 +1010,13 @@
       return true;
     }
 
-    function openPencilTextEditor(initialText, onSubmit, { copyEnabled = false } = {}) {
+    function openPencilTextEditor(initialText, onSubmit, { copyEnabled = false, closeOnly = false } = {}) {
       pencilTextSubmit = onSubmit;
       pencilTextInput.value = initialText;
+      pencilTextInput.readOnly = closeOnly;
+      pencilTextCancelBtn.textContent = closeOnly ? "閉じる" : "キャンセル";
       pencilTextCopyBtn.classList.toggle("hidden", !copyEnabled);
+      pencilTextSaveBtn.classList.toggle("hidden", closeOnly);
       pencilTextDialog.classList.remove("hidden");
       requestAnimationFrame(() => {
         pencilTextInput.focus();
@@ -1024,7 +1027,10 @@
     function closePencilTextEditor() {
       pencilTextDialog.classList.add("hidden");
       pencilTextSubmit = null;
+      pencilTextInput.readOnly = false;
+      pencilTextCancelBtn.textContent = "キャンセル";
       pencilTextCopyBtn.classList.add("hidden");
+      pencilTextSaveBtn.classList.remove("hidden");
     }
 
     function stopPencilOcrMode() {
@@ -1924,21 +1930,8 @@
           setStatus("文字を読み取れませんでした。範囲を大きめに選んでください。");
           return;
         }
-        openPencilTextEditor(text, (editedText) => {
-          pencilAnnotations[pencilCurrentPageIndex].push({
-            type: "text",
-            x: selection.x,
-            y: selection.y,
-            color: pencilColor,
-            text: editedText,
-            fontScale: 1
-          });
-          releaseSingleUsePencilTool("text");
-          refreshPencilOutput();
-          showPencilEditor();
-          saveModeState(currentDocType);
-        }, { copyEnabled: true });
-        setStatus("文字を読み取りました。コピーまたは入力できます。");
+        openPencilTextEditor(text, null, { copyEnabled: true, closeOnly: true });
+        setStatus("文字を読み取りました。コピーできます。");
       } catch (error) {
         console.error(error);
         japaneseOcrWorkerPromise = null;

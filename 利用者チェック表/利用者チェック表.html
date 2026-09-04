@@ -3837,6 +3837,7 @@ let columnEditorTextMode = false;
 let rowEditorReorderMode = false;
 let rowEditorDeleteMode = false;
 let returnToRowEditorAfterAdd = false;
+let rowEditorScrollTop = 0;
 
 function openRowReorderModal() {
   if (loadOrderMode() !== 'custom') {
@@ -3847,11 +3848,16 @@ function openRowReorderModal() {
   selectedRowReorderId = '';
   rowEditorReorderMode = false;
   rowEditorDeleteMode = false;
+  rowEditorScrollTop = 0;
   renderRowReorderModal();
 }
 
-function renderRowReorderModal(keepScroll) {
-  const previousScrollTop = keepScroll ? (document.querySelector('.reorder-list')?.scrollTop || 0) : 0;
+function renderRowReorderModal(keepScroll, savedScrollTop) {
+  const currentScrollTop = document.querySelector('.reorder-list')?.scrollTop;
+  const previousScrollTop = Number.isFinite(savedScrollTop)
+    ? savedScrollTop
+    : (keepScroll ? (currentScrollTop ?? rowEditorScrollTop) : 0);
+  rowEditorScrollTop = previousScrollTop;
   const rows = getVisibleRowItems();
   showModal('利用者編集', '',
     `<div class="editor-actions">
@@ -3872,22 +3878,27 @@ function renderRowReorderModal(keepScroll) {
   document.getElementById('modal').classList.add('compact-picker');
   if (keepScroll) {
     const list = document.querySelector('.reorder-list');
-    if (list) list.scrollTop = previousScrollTop;
+    if (list) {
+      list.scrollTop = previousScrollTop;
+      list.addEventListener('scroll', () => { rowEditorScrollTop = list.scrollTop; }, { passive: true });
+    }
   }
 }
 
 function toggleRowEditorReorderMode() {
+  const scrollTop = document.querySelector('.reorder-list')?.scrollTop ?? rowEditorScrollTop;
   rowEditorReorderMode = !rowEditorReorderMode;
   rowEditorDeleteMode = false;
   selectedRowReorderId = '';
-  renderRowReorderModal();
+  renderRowReorderModal(true, scrollTop);
 }
 
 function toggleRowEditorDeleteMode() {
+  const scrollTop = document.querySelector('.reorder-list')?.scrollTop ?? rowEditorScrollTop;
   rowEditorReorderMode = false;
   rowEditorDeleteMode = !rowEditorDeleteMode;
   selectedRowReorderId = '';
-  renderRowReorderModal();
+  renderRowReorderModal(true, scrollTop);
 }
 
 function tapRowReorder(rowId) {
@@ -4008,6 +4019,8 @@ function closeModal() {
 }
 
 function confirmDelete(i) {
+  const reopenRowEditor = document.getElementById('modal').classList.contains('show') && loadOrderMode() === 'custom';
+  const scrollTop = document.querySelector('.reorder-list')?.scrollTop ?? rowEditorScrollTop;
   closeModal();
   const name = currentData[i].name;
   document.getElementById('cf-title').textContent = '利用者を削除';
@@ -4018,6 +4031,7 @@ function confirmDelete(i) {
     saveMonthData(curYear, curMonth, currentData, { syncFutureClients: true });
     closeConfirm();
     render();
+    if (reopenRowEditor) renderRowReorderModal(true, scrollTop);
   };
   document.getElementById('confirm').classList.add('show');
 }

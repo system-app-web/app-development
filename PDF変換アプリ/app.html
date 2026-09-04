@@ -280,6 +280,12 @@
       color: #fff;
     }
 
+    .pencil-action.active {
+      border-color: #2563eb;
+      background: #2563eb;
+      color: #fff;
+    }
+
     .pencil-color {
       width: 28px;
       min-width: 28px;
@@ -392,6 +398,10 @@
       background: #fff;
       border-color: #b9c8cd;
       color: #40505d;
+    }
+
+    .pencil-text-copy.hidden {
+      display: none;
     }
 
     .contrast-options {
@@ -731,6 +741,7 @@
         <button class="pencil-color" type="button" data-pencil-color="#ffffff" style="background:#ffffff" title="白"></button>
         <button id="pencilUndoBtn" class="pencil-action" type="button">元に戻す</button>
         <button id="pencilClearBtn" class="pencil-action" type="button">このページを消去</button>
+        <button id="pencilOcrBtn" class="pencil-action" type="button">文字を読み取る</button>
       </div>
     </div>
     <div id="pencilPageControl" class="pencil-page-control hidden" aria-label="PDFペンシルのページ切替">
@@ -753,6 +764,7 @@
       <textarea id="pencilTextInput" class="pencil-text-input" rows="5" spellcheck="false" aria-label="入力する文字"></textarea>
       <div class="pencil-text-dialog-actions">
         <button id="pencilTextCancelBtn" class="pencil-text-dialog-button pencil-text-dialog-cancel" type="button">キャンセル</button>
+        <button id="pencilTextCopyBtn" class="pencil-text-dialog-button pencil-text-dialog-cancel pencil-text-copy hidden" type="button">コピー</button>
         <button id="pencilTextSaveBtn" class="pencil-text-dialog-button" type="button">入力</button>
       </div>
     </div>
@@ -785,12 +797,14 @@
     const pencilColorButtons = Array.from(document.querySelectorAll(".pencil-color"));
     const pencilUndoBtn = document.getElementById("pencilUndoBtn");
     const pencilClearBtn = document.getElementById("pencilClearBtn");
+    const pencilOcrBtn = document.getElementById("pencilOcrBtn");
     const pencilPreviousBtn = document.getElementById("pencilPreviousBtn");
     const pencilNextBtn = document.getElementById("pencilNextBtn");
     const pencilPageLabel = document.getElementById("pencilPageLabel");
     const pencilTextDialog = document.getElementById("pencilTextDialog");
     const pencilTextInput = document.getElementById("pencilTextInput");
     const pencilTextCancelBtn = document.getElementById("pencilTextCancelBtn");
+    const pencilTextCopyBtn = document.getElementById("pencilTextCopyBtn");
     const pencilTextSaveBtn = document.getElementById("pencilTextSaveBtn");
     const contrastButtons = Array.from(document.querySelectorAll(".contrast-btn"));
     const sizeButtons = Array.from(document.querySelectorAll(".size-btn"));
@@ -812,6 +826,9 @@
     let pencilResize = null;
     let pencilMove = null;
     let pencilTextSubmit = null;
+    let pencilOcrMode = false;
+    let pencilOcrDraft = null;
+    let japaneseOcrWorkerPromise = null;
     let outputDirectory = null;
     let blackThreshold = 172;
     let sizeScale = 1;
@@ -891,6 +908,19 @@
       undoPencilAnnotation();
     });
 
+    pencilOcrBtn.addEventListener("click", () => {
+      if (!loadedCanvases.length) return;
+      pencilOcrMode = !pencilOcrMode;
+      pencilOcrDraft = null;
+      pencilSelection = null;
+      pencilResize = null;
+      pencilMove = null;
+      showPencilEditor();
+      setStatus(pencilOcrMode
+        ? "文字を読み取る範囲をドラッグしてください。"
+        : "文字の読み取りを中止しました。");
+    });
+
     document.addEventListener("keydown", (event) => {
       if (event.target === pencilTextInput) return;
       if (!isPencilMode() || event.key.toLowerCase() !== "z" || (!event.ctrlKey && !event.metaKey)) return;
@@ -907,6 +937,22 @@
 
     pencilTextCancelBtn.addEventListener("click", () => {
       closePencilTextEditor();
+    });
+
+    pencilTextCopyBtn.addEventListener("click", async () => {
+      const text = pencilTextInput.value;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus("読み取った文字をコピーしました。");
+      } catch {
+        pencilTextInput.select();
+        if (document.execCommand("copy")) {
+          setStatus("読み取った文字をコピーしました。");
+        } else {
+          setStatus("コピーできませんでした。文字を選択してコピーしてください。");
+        }
+      }
     });
 
     pencilTextInput.addEventListener("keydown", (event) => {
@@ -928,6 +974,8 @@
       pencilSelection = null;
       pencilResize = null;
       pencilMove = null;
+      pencilOcrMode = false;
+      pencilOcrDraft = null;
       showPencilEditor();
       saveModeState(currentDocType);
     });
@@ -938,6 +986,8 @@
       pencilSelection = null;
       pencilResize = null;
       pencilMove = null;
+      pencilOcrMode = false;
+      pencilOcrDraft = null;
       showPencilEditor();
       saveModeState(currentDocType);
     });
@@ -955,9 +1005,10 @@
       return true;
     }
 
-    function openPencilTextEditor(initialText, onSubmit) {
+    function openPencilTextEditor(initialText, onSubmit, { copyEnabled = false } = {}) {
       pencilTextSubmit = onSubmit;
       pencilTextInput.value = initialText;
+      pencilTextCopyBtn.classList.toggle("hidden", !copyEnabled);
       pencilTextDialog.classList.remove("hidden");
       requestAnimationFrame(() => {
         pencilTextInput.focus();
@@ -968,6 +1019,7 @@
     function closePencilTextEditor() {
       pencilTextDialog.classList.add("hidden");
       pencilTextSubmit = null;
+      pencilTextCopyBtn.classList.add("hidden");
     }
 
     async function updateContrastPreview() {
@@ -1231,6 +1283,8 @@
       pencilSelection = null;
       pencilResize = null;
       pencilMove = null;
+      pencilOcrMode = false;
+      pencilOcrDraft = null;
       manualOrientationDirections[type] = 0;
       manualOrientationEnabled[type] = false;
       manualUpsideDown[type] = false;
@@ -1292,6 +1346,8 @@
       pencilSelection = null;
       pencilResize = null;
       pencilMove = null;
+      pencilOcrMode = false;
+      pencilOcrDraft = null;
       blackThreshold = state.blackThreshold;
       sizeScale = state.sizeScale;
       updateContrastButtons();
@@ -1371,6 +1427,8 @@
           pencilSelection = null;
           pencilResize = null;
           pencilMove = null;
+          pencilOcrMode = false;
+          pencilOcrDraft = null;
           refreshPencilOutput();
           saveModeState(currentDocType);
           showPencilEditor();
@@ -1778,6 +1836,7 @@
       editor.className = "pencil-editor";
       const canvas = renderPencilPage(pencilCurrentPageIndex);
       drawPencilSelection(canvas.getContext("2d"), canvas);
+      drawPencilOcrSelection(canvas.getContext("2d"), canvas);
       canvas.className = "pencil-canvas";
       canvas.setAttribute("aria-label", `PDF ${pencilCurrentPageIndex + 1}ページ目の編集画面`);
       canvas.addEventListener("pointerdown", startPencilDrawing);
@@ -1795,6 +1854,83 @@
         x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
         y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height))
       };
+    }
+
+    function normalizedPencilRect(rect) {
+      const x = rect.w < 0 ? rect.x + rect.w : rect.x;
+      const y = rect.h < 0 ? rect.y + rect.h : rect.y;
+      return { x, y, w: Math.abs(rect.w), h: Math.abs(rect.h) };
+    }
+
+    function drawPencilOcrSelection(ctx, canvas) {
+      if (!pencilOcrDraft) return;
+      const selection = normalizedPencilRect(pencilOcrDraft);
+      ctx.save();
+      ctx.fillStyle = "rgba(37, 99, 235, .14)";
+      ctx.strokeStyle = "#2563eb";
+      ctx.lineWidth = Math.max(2, Math.round(canvas.width * 0.0018));
+      ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 2]);
+      ctx.fillRect(selection.x * canvas.width, selection.y * canvas.height, selection.w * canvas.width, selection.h * canvas.height);
+      ctx.strokeRect(selection.x * canvas.width, selection.y * canvas.height, selection.w * canvas.width, selection.h * canvas.height);
+      ctx.restore();
+    }
+
+    async function getJapaneseOcrWorker() {
+      if (!japaneseOcrWorkerPromise) {
+        japaneseOcrWorkerPromise = createWorker("jpn", 1, {
+          logger: (message) => {
+            if (message.status === "recognizing text") {
+              setStatus(`文字を読み取り中です。${Math.round((message.progress || 0) * 100)}%`);
+            }
+          }
+        });
+      }
+      return japaneseOcrWorkerPromise;
+    }
+
+    function cropPencilPageForOcr(selection) {
+      const source = loadedCanvases[pencilCurrentPageIndex];
+      const x = Math.max(0, Math.floor(selection.x * source.width));
+      const y = Math.max(0, Math.floor(selection.y * source.height));
+      const width = Math.min(source.width - x, Math.ceil(selection.w * source.width));
+      const height = Math.min(source.height - y, Math.ceil(selection.h * source.height));
+      const crop = document.createElement("canvas");
+      crop.width = width;
+      crop.height = height;
+      crop.getContext("2d").drawImage(source, x, y, width, height, 0, 0, width, height);
+      return crop;
+    }
+
+    async function recognizePencilText(selection) {
+      try {
+        setStatus("文字を読み取る準備をしています。");
+        const worker = await getJapaneseOcrWorker();
+        const { data } = await worker.recognize(cropPencilPageForOcr(selection));
+        const text = data.text.trim();
+        if (!text) {
+          setStatus("文字を読み取れませんでした。範囲を大きめに選んでください。");
+          return;
+        }
+        openPencilTextEditor(text, (editedText) => {
+          pencilAnnotations[pencilCurrentPageIndex].push({
+            type: "text",
+            x: selection.x,
+            y: selection.y,
+            color: pencilColor,
+            text: editedText,
+            fontScale: 1
+          });
+          releaseSingleUsePencilTool("text");
+          refreshPencilOutput();
+          showPencilEditor();
+          saveModeState(currentDocType);
+        }, { copyEnabled: true });
+        setStatus("文字を読み取りました。コピーまたは入力できます。");
+      } catch (error) {
+        console.error(error);
+        japaneseOcrWorkerPromise = null;
+        setStatus("文字の読み取りに失敗しました。インターネット接続を確認してください。");
+      }
     }
 
     function findPencilAnnotationAtPoint(point) {
@@ -1898,6 +2034,12 @@
       if (!isPencilMode() || !loadedCanvases.length) return;
       const canvas = event.currentTarget;
       const point = pencilPoint(event, canvas);
+      if (pencilOcrMode) {
+        pencilOcrDraft = { x: point.x, y: point.y, w: 0, h: 0 };
+        canvas.setPointerCapture(event.pointerId);
+        repaintPencilCanvas(canvas);
+        return;
+      }
       const existingAnnotationIndex = findPencilAnnotationAtPoint(point);
       const existingAnnotation = existingAnnotationIndex === null
         ? null
@@ -1982,6 +2124,13 @@
     }
 
     function continuePencilDrawing(event) {
+      if (pencilOcrDraft) {
+        const point = pencilPoint(event, event.currentTarget);
+        pencilOcrDraft.w = point.x - pencilOcrDraft.x;
+        pencilOcrDraft.h = point.y - pencilOcrDraft.y;
+        repaintPencilCanvas(event.currentTarget);
+        return;
+      }
       if (pencilResize) {
         const annotation = pencilAnnotations[pencilCurrentPageIndex][pencilResize.annotationIndex];
         Object.assign(annotation, clonePencilAnnotations([[pencilResize.annotation]])[0][0]);
@@ -2012,6 +2161,21 @@
     }
 
     function finishPencilDrawing(event) {
+      if (pencilOcrDraft) {
+        const point = pencilPoint(event, event.currentTarget);
+        pencilOcrDraft.w = point.x - pencilOcrDraft.x;
+        pencilOcrDraft.h = point.y - pencilOcrDraft.y;
+        const selection = normalizedPencilRect(pencilOcrDraft);
+        pencilOcrDraft = null;
+        pencilOcrMode = false;
+        showPencilEditor();
+        if (selection.w < 0.01 || selection.h < 0.01) {
+          setStatus("文字を読み取る範囲をドラッグしてください。");
+          return;
+        }
+        void recognizePencilText(selection);
+        return;
+      }
       if (pencilResize) {
         const annotation = pencilAnnotations[pencilCurrentPageIndex][pencilResize.annotationIndex];
         Object.assign(annotation, clonePencilAnnotations([[pencilResize.annotation]])[0][0]);
@@ -2072,6 +2236,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(page, 0, 0);
       drawPencilSelection(ctx, canvas);
+      drawPencilOcrSelection(ctx, canvas);
     }
 
     function updatePencilPalette() {
@@ -2082,6 +2247,8 @@
       pencilColorButtons.forEach((button) => {
         button.classList.toggle("active", button.dataset.pencilColor === pencilColor);
       });
+      pencilOcrBtn.classList.toggle("active", pencilOcrMode);
+      pencilOcrBtn.disabled = !loadedCanvases.length;
       pencilPageLabel.textContent = pageCount ? `${pencilCurrentPageIndex + 1} / ${pageCount}` : "1 / 1";
       pencilPreviousBtn.disabled = pencilCurrentPageIndex <= 0;
       pencilNextBtn.disabled = !pageCount || pencilCurrentPageIndex >= pageCount - 1;

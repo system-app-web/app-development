@@ -1,4 +1,4 @@
-const CACHE_NAME = 'riyosha-check-pwa-v4';
+const CACHE_NAME = 'riyosha-check-pwa-v5';
 const APP_SHELL = [
   './',
   './利用者チェック表.html',
@@ -25,6 +25,25 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+  const isAppDocument = event.request.mode === 'navigate' || url.pathname.endsWith('/利用者チェック表.html');
+
+  // Always prefer the newest checklist screen when online, while keeping the
+  // previous screen available for offline use.
+  if (isAppDocument) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response && response.status === 200 && response.type !== 'opaque') {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+        }
+        return response;
+      }).catch(() => caches.match('./利用者チェック表.html'))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;

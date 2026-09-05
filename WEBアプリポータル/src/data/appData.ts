@@ -44,14 +44,14 @@ export const appData: PortalApp[] = [
   {
     id: 'assessment-sheet',
     name: 'アセスメントシート',
-    url: '',
+    url: 'https://assessment-sheet-app.uragoshi.chatgpt.site/assessment.html',
     manualUrl: '',
     icon: 'assessment',
     iconImage: 'app-icons/assessment.svg',
-    description: '利用者支援のアセスメントを整理',
-    version: 'v0.1.0',
+    description: '利用者支援のアセスメントを整理（試作版）',
+    version: 'v0.2.0',
     status: 'preview',
-    availability: 'adjusting',
+    availability: 'trial',
   },
   {
     id: 'pdf-converter',

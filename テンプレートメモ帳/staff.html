@@ -711,7 +711,7 @@ const DEFAULT_SUPPORT_PROGRESS = [
 const DEFAULT_DATA = {
   groups: [
     { id: 'g_ai', label: 'AIプロンプト' },
-    { id: 'g_keika', label: '支援経過' },
+    { id: 'g_keika', label: '支援経過記録' },
     { id: 'g_other', label: 'その他' },
   ],
   categories: [
@@ -730,13 +730,13 @@ function normalizeData(data) {
   }
   if (!data.groups.some(g => g.id === 'g_keika')) {
     const aiIndex = data.groups.findIndex(g => g.id === 'g_ai');
-    data.groups.splice(aiIndex + 1, 0, { id: 'g_keika', label: '支援経過' });
+    data.groups.splice(aiIndex + 1, 0, { id: 'g_keika', label: '支援経過記録' });
   }
   if (!data.groups.some(g => g.id === 'g_other')) {
     data.groups.push({ id: 'g_other', label: 'その他' });
   }
   const supportGroup = data.groups.find(g => g.id === 'g_keika');
-  if (supportGroup) supportGroup.label = '支援経過';
+  if (supportGroup) supportGroup.label = '支援経過記録';
 
   DEFAULT_AI_PROMPTS.forEach(prompt => {
     if (!data.categories.some(c => c.id === prompt.id)) {

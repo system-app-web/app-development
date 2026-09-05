@@ -26,6 +26,8 @@
     flex-shrink: 0;
   }
   header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.06em; }
+  .undo-delete { margin-left: 12px; padding: 5px 10px; border: 1px solid rgba(255,255,255,0.48); border-radius: 6px; color: white; background: rgba(255,255,255,0.13); font: inherit; font-size: 0.78rem; cursor: pointer; }
+  .undo-delete:hover:not(:disabled) { background: rgba(255,255,255,0.24); }.undo-delete:disabled { opacity: 0.42; cursor: default; }
 
   .main {
     display: flex;
@@ -485,6 +487,7 @@
 
 <header>
   <h1>📋 テンプレートメモ帳</h1>
+  <button class="undo-delete" id="undoDelete" type="button" disabled>↶ 戻す</button>
 </header>
 
 <div class="main">
@@ -774,6 +777,23 @@ function saveData(data) {
 // ── 状態 ──
 let currentCatId = null;
 let collapsedGroups = {};  // groupId → false で展開、未設定は折りたたみ
+let deletedSnapshot = null;
+
+function setUndoSnapshot(data) {
+  deletedSnapshot = JSON.parse(JSON.stringify(data));
+  document.getElementById('undoDelete').disabled = false;
+}
+
+function undoDelete() {
+  if (!deletedSnapshot) return;
+  saveData(deletedSnapshot);
+  deletedSnapshot = null;
+  document.getElementById('undoDelete').disabled = true;
+  currentCatId = null;
+  document.getElementById('editorPanel').classList.remove('visible');
+  document.getElementById('editorPlaceholder').style.display = 'flex';
+  renderSidebar();
+}
 
 // 編集中
 let editingGroupId = null;
@@ -1046,6 +1066,7 @@ function deleteCat(id) {
   const data = getData();
   const cat = data.categories.find(c => c.id === id);
   if (!confirm(`「${cat.label}」を削除しますか？`)) return;
+  setUndoSnapshot(data);
   data.categories = data.categories.filter(c => c.id !== id);
   saveData(data);
   if (currentCatId === id) {
@@ -1065,6 +1086,7 @@ function deleteGroup(id) {
     ? `「${group.label}」を削除しますか？\n※ このグループのカテゴリ（${catCount}件）も一緒に削除されます。`
     : `「${group.label}」を削除しますか？`;
   if (!confirm(msg)) return;
+  setUndoSnapshot(data);
   data.groups = data.groups.filter(g => g.id !== id);
   data.categories = data.categories.filter(c => c.groupId !== id);
   saveData(data);
@@ -1089,6 +1111,7 @@ function openGroupModal(id = null) {
 function closeGroupModal() { document.getElementById('groupModalOverlay').classList.remove('open'); }
 
 document.getElementById('btnAddGroup').onclick = () => openGroupModal(null);
+document.getElementById('undoDelete').onclick = undoDelete;
 document.getElementById('groupModalClose').onclick = closeGroupModal;
 document.getElementById('groupModalCancel').onclick = closeGroupModal;
 document.getElementById('groupModalOverlay').onclick = (e) => { if (e.target === e.currentTarget) closeGroupModal(); };

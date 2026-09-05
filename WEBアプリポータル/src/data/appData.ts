@@ -100,7 +100,6 @@ export const appData: PortalApp[] = [
     description: '文例管理',
     version: 'v0.8.0',
     status: 'preview',
-    availability: 'trial',
   },
   {
     id: 'shortcut-memo',

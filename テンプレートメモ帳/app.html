@@ -721,7 +721,7 @@ const DEFAULT_DATA = {
   categories: [
     ...DEFAULT_AI_PROMPTS,
     ...DEFAULT_SUPPORT_PROGRESS,
-    { id: 'free', groupId: 'g_other', label: '自由記述', template: '' },
+    { id: 'free', groupId: 'g_other', label: 'メモ', template: '' },
   ]
 };
 
@@ -735,6 +735,9 @@ function normalizeData(data) {
   if (!data.groups.some(g => g.id === 'g_keika')) {
     const aiIndex = data.groups.findIndex(g => g.id === 'g_ai');
     data.groups.splice(aiIndex + 1, 0, { id: 'g_keika', label: '支援経過' });
+  }
+  if (!data.groups.some(g => g.id === 'g_other')) {
+    data.groups.push({ id: 'g_other', label: 'その他' });
   }
   const supportGroup = data.groups.find(g => g.id === 'g_keika');
   if (supportGroup) supportGroup.label = '支援経過';
@@ -750,7 +753,13 @@ function normalizeData(data) {
     }
   });
 
-  const free = data.categories.find(c => c.id === 'free');
+  let free = data.categories.find(c => c.id === 'free');
+  if (!free) {
+    free = { id: 'free', groupId: 'g_other', label: 'メモ', template: '' };
+    data.categories.push(free);
+  }
+  free.groupId = 'g_other';
+  free.label = 'メモ';
   if (free && free.template.trim() === '【支援記録】') {
     free.template = '';
   }
@@ -835,7 +844,8 @@ function renderSidebar() {
     const toggle = document.createElement('button');
     toggle.className = 'group-toggle';
     toggle.textContent = collapsed ? '▶' : '▼';
-    toggle.onclick = () => {
+    toggle.onclick = (e) => {
+      e.stopPropagation();
       collapsedGroups[group.id] = !collapsedGroups[group.id];
       renderSidebar();
     };
@@ -887,6 +897,11 @@ function renderSidebar() {
     header.appendChild(toggle);
     header.appendChild(lbl);
     header.appendChild(gBtns);
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.drag-handle, .group-btns')) return;
+      collapsedGroups[group.id] = !collapsedGroups[group.id];
+      renderSidebar();
+    });
     list.appendChild(header);
 
     if (!collapsed) {

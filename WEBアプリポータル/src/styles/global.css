@@ -56,16 +56,16 @@ a {
 
 .portal-title-logo {
   display: block;
-  width: 300px;
-  height: 158px;
+  width: 252px;
+  height: 132px;
   object-fit: contain;
   object-position: left center;
 }
 
 .brand-logo {
   display: block;
-  width: 132px;
-  height: 112px;
+  width: 114px;
+  height: 98px;
   object-fit: contain;
   object-position: right center;
 }
@@ -79,7 +79,7 @@ a {
 .portal-visual {
   position: relative;
   width: min(1180px, calc(100% - 40px));
-  height: 180px;
+  height: 145px;
   margin: 8px auto 0;
   overflow: hidden;
   background: #ffffff;
@@ -537,13 +537,13 @@ a {
   }
 
   .portal-title-logo {
-    width: 184px;
-    height: 136px;
+    width: 164px;
+    height: 120px;
   }
 
   .brand-logo {
-    width: 88px;
-    height: 92px;
+    width: 78px;
+    height: 82px;
   }
 
   .brand {
@@ -558,7 +558,7 @@ a {
 
   .portal-visual {
     width: calc(100% - 28px);
-    height: 160px;
+    height: 130px;
     margin-top: 6px;
   }
 

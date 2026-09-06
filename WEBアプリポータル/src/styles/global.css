@@ -39,33 +39,42 @@ a {
 }
 
 .site-header {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  width: min(1180px, calc(100% - 40px));
-  height: 78px;
-  margin: 0 auto;
-  padding: 0;
-  background: #ffffff;
+  justify-content: space-between;
+  padding: 10px 24px;
 }
 
+.portal-title,
 .brand {
   display: inline-flex;
   align-items: center;
 }
 
+.portal-title-logo {
+  display: block;
+  width: 300px;
+  height: 158px;
+  object-fit: contain;
+  object-position: left center;
+}
+
 .brand-logo {
   display: block;
-  width: 128px;
-  height: 78px;
-  object-fit: cover;
-  object-position: center;
+  width: 174px;
+  height: 150px;
+  object-fit: contain;
+  object-position: right center;
 }
 
 .portal-visual {
+  position: relative;
   width: min(1180px, calc(100% - 40px));
-  height: 210px;
-  margin: 0 auto;
+  height: 180px;
+  margin: 8px auto 0;
   overflow: hidden;
   background: #ffffff;
 }
@@ -75,7 +84,7 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 35%;
+  object-position: center;
 }
 
 .portal-notices {
@@ -518,13 +527,17 @@ a {
 
 @media (max-width: 760px) {
   .site-header {
-    width: calc(100% - 28px);
-    height: 68px;
+    padding: 6px 10px;
+  }
+
+  .portal-title-logo {
+    width: 184px;
+    height: 136px;
   }
 
   .brand-logo {
-    width: 108px;
-    height: 68px;
+    width: 112px;
+    height: 126px;
   }
 
   .hero,
@@ -534,12 +547,12 @@ a {
 
   .portal-visual {
     width: calc(100% - 28px);
-    height: 190px;
-    margin-top: 0;
+    height: 160px;
+    margin-top: 6px;
   }
 
   .portal-visual-image {
-    object-position: 28% 35%;
+    object-position: center;
   }
 
   .hero {

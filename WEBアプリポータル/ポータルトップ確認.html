@@ -14,9 +14,10 @@
     body { min-width: 320px; margin: 0; background: #fff; }
 
     .portal-visual {
+      position: relative;
       width: min(1180px, calc(100% - 40px));
-      height: 210px;
-      margin: 0 auto;
+      height: 180px;
+      margin: 8px auto 0;
       overflow: hidden;
       background: #fff;
     }
@@ -26,25 +27,31 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      object-position: center 35%;
+      object-position: center;
     }
 
-    .brand {
+    .portal-header {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
       display: flex;
       align-items: center;
-      justify-content: flex-end;
-      width: min(1180px, calc(100% - 40px));
-      height: 78px;
-      margin: 0 auto;
-      background: #fff;
+      justify-content: space-between;
+      padding: 10px 24px;
     }
 
-    .brand img {
-      display: block;
-      width: 128px;
-      height: 78px;
-      object-fit: cover;
-      object-position: center;
+    .portal-header img { display: block; object-fit: contain; }
+    .riho-title {
+      width: 300px;
+      height: 158px;
+      object-position: left center;
+    }
+
+    .brand-logo {
+      width: 174px;
+      height: 150px;
+      object-fit: contain;
+      object-position: right center;
     }
 
     .portal-notice {
@@ -111,10 +118,11 @@
     }
 
     @media (max-width: 760px) {
-      .portal-visual { width: calc(100% - 28px); height: 190px; margin-top: 0; }
-      .portal-visual-image { object-position: 28% 35%; }
-      .brand { width: calc(100% - 28px); height: 68px; }
-      .brand img { width: 108px; height: 68px; }
+      .portal-visual { width: calc(100% - 28px); height: 160px; margin-top: 6px; }
+      .portal-visual-image { object-position: center; }
+      .portal-header { padding: 6px 10px; }
+      .riho-title { width: 184px; height: 136px; }
+      .brand-logo { width: 112px; height: 126px; }
       .portal-notice { width: calc(100% - 28px); margin-top: 8px; gap: 10px; padding: 14px; }
       .portal-notice h1 { font-size: .95rem; }
       .portal-notice p { font-size: .9rem; }
@@ -131,9 +139,12 @@
 </head>
 <body>
   <main>
-    <div class="brand"><img src="./public/2207.jpg" alt="KTM Keep Trust Meaning ロゴ"></div>
     <section class="portal-visual" aria-label="リーホ ポータルアプリ">
-      <img class="portal-visual-image" src="./public/portal-banner.jpg" alt="介護業務効率化ポータルアプリ リーホ">
+      <img class="portal-visual-image" src="./public/portal-background.png" alt="">
+      <div class="portal-header">
+        <img class="riho-title" src="./public/riho-title.png" alt="リーホ 介護業務効率化ポータルアプリ">
+        <img class="brand-logo" src="./public/ktm-logo.png" alt="KTM Keep Trust Meaning ロゴ">
+      </div>
     </section>
     <aside class="portal-notice" aria-label="データ保存について">
       <span class="notice-mark" aria-hidden="true">i</span>

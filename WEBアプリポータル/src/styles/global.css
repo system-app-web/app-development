@@ -44,7 +44,7 @@ a {
   z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   padding: 10px 24px;
 }
 
@@ -93,9 +93,8 @@ a {
 }
 
 .brand {
-  position: absolute;
-  right: 0;
-  bottom: 8px;
+  position: relative;
+  align-self: flex-end;
   isolation: isolate;
 }
 
@@ -583,8 +582,7 @@ a {
   }
 
   .brand {
-    right: 0;
-    bottom: 4px;
+    align-self: flex-end;
   }
 
   .hero,

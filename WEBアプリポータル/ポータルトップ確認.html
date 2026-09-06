@@ -36,7 +36,7 @@
       z-index: 1;
       display: flex;
       align-items: center;
-      justify-content: flex-start;
+      justify-content: space-between;
       padding: 10px 24px;
     }
 
@@ -64,9 +64,8 @@
     }
 
     .brand-logo {
-      position: absolute;
-      right: 0;
-      bottom: 8px;
+      position: relative;
+      align-self: flex-end;
       z-index: 1;
       width: 96px;
       height: 82px;
@@ -159,7 +158,7 @@
       .portal-header { padding: 6px 10px; }
       .portal-header::before { top: 20px; left: 10px; width: 180px; height: 88px; }
       .riho-title { width: 174px; height: 126px; transform: translateX(6px); }
-      .brand-logo { right: 0; bottom: 4px; width: 68px; height: 70px; }
+      .brand-logo { width: 68px; height: 70px; }
       .portal-header::after { right: -6px; bottom: 0; width: 80px; height: 82px; }
       .portal-notice { width: calc(100% - 28px); margin-top: 8px; gap: 10px; padding: 14px; }
       .portal-notice h1 { font-size: .95rem; }

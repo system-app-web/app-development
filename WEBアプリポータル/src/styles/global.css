@@ -54,13 +54,32 @@ a {
   align-items: center;
 }
 
+.portal-title {
+  position: relative;
+  isolation: isolate;
+}
+
 .portal-title-logo {
   display: block;
+  position: relative;
+  z-index: 1;
   width: 270px;
   height: 140px;
   object-fit: contain;
   object-position: left center;
   transform: translateX(12px);
+}
+
+.portal-title::before {
+  position: absolute;
+  inset: 14px -8px;
+  z-index: 0;
+  border-radius: 48%;
+  background: rgba(255, 255, 255, 0.28);
+  content: "";
+  filter: blur(7px);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 .brand-logo {

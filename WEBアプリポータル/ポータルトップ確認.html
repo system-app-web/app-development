@@ -40,7 +40,22 @@
       padding: 10px 24px;
     }
 
-    .portal-header img { display: block; object-fit: contain; }
+    .portal-header img { display: block; position: relative; z-index: 1; object-fit: contain; }
+
+    .portal-header::before {
+      position: absolute;
+      top: 18px;
+      left: 28px;
+      z-index: 0;
+      width: 280px;
+      height: 108px;
+      border-radius: 48%;
+      background: rgba(255, 255, 255, .28);
+      content: "";
+      filter: blur(7px);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+    }
     .riho-title {
       width: 270px;
       height: 140px;
@@ -142,6 +157,7 @@
       .portal-visual { width: calc(100% - 28px); height: 130px; margin-top: 6px; }
       .portal-visual-image { object-position: center bottom; }
       .portal-header { padding: 6px 10px; }
+      .portal-header::before { top: 20px; left: 10px; width: 180px; height: 88px; }
       .riho-title { width: 174px; height: 126px; transform: translateX(6px); }
       .brand-logo { right: 8px; bottom: 4px; width: 68px; height: 70px; }
       .portal-header::after { right: 2px; bottom: 0; width: 80px; height: 82px; }

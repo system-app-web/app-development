@@ -636,8 +636,8 @@ const TEMPLATE_STORAGE_KEY = "simple-mitorizu-templates";
 const itemCatalog = {
   bed: { name: "ベッド", type: "bed", w: 84, h: 118, cols: 3, rows: 4.2 },
   toiletItem: { name: "トイレ", type: "toiletItem", w: 46, h: 52, cols: 1.65, rows: 1.85 },
-  kitchenMedium: { name: "キッチン（中）", type: "kitchenMedium", w: 64, h: 112, cols: 2.25, rows: 3.9 },
-  kitchenLarge: { name: "キッチン（大）", type: "kitchenLarge", w: 78, h: 138, cols: 2.75, rows: 4.8 },
+  kitchenMedium: { name: "キッチン（中）", type: "kitchenMedium", w: 58, h: 122, cols: 2, rows: 4.25 },
+  kitchenLarge: { name: "キッチン（大）", type: "kitchenLarge", w: 72, h: 150, cols: 2.5, rows: 5.2 },
   washbasin: { name: "洗面台", type: "washbasin", w: 64, h: 52, cols: 2.3, rows: 1.9 },
   washer: { name: "洗濯機", type: "washer", w: 56, h: 56, cols: 2, rows: 2 },
   bathSquare: { name: "正方形浴槽", type: "bathSquare", w: 56, h: 56, cols: 2, rows: 2 },
@@ -1068,18 +1068,14 @@ function renderCatalogItem(group, room) {
     return;
   }
   if (room.type === "kitchenMedium" || room.type === "kitchenLarge") {
-    const kitchenLine = Math.max(1, Math.min(room.w, room.h) * 0.04);
-    const dividerY = room.h * 0.6;
-    const sinkSize = room.w * 0.55;
-    const sinkX = (room.w - sinkSize) / 2;
-    const sinkY = room.h * 0.18;
-    rect({ x: room.w * 0.06, y: room.h * 0.04, width: room.w * 0.88, height: room.h * 0.92, rx: 0, fill: "#fff", "stroke-width": kitchenLine });
-    rect({ x: sinkX, y: sinkY, width: sinkSize, height: sinkSize, rx: 0, fill: "#fff", "stroke-width": Math.max(1, kitchenLine * 0.78) });
-    lineEl({ x1: room.w * 0.5, y1: room.h * 0.09, x2: room.w * 0.5, y2: sinkY, "stroke-width": Math.max(1, kitchenLine * 0.72) });
-    lineEl({ x1: room.w * 0.42, y1: room.h * 0.09, x2: room.w * 0.58, y2: room.h * 0.09, "stroke-width": Math.max(1, kitchenLine * 0.72) });
-    lineEl({ x1: room.w * 0.06, y1: dividerY, x2: room.w * 0.94, y2: dividerY, "stroke-width": kitchenLine });
-    [[0.34, 0.72], [0.66, 0.72], [0.34, 0.86], [0.66, 0.86]].forEach(([x, y]) => {
-      circle({ cx: room.w * x, cy: room.h * y, r: Math.min(room.w, room.h) * 0.065, fill: "#fff", "stroke-width": Math.max(1, kitchenLine * 0.75) });
+    const dividerY = room.h * 0.57;
+    rect({ x: room.w * 0.06, y: room.h * 0.04, width: room.w * 0.88, height: room.h * 0.92, rx: 0, fill: "#fff", "stroke-width": Math.max(1, line * 0.72) });
+    rect({ x: room.w * 0.18, y: room.h * 0.14, width: room.w * 0.64, height: room.h * 0.28, rx: 0, fill: "#fff", "stroke-width": Math.max(1, line * 0.58) });
+    lineEl({ x1: room.w * 0.5, y1: room.h * 0.08, x2: room.w * 0.5, y2: room.h * 0.18, "stroke-width": Math.max(1, line * 0.58) });
+    lineEl({ x1: room.w * 0.42, y1: room.h * 0.08, x2: room.w * 0.5, y2: room.h * 0.08, "stroke-width": Math.max(1, line * 0.58) });
+    lineEl({ x1: room.w * 0.06, y1: dividerY, x2: room.w * 0.94, y2: dividerY, "stroke-width": Math.max(1, line * 0.72) });
+    [[0.34, 0.69], [0.66, 0.69], [0.34, 0.84], [0.66, 0.84]].forEach(([x, y]) => {
+      circle({ cx: room.w * x, cy: room.h * y, r: Math.min(room.w, room.h) * 0.075, fill: "#fff", "stroke-width": Math.max(1, line * 0.62) });
     });
     return;
   }

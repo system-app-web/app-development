@@ -56,10 +56,11 @@ a {
 
 .portal-title-logo {
   display: block;
-  width: 252px;
-  height: 132px;
+  width: 270px;
+  height: 140px;
   object-fit: contain;
   object-position: left center;
+  transform: translateX(12px);
 }
 
 .brand-logo {
@@ -552,8 +553,9 @@ a {
   }
 
   .portal-title-logo {
-    width: 164px;
-    height: 120px;
+    width: 174px;
+    height: 126px;
+    transform: translateX(6px);
   }
 
   .brand-logo {

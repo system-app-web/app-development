@@ -94,7 +94,7 @@ a {
 
 .brand {
   position: absolute;
-  right: 18px;
+  right: 0;
   bottom: 8px;
   isolation: isolate;
 }
@@ -583,7 +583,7 @@ a {
   }
 
   .brand {
-    right: 8px;
+    right: 0;
     bottom: 4px;
   }
 

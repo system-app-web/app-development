@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WEBアプリポータル - トップ画面確認用</title>
+  <style>
+    :root {
+      color: #172033;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { min-width: 320px; margin: 0; background: #fff; }
+
+    .portal-visual {
+      position: relative;
+      width: min(1180px, calc(100% - 40px));
+      aspect-ratio: 3 / 1;
+      margin: 16px auto 0;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .portal-visual-image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .brand {
+      position: absolute;
+      top: 18px;
+      right: 24px;
+      z-index: 2;
+    }
+
+    .brand img {
+      display: block;
+      width: 158px;
+      height: 100px;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .portal-notice {
+      position: absolute;
+      right: 24px;
+      bottom: 20px;
+      left: 24px;
+      z-index: 1;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px 18px;
+      border: 1px solid #d9e6f2;
+      border-left: 4px solid #2d9de6;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .94);
+    }
+
+    .notice-mark {
+      display: grid;
+      flex: 0 0 auto;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      margin-top: 1px;
+      border-radius: 50%;
+      background: #167ac9;
+      color: #fff;
+      font-family: Georgia, serif;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .portal-notice h1,
+    .portal-notice p { margin: 0; }
+    .portal-notice h1 { font-size: 1rem; }
+    .portal-notice p { margin-top: 4px; color: #40516a; font-size: .98rem; line-height: 1.65; }
+
+    .app-section {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 18px 0 72px;
+    }
+
+    .app-section h2 { margin: 0 0 20px; font-size: 1.75rem; }
+    .app-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+
+    .app-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 246px;
+      padding: 22px;
+      border: 1px solid #d9e6f2;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(23, 65, 110, .12);
+    }
+
+    .app-card-top { display: flex; align-items: center; gap: 14px; }
+    .app-card-top img { display: block; width: 58px; height: 58px; border-radius: 18px; object-fit: cover; }
+    .app-card h3 { margin: 0; font-size: 1.18rem; line-height: 1.35; }
+    .app-card p { flex: 1; margin: 18px 0 16px; color: #40516a; font-size: 1rem; line-height: 1.7; }
+    .app-button { display: grid; min-height: 48px; place-items: center; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #1176d8, #45b7f5); font-size: 1rem; font-weight: 800; }
+
+    @media (max-width: 980px) {
+      .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 760px) {
+      .portal-visual { width: calc(100% - 28px); height: 300px; aspect-ratio: auto; margin-top: 8px; }
+      .portal-visual-image { object-position: 38% center; }
+      .brand { top: 10px; right: 12px; }
+      .brand img { width: 112px; height: 70px; }
+      .portal-notice { right: 12px; bottom: 12px; left: 12px; gap: 10px; padding: 14px; }
+      .portal-notice h1 { font-size: .95rem; }
+      .portal-notice p { font-size: .9rem; }
+      .app-section { width: calc(100% - 28px); padding-top: 12px; }
+      .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .app-card { min-height: 212px; padding: 14px; }
+      .app-card-top { gap: 10px; }
+      .app-card-top img { width: 46px; height: 46px; border-radius: 14px; }
+      .app-card h3 { font-size: 1rem; }
+      .app-card p { margin: 14px 0 8px; font-size: .9rem; line-height: 1.55; }
+      .app-button { min-height: 42px; border-radius: 12px; font-size: .88rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="portal-visual" aria-label="リーホ ポータルアプリ">
+      <img class="portal-visual-image" src="./public/portal-banner.jpg" alt="介護業務効率化ポータルアプリ リーホ">
+      <div class="brand"><img src="./public/2207.jpg" alt="KTM Keep Trust Meaning ロゴ"></div>
+      <aside class="portal-notice" aria-label="データ保存について">
+        <span class="notice-mark" aria-hidden="true">i</span>
+        <div>
+          <h1>データ保存について</h1>
+          <p>このアプリで入力した内容は、操作した端末のブラウザ内に保存されます。ほかの端末に自動で共有・表示されることはありません。</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="app-section">
+      <h2>アプリ一覧</h2>
+      <div class="app-grid">
+        <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/genogram.png" alt=""><h3>かんたんジェノグラム</h3></div><p>家族関係を図で整理</p><span class="app-button">このアプリを開く</span></article>
+        <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/floor-plan.png" alt=""><h3>シンプル見取り図</h3></div><p>施設・住居の見取り図を作成</p><span class="app-button">このアプリを開く</span></article>
+        <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/assessment.svg" alt=""><h3>アセスメントシート</h3></div><p>利用者支援のアセスメントを整理</p><span class="app-button">このアプリを開く</span></article>
+        <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/pdf-converter.png" alt=""><h3>PDF変換アプリ</h3></div><p>証書PDFの変換・結合</p><span class="app-button">このアプリを開く</span></article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

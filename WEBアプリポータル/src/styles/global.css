@@ -65,7 +65,7 @@ a {
   object-fit: contain;
   object-position: left center;
   transform: translateX(12px);
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.98)) drop-shadow(0 1px 1px rgba(29, 82, 54, 0.32));
 }
 
 .brand-logo {
@@ -74,7 +74,7 @@ a {
   height: 82px;
   object-fit: contain;
   object-position: right center;
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.98)) drop-shadow(0 1px 1px rgba(29, 82, 54, 0.32));
 }
 
 .brand {

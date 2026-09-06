@@ -39,15 +39,14 @@ a {
 }
 
 .site-header {
-  position: absolute;
-  top: 18px;
-  right: 24px;
-  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  margin: 0;
+  width: min(1180px, calc(100% - 40px));
+  height: 78px;
+  margin: 0 auto;
   padding: 0;
+  background: #ffffff;
 }
 
 .brand {
@@ -57,17 +56,16 @@ a {
 
 .brand-logo {
   display: block;
-  width: 158px;
-  height: 100px;
+  width: 128px;
+  height: 78px;
   object-fit: cover;
   object-position: center;
 }
 
 .portal-visual {
-  position: relative;
   width: min(1180px, calc(100% - 40px));
-  aspect-ratio: 3 / 1;
-  margin: 16px auto 0;
+  height: 210px;
+  margin: 0 auto;
   overflow: hidden;
   background: #ffffff;
 }
@@ -77,15 +75,12 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: center 35%;
 }
 
 .portal-notices {
-  position: absolute;
-  right: 24px;
-  bottom: 20px;
-  left: 24px;
-  z-index: 1;
+  width: min(1180px, calc(100% - 40px));
+  margin: 10px auto 0;
 }
 
 .portal-notice {
@@ -96,7 +91,7 @@ a {
   border: 1px solid #d9e6f2;
   border-left: 4px solid #2d9de6;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  background: #ffffff;
 }
 
 .portal-notice-mark {
@@ -523,13 +518,13 @@ a {
 
 @media (max-width: 760px) {
   .site-header {
-    top: 10px;
-    right: 12px;
+    width: calc(100% - 28px);
+    height: 68px;
   }
 
   .brand-logo {
-    width: 112px;
-    height: 70px;
+    width: 108px;
+    height: 68px;
   }
 
   .hero,
@@ -539,13 +534,12 @@ a {
 
   .portal-visual {
     width: calc(100% - 28px);
-    height: 300px;
-    aspect-ratio: auto;
-    margin-top: 8px;
+    height: 190px;
+    margin-top: 0;
   }
 
   .portal-visual-image {
-    object-position: 38% center;
+    object-position: 28% 35%;
   }
 
   .hero {
@@ -639,9 +633,8 @@ a {
   }
 
   .portal-notices {
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
+    width: calc(100% - 28px);
+    margin-top: 8px;
   }
 
   .portal-notice {

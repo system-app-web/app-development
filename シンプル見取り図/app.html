@@ -1068,14 +1068,25 @@ function renderCatalogItem(group, room) {
     return;
   }
   if (room.type === "kitchenMedium" || room.type === "kitchenLarge") {
-    const dividerY = room.h * 0.57;
-    rect({ x: room.w * 0.06, y: room.h * 0.04, width: room.w * 0.88, height: room.h * 0.92, rx: 0, fill: "#fff", "stroke-width": Math.max(1, line * 0.72) });
-    rect({ x: room.w * 0.18, y: room.h * 0.14, width: room.w * 0.64, height: room.h * 0.28, rx: 0, fill: "#fff", "stroke-width": Math.max(1, line * 0.58) });
-    lineEl({ x1: room.w * 0.5, y1: room.h * 0.08, x2: room.w * 0.5, y2: room.h * 0.18, "stroke-width": Math.max(1, line * 0.58) });
-    lineEl({ x1: room.w * 0.42, y1: room.h * 0.08, x2: room.w * 0.5, y2: room.h * 0.08, "stroke-width": Math.max(1, line * 0.58) });
-    lineEl({ x1: room.w * 0.06, y1: dividerY, x2: room.w * 0.94, y2: dividerY, "stroke-width": Math.max(1, line * 0.72) });
-    [[0.34, 0.69], [0.66, 0.69], [0.34, 0.84], [0.66, 0.84]].forEach(([x, y]) => {
-      circle({ cx: room.w * x, cy: room.h * y, r: Math.min(room.w, room.h) * 0.075, fill: "#fff", "stroke-width": Math.max(1, line * 0.62) });
+    const kitchenLine = Math.max(1, Math.min(room.w, room.h) * 0.035);
+    const dividerY = room.h * 0.61;
+    rect({ x: room.w * 0.06, y: room.h * 0.04, width: room.w * 0.88, height: room.h * 0.92, rx: 0, fill: "#fff", "stroke-width": kitchenLine });
+    rect({ x: room.w * 0.23, y: room.h * 0.12, width: room.w * 0.58, height: room.h * 0.39, rx: room.w * 0.025, fill: "#fff", "stroke-width": Math.max(1, kitchenLine * 0.72) });
+    pathEl({ d: `M ${room.w * 0.35} ${room.h * 0.19}
+      H ${room.w * 0.68}
+      Q ${room.w * 0.73} ${room.h * 0.19}, ${room.w * 0.73} ${room.h * 0.24}
+      V ${room.h * 0.43}
+      Q ${room.w * 0.73} ${room.h * 0.47}, ${room.w * 0.68} ${room.h * 0.47}
+      H ${room.w * 0.35}
+      Q ${room.w * 0.28} ${room.h * 0.47}, ${room.w * 0.28} ${room.h * 0.4}
+      V ${room.h * 0.34}
+      Q ${room.w * 0.28} ${room.h * 0.3}, ${room.w * 0.34} ${room.h * 0.3}`, "stroke-width": Math.max(1, kitchenLine * 0.7) });
+    lineEl({ x1: room.w * 0.06, y1: room.h * 0.3, x2: room.w * 0.5, y2: room.h * 0.3, "stroke-width": Math.max(1, kitchenLine * 0.78) });
+    circle({ cx: room.w * 0.52, cy: room.h * 0.3, r: room.w * 0.075, fill: "#fff", "stroke-width": Math.max(1, kitchenLine * 0.72) });
+    lineEl({ x1: room.w * 0.06, y1: dividerY, x2: room.w * 0.94, y2: dividerY, "stroke-width": kitchenLine });
+    rect({ x: room.w * 0.22, y: room.h * 0.68, width: room.w * 0.56, height: room.h * 0.23, rx: 0, fill: "#fff", "stroke-width": Math.max(1, kitchenLine * 0.72) });
+    [0.75, 0.85].forEach((y) => {
+      circle({ cx: room.w * 0.5, cy: room.h * y, r: Math.min(room.w, room.h) * 0.115, fill: "#fff", "stroke-width": Math.max(1, kitchenLine * 0.72) });
     });
     return;
   }

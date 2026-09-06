@@ -56,58 +56,30 @@ a {
 
 .portal-title {
   position: relative;
-  isolation: isolate;
 }
 
 .portal-title-logo {
   display: block;
-  position: relative;
-  z-index: 1;
   width: 270px;
   height: 140px;
   object-fit: contain;
   object-position: left center;
   transform: translateX(12px);
-}
-
-.portal-title::before {
-  position: absolute;
-  inset: 18px 4px;
-  z-index: 0;
-  border-radius: 0;
-  background: rgba(255, 255, 255, 0.28);
-  content: "";
-  filter: blur(4px);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
 }
 
 .brand-logo {
   display: block;
-  position: relative;
-  z-index: 1;
   width: 96px;
   height: 82px;
   object-fit: contain;
   object-position: right center;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
 }
 
 .brand {
   position: relative;
   align-self: flex-end;
-  isolation: isolate;
-}
-
-.brand::before {
-  position: absolute;
-  inset: -2px -3px;
-  z-index: 0;
-  border-radius: 0;
-  background: rgba(255, 255, 255, 0.38);
-  content: "";
-  filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
 }
 
 .portal-visual {

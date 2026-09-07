@@ -1217,8 +1217,7 @@
       setActionButtonsDisabled(true);
       try {
         if (isMergeMode()) {
-          const mergeCanvases = await renderMergedPagesForPrint(mergeFiles);
-          await printMergedPdfBlob(buildPencilPdfBlob(mergeCanvases.map(toBlackWhite)));
+          await printMergedPdfBlob(await buildMergedPdfBlob(mergeFiles));
         } else if (isPencilMode()) {
           printCanvasesInCurrentWindow(outputCanvases.map(toBlackWhite), buildMergedPageCanvas);
         } else {
@@ -1601,28 +1600,6 @@
         await nextFrame();
       }
       return previews;
-    }
-
-    async function renderMergedPagesForPrint(files) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
-      const canvases = [];
-      let renderedPageCount = 0;
-      for (const file of files) {
-        const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-          renderedPageCount += 1;
-          setStatus(`印刷用ページを準備中です。${renderedPageCount}/${mergePageCount}`);
-          const sourcePage = await pdf.getPage(pageNumber);
-          const viewport = sourcePage.getViewport({ scale: PRINT_DPI / 72 });
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.floor(viewport.width);
-          canvas.height = Math.floor(viewport.height);
-          await sourcePage.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-          canvases.push(canvas);
-          await nextFrame();
-        }
-      }
-      return canvases;
     }
 
     function cropDocument(canvas) {

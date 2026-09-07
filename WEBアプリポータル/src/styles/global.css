@@ -97,6 +97,7 @@ a {
   height: 100%;
   object-fit: cover;
   object-position: center 56%;
+  transform: scale(1.55);
 }
 
 .portal-notices {

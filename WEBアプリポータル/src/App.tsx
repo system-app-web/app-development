@@ -10,7 +10,7 @@ export default function App() {
         <section className="portal-visual" aria-label="リーホ ポータルアプリ">
           <img
             className="portal-visual-image"
-            src={`${import.meta.env.BASE_URL}portal-background.png`}
+            src={`${import.meta.env.BASE_URL}portal-sky.jpg`}
             alt=""
           />
           <Header />

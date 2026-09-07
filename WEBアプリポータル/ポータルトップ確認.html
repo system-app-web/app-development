@@ -22,21 +22,12 @@
       background: #fff;
     }
 
-    .portal-visual::before {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      background: linear-gradient(to bottom, rgba(255, 255, 255, .97) 0%, rgba(255, 255, 255, .88) 58%, rgba(255, 255, 255, 0) 100%);
-      content: "";
-      pointer-events: none;
-    }
-
     .portal-visual-image {
       display: block;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      object-position: center bottom;
+      object-position: center 38%;
     }
 
     .portal-header {
@@ -133,7 +124,7 @@
 
     @media (max-width: 760px) {
       .portal-visual { width: calc(100% - 28px); height: 130px; margin-top: 6px; }
-      .portal-visual-image { object-position: center bottom; }
+      .portal-visual-image { object-position: center 38%; }
       .portal-header { padding: 6px 10px; }
       .riho-title { width: 174px; height: 126px; transform: translateX(6px); }
       .brand-logo { width: 68px; height: 70px; }
@@ -154,7 +145,7 @@
 <body>
   <main>
     <section class="portal-visual" aria-label="リーホ ポータルアプリ">
-      <img class="portal-visual-image" src="./public/portal-background.png" alt="">
+      <img class="portal-visual-image" src="./public/portal-sky.jpg" alt="">
       <div class="portal-header">
         <img class="riho-title" src="./public/riho-title.png" alt="リーホ 介護業務効率化ポータルアプリ">
         <img class="brand-logo" src="./public/ktm-logo.png" alt="KTM Keep Trust Meaning ロゴ">

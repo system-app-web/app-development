@@ -44,7 +44,7 @@ export const appData: PortalApp[] = [
   {
     id: 'assessment-sheet',
     name: 'アセスメントシート',
-    url: 'https://assessment-sheet-app.uragoshi.chatgpt.site/assessment.html',
+    url: 'https://assessment-sheet-app.vercel.app',
     manualUrl: '',
     icon: 'assessment',
     iconImage: 'app-icons/assessment.svg',

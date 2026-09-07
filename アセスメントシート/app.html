@@ -63,6 +63,10 @@
     /* 左メニューは氏名だけを表示し、履歴は利用者を開いた時だけ表示 */
     .user-group{margin-bottom:6px}.user-record{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 13px;text-align:left;color:#365064;border-color:#c6e7e8;background:#fff}.user-record b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px}.user-record span{margin-left:8px;color:#4aaab2;font-size:20px;line-height:1}.user-record.active{border-color:#9edadd;background:#e7f7f7}.assessment-list{margin:4px 0 8px;padding:0 2px}.assessment-entry{display:flex;gap:5px;margin:4px 0}.assessment-entry.active .assessment-select{border-color:#a3dadd;background:#f0fbfb}.assessment-select{flex:1;min-width:0;padding:8px 9px;overflow:hidden;color:#54717e;border-color:#d3e7e9;background:#f9fcfc;font-size:12px;text-align:left;text-overflow:ellipsis;white-space:nowrap}.assessment-delete{flex:0 0 auto;padding:7px 8px;color:#a44b4b;border-color:#efcaca;background:#fff7f7;font-size:11px}.assessment-delete:hover{background:#ffeded}
   </style>
+  <style>
+    /* 履歴の題名は左メニューでも直接変更できる */
+    .assessment-title-input{flex:1;min-width:0;padding:8px 9px;color:#54717e;border:1px solid #d3e7e9;border-radius:9px;background:#f9fcfc;font-size:12px;outline:none}.assessment-title-input:focus{border-color:#7bcbd0;background:#fff}.assessment-entry .assessment-select{flex:0 0 auto;padding:7px 8px;color:#2f7e88;border-color:#bfe3e5;background:#f4ffff;font-size:11px}
+  </style>
 </head>
 <body>
   <main class="app">
@@ -265,6 +269,43 @@
       if (!docs) return;
       new MutationObserver(() => queueMicrotask(organizeReference)).observe(docs, { childList: true, subtree: true });
       organizeReference();
+    })();
+  </script>
+  <script>
+    (() => {
+      const key = "assessment-html-local-v1";
+      const decorateHistory = () => {
+        let records;
+        try { records = JSON.parse(localStorage.getItem(key) || "[]"); } catch { return; }
+        document.querySelectorAll(".user-group").forEach((group) => {
+          const name = group.querySelector(".user-record b")?.textContent || "氏名未入力";
+          const items = records.filter((record) => (record.fields?.["1"] || "氏名未入力").trim() === name);
+          group.querySelectorAll(".assessment-entry").forEach((entry, index) => {
+            if (entry.querySelector(".assessment-title-input")) return;
+            const record = items[index];
+            const edit = entry.querySelector(".assessment-select");
+            if (!record || !edit) return;
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = "assessment-title-input";
+            input.value = record.title;
+            input.setAttribute("aria-label", "アセスメントの題名を編集");
+            input.addEventListener("input", () => {
+              record.title = input.value;
+              record.updatedAt = new Date().toISOString();
+              localStorage.setItem(key, JSON.stringify(records));
+              const title = document.querySelector("#record-title");
+              if (title && title.value === edit.textContent) title.value = input.value;
+            });
+            edit.textContent = "編集";
+            entry.prepend(input);
+          });
+        });
+      };
+      const list = document.querySelector("#records");
+      if (!list) return;
+      new MutationObserver(decorateHistory).observe(list, { childList: true, subtree: true });
+      decorateHistory();
     })();
   </script>
 </body>

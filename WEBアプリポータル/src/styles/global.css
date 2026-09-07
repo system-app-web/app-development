@@ -96,7 +96,7 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 48%;
+  object-position: center 56%;
 }
 
 .portal-notices {
@@ -569,7 +569,7 @@ a {
   }
 
   .portal-visual-image {
-    object-position: center 48%;
+    object-position: center 56%;
   }
 
   .hero {

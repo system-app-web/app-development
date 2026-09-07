@@ -67,6 +67,10 @@
     /* 履歴の題名は左メニューでも直接変更できる */
     .assessment-title-input{flex:1;min-width:0;padding:8px 9px;color:#54717e;border:1px solid #d3e7e9;border-radius:9px;background:#f9fcfc;font-size:12px;outline:none}.assessment-title-input:focus{border-color:#7bcbd0;background:#fff}.assessment-entry .assessment-select{flex:0 0 auto;padding:7px 8px;color:#2f7e88;border-color:#bfe3e5;background:#f4ffff;font-size:11px}
   </style>
+  <style>
+    /* 右端の三点メニューから編集・削除を選ぶ */
+    .assessment-entry{position:relative}.assessment-entry .assessment-select{flex:1;min-width:0;padding:8px 9px;overflow:hidden;color:#54717e;border-color:#d3e7e9;background:#f9fcfc;font-size:12px;text-align:left;text-overflow:ellipsis;white-space:nowrap}.history-source-delete{display:none!important}.assessment-more{flex:0 0 auto;width:34px;padding:3px 0!important;color:#3d8490!important;border-color:#bfe3e5!important;background:#f4ffff!important;font-size:22px!important;line-height:1!important}.assessment-menu{position:absolute;z-index:30;top:39px;right:0;display:none;min-width:84px;padding:4px;border:1px solid #c8e4e6;border-radius:9px;background:#fff;box-shadow:0 7px 18px rgba(55,108,120,.18)}.assessment-menu.open{display:grid}.assessment-menu button{padding:7px 9px;border:0;border-radius:6px;background:transparent;font-size:12px;text-align:left}.assessment-menu button:hover{background:#eefafa}.assessment-menu .danger{color:#a44b4b}.assessment-menu .danger:hover{background:#fff1f1}
+  </style>
 </head>
 <body>
   <main class="app">
@@ -273,38 +277,38 @@
   </script>
   <script>
     (() => {
-      const key = "assessment-html-local-v1";
       const decorateHistory = () => {
-        let records;
-        try { records = JSON.parse(localStorage.getItem(key) || "[]"); } catch { return; }
-        document.querySelectorAll(".user-group").forEach((group) => {
-          const name = group.querySelector(".user-record b")?.textContent || "氏名未入力";
-          const items = records.filter((record) => (record.fields?.["1"] || "氏名未入力").trim() === name);
-          group.querySelectorAll(".assessment-entry").forEach((entry, index) => {
-            if (entry.querySelector(".assessment-title-input")) return;
-            const record = items[index];
-            const edit = entry.querySelector(".assessment-select");
-            if (!record || !edit) return;
-            const input = document.createElement("input");
-            input.type = "text";
-            input.className = "assessment-title-input";
-            input.value = record.title;
-            input.setAttribute("aria-label", "アセスメントの題名を編集");
-            input.addEventListener("input", () => {
-              record.title = input.value;
-              record.updatedAt = new Date().toISOString();
-              localStorage.setItem(key, JSON.stringify(records));
-              const title = document.querySelector("#record-title");
-              if (title && title.value === edit.textContent) title.value = input.value;
-            });
-            edit.textContent = "編集";
-            entry.prepend(input);
-          });
+        document.querySelectorAll(".assessment-entry").forEach((entry) => {
+          if (entry.querySelector(".assessment-more")) return;
+          const edit = entry.querySelector(".assessment-select");
+          const remove = entry.querySelector(".assessment-delete");
+          if (!edit || !remove) return;
+          remove.classList.add("history-source-delete");
+          const more = document.createElement("button");
+          more.type = "button";
+          more.className = "assessment-more";
+          more.textContent = "…";
+          more.setAttribute("aria-label", "アセスメントの操作メニュー");
+          const menu = document.createElement("div");
+          menu.className = "assessment-menu";
+          const editAction = document.createElement("button");
+          editAction.type = "button";
+          editAction.textContent = "編集";
+          editAction.onclick = () => edit.click();
+          const deleteAction = document.createElement("button");
+          deleteAction.type = "button";
+          deleteAction.textContent = "削除";
+          deleteAction.className = "danger";
+          deleteAction.onclick = () => remove.click();
+          menu.append(editAction, deleteAction);
+          more.onclick = (event) => { event.stopPropagation(); document.querySelectorAll(".assessment-menu.open").forEach((item) => item !== menu && item.classList.remove("open")); menu.classList.toggle("open"); };
+          entry.append(more, menu);
         });
       };
       const list = document.querySelector("#records");
       if (!list) return;
       new MutationObserver(decorateHistory).observe(list, { childList: true, subtree: true });
+      document.addEventListener("click", (event) => { if (!event.target.closest(".assessment-entry")) document.querySelectorAll(".assessment-menu.open").forEach((menu) => menu.classList.remove("open")); });
       decorateHistory();
     })();
   </script>

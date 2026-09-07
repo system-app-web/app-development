@@ -26,6 +26,10 @@
   <style>
     .reference-grid .profile-left{grid-column:1/6;display:grid;grid-template-columns:24% 76%;background:#6f7780;gap:1px}.reference-grid .profile-left>*{background:#fff}.reference-grid .profile-left .profile-two{display:grid;grid-template-columns:1fr 1fr;background:#6f7780;gap:1px}.reference-grid .profile-left .profile-two>*{background:#fff}.reference-grid .family-box{grid-column:6/-1;grid-row:auto}.reference-grid .profile-left .family-row{grid-column:1/-1}
   </style>
+  <style>
+    /* 原本の居住環境欄：左は状況、右は住宅見取り図 */
+    .housing-reference{margin-top:10px}.housing-reference>h3{margin:0;padding:2px 4px;color:#303d61;font-size:18px}.housing-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(290px,1.55fr);overflow:hidden;border:1px solid #252525;background:#252525;gap:1px}.housing-field,.housing-field.wide{display:grid;grid-column:auto;grid-template-columns:43% 1fr;min-height:48px;border:0;background:#fff}.housing-field>span{display:flex;align-items:center;justify-content:center;padding:6px;background:#c7c7f2;color:#202a4b;font-size:15px;font-weight:700;text-align:center;line-height:1.25}.housing-field>span small{display:none}.housing-field textarea{width:100%;min-width:0;padding:7px;border:0;outline:0;resize:vertical;background:#fff;font-size:15px;font-weight:600;line-height:1.45}.housing-note,.housing-note.wide{grid-column:1/3;grid-template-columns:22% 1fr;min-height:110px}.housing-note textarea{min-height:108px;font-weight:500}.housing-floorplan{grid-column:3;grid-row:1 / span 5;min-height:0;padding:0!important;border:0!important;border-radius:0!important;background:#fff!important}.housing-floorplan h3{margin:0;padding:8px;color:#202a4b!important;background:#c7c7f2;font-size:18px!important;text-align:center}.housing-floorplan p{display:none}.housing-floorplan .diagram-preview{min-height:255px;flex:1;margin:0;border:0;border-radius:0;border-bottom:1px solid #252525}.housing-floorplan .diagram-preview img{max-height:300px}.housing-floorplan .diagram-actions{padding:6px;background:#f7ffff}.housing-floorplan .diagram-url,.housing-floorplan .hint{margin:0 6px 6px}.housing-aircon textarea{font-weight:600}@media print{.housing-reference>h3{font-size:12px}.housing-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(190px,1.5fr)}.housing-field,.housing-field.wide{min-height:27px}.housing-field>span,.housing-field textarea{padding:3px;font-size:9px}.housing-note,.housing-note.wide{min-height:72px}.housing-note textarea{min-height:70px}.housing-floorplan h3{padding:4px;font-size:11px!important}.housing-floorplan .diagram-preview{min-height:170px}.housing-floorplan .diagram-actions,.housing-floorplan .diagram-url,.housing-floorplan .hint{display:none}}
+  </style>
 </head>
 <body>
   <main class="app">
@@ -103,6 +107,88 @@
         grid.append(label("緊急連絡先", "long-label"), label("氏名"), label("続柄"), label("住所・病院名", "span3"), label("電話番号"), input("10"), input("9"), input("11", "span3"), input("12"), input("13"), label("主治医"), input("14", "span3"), input("15"), label("【これまでの生活と現在の状況】", "lower-section"), label("これまでの生活", "life-label"), input("16", "life-input memo"), label("現在の状況", "life-label"), input("17", "life-input memo")); first.append(heading, grid); const date = first.querySelector("#template-date"); if (date) date.textContent = currentRecord().record?.fields?.["created-date"] || "未入力"; };
       new MutationObserver(build).observe(docs, { childList: true, subtree: true });
       build();
+    })();
+  </script>
+  <script>
+    /* 既存の入力部品を並べ替えるため、保存や画像選択の処理はそのままです。 */
+    (() => {
+      const storageKey = "assessment-html-local-v1";
+      const docs = document.querySelector("#docs");
+      let airconInput = null;
+
+      const currentRecord = () => {
+        try {
+          const records = JSON.parse(localStorage.getItem(storageKey) || "[]");
+          const title = document.querySelector("#record-title")?.value;
+          return { records, record: records.find((item) => item.title === title) || records[0] };
+        } catch {
+          return { records: [], record: null };
+        }
+      };
+
+      const saveAircon = () => {
+        if (!airconInput?.isConnected) return;
+        const data = currentRecord();
+        if (!data.record) return;
+        data.record.fields["housing-aircon"] = airconInput.value;
+        data.record.updatedAt = new Date().toISOString();
+        localStorage.setItem(storageKey, JSON.stringify(data.records));
+      };
+
+      const housingAircon = () => {
+        const cell = document.createElement("label");
+        cell.className = "field housing-field housing-aircon";
+        cell.innerHTML = '<span><small>housing-aircon</small>エアコン</span>';
+        const input = document.createElement("textarea");
+        input.rows = 1;
+        input.value = currentRecord().record?.fields?.["housing-aircon"] || "";
+        input.addEventListener("input", saveAircon);
+        cell.append(input);
+        airconInput = input;
+        return cell;
+      };
+
+      const buildHousing = () => {
+        const source = [...docs.querySelectorAll(".section-diagram")].find((item) => item.querySelector(".section h3")?.textContent.includes("居住環境"));
+        if (!source) return;
+
+        const fields = new Map([...source.querySelectorAll(".field")].map((item) => [item.querySelector("small")?.textContent.trim(), item]));
+        if (!fields.has("151") || !fields.has("158")) return;
+
+        const takeField = (id, title, className = "") => {
+          const field = fields.get(id);
+          field.className = `field housing-field ${className}`;
+          field.querySelector(":scope > span").innerHTML = `<small>${id}</small>${title}`;
+          return field;
+        };
+
+        const housing = document.createElement("section");
+        housing.className = "housing-reference";
+        housing.innerHTML = "<h3>【居住環境】</h3>";
+        const grid = document.createElement("div");
+        grid.className = "housing-grid";
+        const plan = source.querySelector(".diagram-card");
+        plan.classList.add("housing-floorplan");
+        plan.querySelector("h3").textContent = "住宅見取り図";
+        grid.append(
+          takeField("151", "家屋の形態"),
+          takeField("152", "エレベーター"),
+          plan,
+          takeField("153", "浴室"),
+          housingAircon(),
+          takeField("154", "ペット"),
+          takeField("155", "手すり"),
+          takeField("156", "危険箇所"),
+          takeField("157", "住宅改修の必要性"),
+          takeField("158", "特記、解決すべき課題など", "housing-note")
+        );
+        housing.append(grid);
+        source.replaceWith(housing);
+      };
+
+      document.addEventListener("input", () => queueMicrotask(saveAircon));
+      new MutationObserver(buildHousing).observe(docs, { childList: true, subtree: true });
+      buildHousing();
     })();
   </script>
 </body>

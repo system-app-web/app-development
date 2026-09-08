@@ -112,6 +112,13 @@
     .reference-grid .input-cell:has(textarea.review){background:#fff61d}
     .reference-grid .input-cell textarea{align-self:stretch;min-height:100%}
   </style>
+  <style>
+    /* 大項目の表は grid の隙間で線を作らず、通常の1px罫線だけで区切る */
+    .reference-grid{gap:0;border-color:var(--line);background:#fff}
+    .reference-grid>*{border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .reference-grid .profile-left,.reference-grid .family-row,.reference-grid .emergency,.reference-grid .profile-left .profile-two{gap:0;background:#fff}
+    .reference-grid .profile-left>*,.reference-grid .family-row>*,.reference-grid .emergency>*,.reference-grid .profile-left .profile-two>*{border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  </style>
 </head>
 <body>
   <main class="app">

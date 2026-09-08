@@ -1,5 +1,8 @@
-# Deployment Policy
+# Change and Publishing Policy
 
-- Do not start a Vercel deployment, redeployment, promotion, or other publishing action unless the user explicitly asks to deploy in the current task.
-- Continue to create Git commits automatically for completed code changes.
-- Do not push to GitHub automatically. After each commit, instruct the user: `GitHub Desktopを開いて、右上の **Push origin** を1回押してください。`
+- Edit and verify files locally by default.
+- Do not create a Git commit unless the user explicitly asks to commit in the current task.
+- Do not push to GitHub unless the user explicitly asks to push in the current task.
+- Do not start a Vercel deployment, redeployment, promotion, publishing action, or hosting configuration unless the user explicitly asks to deploy in the current task.
+- Treat `commit`, `push`, and `deploy` as separate actions. Editing files does not imply any of them.
+- Do not start a local web server, open a hosted preview, or check a site on the web unless the user explicitly asks for web-based confirmation.

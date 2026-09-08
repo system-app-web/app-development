@@ -95,6 +95,10 @@
     /* 家族構成図も画像エリアと起動ボタンの間を罫線で区切る */
     .reference-grid .family-box .template-preview{border-bottom:1px solid var(--line)}
   </style>
+  <style>
+    /* 生活歴と現在の状況は個別の大項目として表示する */
+    .life-summary-section{margin-top:10px}.life-summary-section>h3{margin:0 0 6px;padding:2px 4px;color:#42536a;font-size:19px}.life-summary-section .reference-grid{border-radius:14px}
+  </style>
 </head>
 <body>
   <main class="app">
@@ -334,6 +338,37 @@
       new MutationObserver(decorateHistory).observe(list, { childList: true, subtree: true });
       document.addEventListener("click", (event) => { if (!event.target.closest(".assessment-entry")) document.querySelectorAll(".assessment-menu.open").forEach((menu) => menu.classList.remove("open")); });
       decorateHistory();
+    })();
+  </script>
+  <script>
+    (() => {
+      const splitLifeSummary = () => {
+        const basicGroup = document.querySelector("#docs .reference-basic-group");
+        const grid = basicGroup?.querySelector(":scope > .reference-grid");
+        if (!basicGroup || !grid || basicGroup.nextElementSibling?.classList.contains("life-summary-section")) return;
+        const cells = [...grid.children];
+        const start = cells.findIndex((cell) => cell.classList.contains("lower-section"));
+        if (start < 0 || cells.length < start + 5) return;
+        const build = (title, label, input) => {
+          const section = document.createElement("section");
+          section.className = "life-summary-section";
+          const heading = document.createElement("h3");
+          heading.textContent = `【${title}】`;
+          const table = document.createElement("div");
+          table.className = "reference-grid";
+          table.append(label, input);
+          section.append(heading, table);
+          return section;
+        };
+        const life = build("これまでの生活", cells[start + 1], cells[start + 2]);
+        const current = build("現在の状況", cells[start + 3], cells[start + 4]);
+        cells[start].remove();
+        basicGroup.after(life, current);
+      };
+      const docs = document.querySelector("#docs");
+      if (!docs) return;
+      new MutationObserver(() => queueMicrotask(splitLifeSummary)).observe(docs, { childList: true, subtree: true });
+      splitLifeSummary();
     })();
   </script>
   <script>document.querySelector('#tabs [data-tab="sheet"]').textContent="アセスメントシート";</script>

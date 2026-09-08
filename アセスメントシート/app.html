@@ -107,6 +107,11 @@
     /* 自動で高さを伸ばすため、ずれて見えるブラウザ標準のサイズ変更マークは使わない */
     textarea{resize:none!important}
   </style>
+  <style>
+    /* 黄色の入力欄はセル高いっぱいまで塗り、罫線の手前に灰色の隙間を残さない */
+    .reference-grid .input-cell:has(textarea.review){background:#fff61d}
+    .reference-grid .input-cell textarea{align-self:stretch;min-height:100%}
+  </style>
 </head>
 <body>
   <main class="app">

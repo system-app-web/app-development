@@ -79,6 +79,10 @@
     /* 見取り図に合わせて広がる行でも、入力欄を行いっぱいにする */
     .housing-field:not(.housing-note) textarea{height:100%!important;align-self:stretch}
   </style>
+  <style>
+    /* 住宅見取り図は画像エリアから直接配置するため、選択・削除ボタンは表示しない */
+    .housing-floorplan .diagram-actions button:nth-child(-n+2){display:none}
+  </style>
 </head>
 <body>
   <main class="app">

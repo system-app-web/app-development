@@ -125,6 +125,44 @@
     /* 帳票内の大項目・表は影を使わず、罫線だけのフラットな見た目に統一 */
     .paper,.reference-no1,.reference-grid,.housing-grid,.form-page .section .grid,.life-summary-section .reference-grid{box-shadow:none!important}
   </style>
+  <style>
+    /* 独立項目の下端に残る灰色の帯は表示しない */
+    .reference-reason,.reference-receipt{border-bottom:0!important;box-shadow:none!important;filter:none!important}
+  </style>
+  <style>
+    /* 家族一覧の内側と外側の罫線が重なって太くならないようにする */
+    .reference-grid .profile-left>.family-row{border-bottom:0}
+    .reference-grid .family-row>*{border-bottom:0}
+    .reference-grid .family-row>:nth-child(-n+5){border-bottom:1px solid var(--line)}
+  </style>
+  <style>
+    /* すべての大項目ブロックで、最下部だけに出る灰色の外枠は表示しない */
+    .reference-grid,.housing-grid,.form-page:not(.reference-no1) .section .grid{border-bottom:0!important}
+  </style>
+  <style>
+    /* 角丸の端も含め、外枠はすべて同じ1pxの線で閉じる */
+    .reference-grid,.housing-grid,.form-page:not(.reference-no1) .section .grid{border-bottom:1px solid var(--line)!important}
+  </style>
+  <style>
+    /* 基本情報の表は、影や二重線を作らない単純な1px罫線だけで構成する */
+    .reference-grid{gap:1px!important;border:1px solid var(--line)!important;background:var(--line)!important;box-shadow:none!important;filter:none!important}
+    .reference-grid>*{border:0!important;background:#fff}
+    .reference-grid .profile-left,.reference-grid .family-row,.reference-grid .emergency,.reference-grid .profile-left .profile-two{gap:1px!important;background:var(--line)!important}
+    .reference-grid .profile-left>*,.reference-grid .family-row>*,.reference-grid .emergency>*,.reference-grid .profile-left .profile-two>*{border:0!important;background:#fff}
+    .reference-grid .input-cell:has(textarea.review){background:#fff61d!important}
+  </style>
+  <style>
+    /* 家族構成図と左側の入力表の境界も、同じ1pxの縦罫線で区切る */
+    .reference-grid .family-box{border-left:1px solid var(--line)!important}
+  </style>
+  <style>
+    /* かんたんジェノグラムの起動ボタンの上には区切り線を置かない */
+    .reference-grid .family-box .template-preview{border-bottom:0!important}
+  </style>
+  <style>
+    /* 左側の入力表とそろえ、家族構成図の見出し下にも同じ横罫線を入れる */
+    .reference-grid .family-box .family-title{padding-bottom:16px;border-bottom:1px solid var(--line)}
+  </style>
 </head>
 <body>
   <main class="app">
@@ -198,7 +236,7 @@
       const label = (text, extra = "") => { const cell = document.createElement("div"); cell.className = `label ${extra}`; cell.textContent = text; return cell; };
       const imageBox = () => { const { record } = currentRecord(); const box = document.createElement("div"); box.className = "family-box"; const title = document.createElement("div"); title.className = "family-title"; title.textContent = "家族構成図"; const preview = document.createElement("div"); preview.className = "template-preview"; const file = document.createElement("input"); file.type = "file"; file.accept = "image/*"; file.hidden = true; const redraw = () => { preview.textContent = ""; const image = currentRecord().record?.fields?.["genogram-image"]; if (image) { const img = document.createElement("img"); img.src = image; img.alt = "家族構成図"; preview.append(img); } else preview.innerHTML = '<span class="empty">画像をクリックして選択<br>またはここへドラッグ＆ドロップ</span>'; }; const saveImage = (selected) => { if (!selected?.type?.startsWith("image/")) return; if (selected.size > 2.5 * 1024 * 1024) return alert("画像は2.5MB以下にしてください。"); const reader = new FileReader(); reader.onload = () => { setValue("genogram-image", reader.result); redraw(); }; reader.readAsDataURL(selected); }; file.onchange = () => saveImage(file.files?.[0]); preview.onclick = () => file.click(); preview.ondragover = (event) => { event.preventDefault(); }; preview.ondrop = (event) => { event.preventDefault(); saveImage(event.dataTransfer.files?.[0]); }; preview.onpaste = (event) => { const image = [...event.clipboardData.items].find((item) => item.type.startsWith("image/")); if (image) { event.preventDefault(); saveImage(image.getAsFile()); } }; const open = document.createElement("button"); open.type = "button"; open.textContent = "かんたんジェノグラムを開く"; open.onclick = () => { const url = currentRecord().record?.fields?.["genogram-url"] || "https://easy-genogram-app.vercel.app"; window.open(url, "_blank", "noopener"); }; redraw(); box.append(title, preview, file, open); return box; };
       const build = () => { const first = docs.querySelector(".paper.form-page"); if (!first || !first.querySelector(".header")) return; first.className = "paper form-page reference-no1"; first.textContent = ""; const heading = document.createElement("h2"); heading.innerHTML = '基本情報に関する項目 <span>作成年月日：<b id="template-date"></b></span>'; const grid = document.createElement("div"); grid.className = "reference-grid"; grid.append(label("今回のアセスメントの理由"), input("reason", "wide"), input("assessment-type", "span4"), label("【基本情報（受付、利用者等基本情報）】", "section-title"), label("受付日"), input("created-date", "wide"), label("受付対応者"), input("reception-person"), label("受付方法"), input("reception-method"), label("居宅サービス\n計画作成の状況"), input("reason", "span5"));
-        const profile = document.createElement("div"); profile.className = "profile-left"; profile.append(label("フリガナ"), input("2"), label("利用者氏名"), input("1"), label("住 所"), input("address-combined", "memo"), label("電話番号"), input("7"), label("世帯区分"), input("household")); const familyTitle = document.createElement("div"); familyTitle.className = "label"; familyTitle.textContent = "家族状況"; const familyBlank = document.createElement("div"); familyBlank.className = "family-status-blank"; const family = document.createElement("div"); family.className = "family-row"; ["KP", "氏名", "続柄", "年齢", "同居の有無"].forEach((text) => family.append(label(text))); family.append(input("kp"), input("8"), input("9"), input("family-age"), input("cohabitation")); profile.append(familyTitle, familyBlank, family); grid.append(profile, imageBox());
+        const profile = document.createElement("div"); profile.className = "profile-left"; profile.append(label("フリガナ"), input("2"), label("利用者氏名"), input("1"), label("住 所"), input("address-combined", "memo"), label("電話番号"), input("7"), label("世帯区分"), input("household")); const familyTitle = document.createElement("div"); familyTitle.className = "label"; familyTitle.textContent = "家族状況"; const familyStatus = input("family-status"); const family = document.createElement("div"); family.className = "family-row"; ["KP", "氏名", "続柄", "年齢", "同居の有無"].forEach((text) => family.append(label(text))); family.append(input("kp"), input("8"), input("9"), input("family-age"), input("cohabitation")); profile.append(familyTitle, familyStatus, family); grid.append(profile, imageBox());
         grid.append(label("緊急連絡先", "long-label"), label("氏名"), label("続柄"), label("住所・病院名", "span3"), label("電話番号"), input("10"), input("9"), input("11", "span3"), input("12"), input("13"), label("主治医"), input("14", "span3"), input("15"), label("【これまでの生活と現在の状況】", "lower-section"), label("これまでの生活", "life-label"), input("16", "life-input memo"), label("現在の状況", "life-label"), input("17", "life-input memo")); first.append(heading, grid); const date = first.querySelector("#template-date"); if (date) date.textContent = currentRecord().record?.fields?.["created-date"] || "未入力"; };
       new MutationObserver(build).observe(docs, { childList: true, subtree: true });
       build();

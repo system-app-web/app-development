@@ -1670,6 +1670,11 @@ const COLUMN_ORDER_KEY = 'riyosha_column_order_v1';
 const MONTH_COLUMN_ACTIONS_KEY = 'riyosha_month_column_actions_v1';
 const CUSTOM_COLUMNS_KEY = 'riyosha_custom_columns_v1';
 const COLUMN_LABELS_KEY = 'riyosha_column_labels_v1';
+const AUTO_BACKUP_DB_NAME = 'riyosha_check_auto_backup_v1';
+const AUTO_BACKUP_STORE_NAME = 'daily_snapshots';
+const AUTO_BACKUP_FALLBACK_KEY = 'riyosha_check_auto_backup_fallback_v1';
+const AUTO_BACKUP_RETENTION_DAYS = 30;
+const AUTO_BACKUP_SCHEMA_VERSION = 1;
 const CHK = ['monita', 'sikien', 'drive', 'hand', 'fax'];
 const BASE_MOVABLE_COLUMN_KEYS = ['yuko', 'level', 'planL', 'planS', 'visit', 'monita', 'sikien', 'drive', 'hand', 'fax', 'meeting', 'seho'];
 const DEFAULT_COLUMN_LABELS = {
@@ -1694,6 +1699,9 @@ const visitChoices = ['TEL', '入院中'];
 const levelChoices = ['支1', '支2', '1', '2', '3', '4', '5'];
 
 let currentData = [];
+let cachedAllData = null;
+let automaticBackupEnabled = false;
+let automaticBackupTimer = null;
 let modalIndex = -1;
 let visitPickerYear = 0;
 let visitPickerMonth = 0;
@@ -1737,12 +1745,56 @@ function removeUnusedTaskHeaders() {
   headerRow.dataset.removedPlanShokai = '1';
 }
 
-function loadAll() {
+function cloneStoredData(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function isMonthDataMap(value) {
+  return Boolean(value)
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.values(value).every(list => Array.isArray(list));
+}
+
+function isPlausibleClientRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return ['rowId', 'name', 'baseName'].some(key => typeof value[key] === 'string');
+}
+
+function isValidSavedData(value) {
+  return isMonthDataMap(value)
+    && Object.entries(value).every(([month, list]) => (
+      /^\d{4}-\d{2}$/.test(month) && list.every(isPlausibleClientRecord)
+    ));
+}
+
+function countSavedClients(data) {
+  if (!isValidSavedData(data)) return 0;
+  return Object.values(data).reduce((count, list) => count + list.length, 0);
+}
+
+function readPrimaryDataState() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === null) return { data: {}, valid: false, hasClients: false };
+    const data = JSON.parse(raw);
+    if (!isValidSavedData(data)) return { data: {}, valid: false, hasClients: false };
+    return { data, valid: true, hasClients: countSavedClients(data) > 0 };
   } catch {
-    return {};
+    return { data: {}, valid: false, hasClients: false };
   }
+}
+
+function loadAll() {
+  const state = readPrimaryDataState();
+  if (state.valid && state.hasClients) {
+    cachedAllData = cloneStoredData(state.data);
+    return state.data;
+  }
+  // Do not let a temporarily unreadable or empty primary store overwrite
+  // data that has already been safely loaded during this app session.
+  if (cachedAllData && countSavedClients(cachedAllData) > 0) return cloneStoredData(cachedAllData);
+  return state.data;
 }
 
 function loadCustomColumns() {
@@ -1763,6 +1815,7 @@ function loadCustomColumns() {
 
 function saveCustomColumns() {
   localStorage.setItem(CUSTOM_COLUMNS_KEY, JSON.stringify(customColumns));
+  queueAutomaticBackup();
 }
 
 function loadColumnLabels() {
@@ -1781,6 +1834,7 @@ function loadColumnLabels() {
 
 function saveColumnLabels() {
   localStorage.setItem(COLUMN_LABELS_KEY, JSON.stringify(columnLabels));
+  queueAutomaticBackup();
 }
 
 function getColumnLabel(key) {
@@ -1849,6 +1903,7 @@ function loadColumnOrder() {
 
 function saveColumnOrder() {
   localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(columnOrder));
+  queueAutomaticBackup();
 }
 
 function loadMonthColumnActions() {
@@ -1869,6 +1924,7 @@ function loadMonthColumnActions() {
 
 function saveMonthColumnActions(actions) {
   localStorage.setItem(MONTH_COLUMN_ACTIONS_KEY, JSON.stringify(actions));
+  queueAutomaticBackup();
 }
 
 function getColumnStateForMonth(y = curYear, m = curMonth) {
@@ -1908,6 +1964,7 @@ function saveColumnActionForCurrentMonth(key, action) {
 function saveOrderMode(mode) {
   orderMode = mode === 'custom' ? 'custom' : 'name';
   localStorage.setItem(ORDER_MODE_KEY, orderMode);
+  queueAutomaticBackup();
 }
 
 function clearRowSelection() {
@@ -1921,8 +1978,225 @@ function applySelectedRowState() {
   });
 }
 
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function backupChecksum(text) {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function getAutomaticBackupPayload(all = loadAll()) {
+  const data = cloneStoredData(all);
+  if (!isValidSavedData(data) || countSavedClients(data) === 0) return null;
+  return {
+    schemaVersion: EXPORT_SCHEMA_VERSION,
+    data,
+    facilities: loadFacilities(),
+    orderMode: loadOrderMode(),
+    customColumns: loadCustomColumns(),
+    columnLabels: loadColumnLabels(),
+    monthColumnActions: loadMonthColumnActions()
+  };
+}
+
+function makeAutomaticBackupSnapshot(all) {
+  const payload = getAutomaticBackupPayload(all);
+  if (!payload) return null;
+  const payloadText = JSON.stringify(payload);
+  return {
+    schemaVersion: AUTO_BACKUP_SCHEMA_VERSION,
+    dateKey: localDateKey(),
+    updatedAt: new Date().toISOString(),
+    checksum: backupChecksum(payloadText),
+    payload
+  };
+}
+
+function isValidAutomaticBackupSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || snapshot.schemaVersion !== AUTO_BACKUP_SCHEMA_VERSION) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(snapshot.dateKey || ''))) return false;
+  if (!snapshot.payload || typeof snapshot.checksum !== 'string' || Number.isNaN(Date.parse(snapshot.updatedAt || ''))) return false;
+  const payload = snapshot.payload;
+  if (!isValidSavedData(payload.data) || countSavedClients(payload.data) === 0) return false;
+  try {
+    return backupChecksum(JSON.stringify(payload)) === snapshot.checksum;
+  } catch {
+    return false;
+  }
+}
+
+function backupCutoffDateKey() {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (AUTO_BACKUP_RETENTION_DAYS - 1));
+  return localDateKey(cutoff);
+}
+
+function loadFallbackAutomaticBackups() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(AUTO_BACKUP_FALLBACK_KEY) || '[]');
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFallbackAutomaticBackup(snapshot) {
+  try {
+    const cutoff = backupCutoffDateKey();
+    const snapshots = loadFallbackAutomaticBackups()
+      .filter(item => item && item.dateKey >= cutoff && item.dateKey !== snapshot.dateKey);
+    snapshots.push(snapshot);
+    snapshots.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    localStorage.setItem(AUTO_BACKUP_FALLBACK_KEY, JSON.stringify(snapshots));
+  } catch {
+    // Backup failure must never affect the normal save path.
+  }
+}
+
+function openAutomaticBackupDatabase() {
+  if (!window.indexedDB) return Promise.reject(new Error('IndexedDB unavailable'));
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(AUTO_BACKUP_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(AUTO_BACKUP_STORE_NAME)) {
+        database.createObjectStore(AUTO_BACKUP_STORE_NAME, { keyPath: 'dateKey' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
+  });
+}
+
+function runBackupTransaction(database, mode, action) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(AUTO_BACKUP_STORE_NAME, mode);
+    const store = transaction.objectStore(AUTO_BACKUP_STORE_NAME);
+    let result;
+    try {
+      result = action(store);
+    } catch (error) {
+      transaction.abort();
+      reject(error);
+      return;
+    }
+    transaction.oncomplete = () => resolve(result);
+    transaction.onerror = () => reject(transaction.error || new Error('IndexedDB transaction failed'));
+    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB transaction aborted'));
+  });
+}
+
+async function saveIndexedAutomaticBackup(snapshot) {
+  const database = await openAutomaticBackupDatabase();
+  try {
+    await runBackupTransaction(database, 'readwrite', store => store.put(snapshot));
+    const snapshots = await readIndexedAutomaticBackups(database);
+    const cutoff = backupCutoffDateKey();
+    const expiredKeys = snapshots.filter(item => item.dateKey < cutoff).map(item => item.dateKey);
+    if (expiredKeys.length > 0) {
+      await runBackupTransaction(database, 'readwrite', store => expiredKeys.forEach(key => store.delete(key)));
+    }
+  } finally {
+    database.close();
+  }
+}
+
+function readIndexedAutomaticBackups(database) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(AUTO_BACKUP_STORE_NAME, 'readonly');
+    const request = transaction.objectStore(AUTO_BACKUP_STORE_NAME).getAll();
+    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+    request.onerror = () => reject(request.error || new Error('IndexedDB read failed'));
+    transaction.onerror = () => reject(transaction.error || new Error('IndexedDB read failed'));
+    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB read aborted'));
+  });
+}
+
+async function loadIndexedAutomaticBackups() {
+  const database = await openAutomaticBackupDatabase();
+  try {
+    return await readIndexedAutomaticBackups(database);
+  } finally {
+    database.close();
+  }
+}
+
+function queueAutomaticBackup(all) {
+  if (!automaticBackupEnabled) return;
+  const snapshot = makeAutomaticBackupSnapshot(all);
+  if (!snapshot) return;
+  window.clearTimeout(automaticBackupTimer);
+  automaticBackupTimer = window.setTimeout(() => {
+    saveFallbackAutomaticBackup(snapshot);
+    void saveIndexedAutomaticBackup(snapshot).catch(() => {});
+  }, 120);
+}
+
+function restoreAutomaticBackupPayload(payload) {
+  if (!payload || !isValidSavedData(payload.data) || countSavedClients(payload.data) === 0) return false;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload.data));
+    localStorage.setItem(FAC_KEY, JSON.stringify(Array.isArray(payload.facilities) ? payload.facilities : []));
+    localStorage.setItem(ORDER_MODE_KEY, payload.orderMode === 'custom' ? 'custom' : 'name');
+    localStorage.setItem(CUSTOM_COLUMNS_KEY, JSON.stringify(Array.isArray(payload.customColumns) ? payload.customColumns : []));
+    localStorage.setItem(COLUMN_LABELS_KEY, JSON.stringify(payload.columnLabels && typeof payload.columnLabels === 'object' && !Array.isArray(payload.columnLabels) ? payload.columnLabels : {}));
+    localStorage.setItem(MONTH_COLUMN_ACTIONS_KEY, JSON.stringify(payload.monthColumnActions && typeof payload.monthColumnActions === 'object' && !Array.isArray(payload.monthColumnActions) ? payload.monthColumnActions : {}));
+    cachedAllData = cloneStoredData(payload.data);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function recoverPrimaryDataFromAutomaticBackup() {
+  const primary = readPrimaryDataState();
+  if (primary.valid && primary.hasClients) {
+    cachedAllData = cloneStoredData(primary.data);
+    return false;
+  }
+
+  let indexedSnapshots = [];
+  try {
+    indexedSnapshots = await loadIndexedAutomaticBackups();
+  } catch {
+    indexedSnapshots = [];
+  }
+  const candidates = [...indexedSnapshots, ...loadFallbackAutomaticBackups()]
+    .filter(isValidAutomaticBackupSnapshot)
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  for (const snapshot of candidates) {
+    if (restoreAutomaticBackupPayload(snapshot.payload)) return true;
+  }
+  return false;
+}
+
+async function requestPersistentAppStorage() {
+  try {
+    if (navigator.storage && typeof navigator.storage.persist === 'function') await navigator.storage.persist();
+  } catch {
+    // Browsers that do not offer persistent storage safely use IndexedDB or the fallback store.
+  }
+}
+
 function saveAll(all) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  const safeData = cloneStoredData(all);
+  cachedAllData = safeData;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(safeData));
+  } catch {
+    // Keep the in-memory data and attempt a separate automatic backup below.
+  }
+  queueAutomaticBackup(safeData);
 }
 
 function loadUndoSnapshot() {
@@ -2299,6 +2573,7 @@ function loadFacilities() {
 
 function saveFacilities(list) {
   localStorage.setItem(FAC_KEY, JSON.stringify(list));
+  queueAutomaticBackup();
 }
 
 function buildExportPayload() {
@@ -4557,12 +4832,21 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   });
 }
 
-removeUnusedTaskHeaders();
-customColumns = loadCustomColumns();
-columnLabels = loadColumnLabels();
-columnOrder = loadColumnOrder();
-bindMovableColumnHeaders();
-render();
+async function initializeApp() {
+  await requestPersistentAppStorage();
+  await recoverPrimaryDataFromAutomaticBackup();
+  automaticBackupEnabled = true;
+
+  removeUnusedTaskHeaders();
+  customColumns = loadCustomColumns();
+  columnLabels = loadColumnLabels();
+  columnOrder = loadColumnOrder();
+  bindMovableColumnHeaders();
+  render();
+  queueAutomaticBackup();
+}
+
+void initializeApp();
 </script>
 <script type="module" src="./pwa-install.js"></script>
 </body>

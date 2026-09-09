@@ -26,7 +26,10 @@
     flex-shrink: 0;
   }
   header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.06em; }
-  .undo-delete { margin-left: 12px; padding: 5px 10px; border: 1px solid rgba(255,255,255,0.48); border-radius: 6px; color: white; background: rgba(255,255,255,0.13); font: inherit; font-size: 0.78rem; cursor: pointer; }
+  .header-actions { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+  .undo-delete, .header-utility { padding: 5px 10px; border: 1px solid rgba(255,255,255,0.48); border-radius: 6px; color: white; background: rgba(255,255,255,0.13); font: inherit; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
+  .header-utility.import { background: rgba(212,240,196,0.2); }
+  .header-utility:hover { background: rgba(255,255,255,0.24); }
   .undo-delete:hover:not(:disabled) { background: rgba(255,255,255,0.24); }.undo-delete:disabled { opacity: 0.42; cursor: default; }
 
   .main {
@@ -492,8 +495,13 @@
 
 <header>
   <h1>📋 テンプレートメモ帳</h1>
-  <button class="undo-delete" id="undoDelete" type="button" disabled>↶ 戻す</button>
+  <div class="header-actions">
+    <button class="undo-delete" id="undoDelete" type="button" disabled>↶ 戻す</button>
+    <button class="header-utility backup" id="btnBackup" type="button">バックアップ</button>
+    <button class="header-utility import" id="btnImport" type="button">データ挿入</button>
+  </div>
 </header>
+<input id="importDataInput" type="file" accept="application/json,.json" hidden>
 
 <div class="main">
 
@@ -636,6 +644,19 @@ const DEFAULT_AI_PROMPTS = [
 ];
 
 
+const DEFAULT_AI_PROMPT_ORDER = [
+  'ai_monitoring',
+  'ai_assessment',
+  'ai_assessment_addition',
+  'ai_care_plan_1',
+  'ai_care_plan_2',
+  'ai_service_meeting_points',
+  'ai_care_plan_check',
+  'ai_weekly_meeting',
+  'ai_medication_info',
+];
+DEFAULT_AI_PROMPTS.sort((a, b) => DEFAULT_AI_PROMPT_ORDER.indexOf(a.id) - DEFAULT_AI_PROMPT_ORDER.indexOf(b.id));
+
 const DEFAULT_SUPPORT_PROGRESS = [
   {
     "id": "support_consultation",
@@ -751,6 +772,15 @@ function normalizeData(data) {
       data.categories.push({ ...prompt });
     }
   });
+  const defaultAiPromptRanks = new Map(DEFAULT_AI_PROMPT_ORDER.map((id, index) => [id, index]));
+  data.categories.sort((a, b) => {
+    const aRank = defaultAiPromptRanks.get(a.id);
+    const bRank = defaultAiPromptRanks.get(b.id);
+    if (aRank !== undefined && bRank !== undefined) return aRank - bRank;
+    if (aRank !== undefined) return -1;
+    if (bRank !== undefined) return 1;
+    return 0;
+  });
   DEFAULT_SUPPORT_PROGRESS.forEach(prompt => {
     if (!data.categories.some(c => c.id === prompt.id)) {
       data.categories.push({ ...prompt });
@@ -771,15 +801,275 @@ function normalizeData(data) {
 }
 
 // ── ストレージ ──
-function getData() {
+const PRIMARY_STORAGE_KEY = 'tmpl_data_v4_staff';
+const AUTO_BACKUP_DB_NAME = 'template_memo_staff_auto_backup_v1';
+const AUTO_BACKUP_STORE_NAME = 'daily_snapshots';
+const BACKUP_APP_ID = 'template-memo';
+const BACKUP_SCHEMA_VERSION = 1;
+const BACKUP_RETENTION_DAYS = 30;
+let automaticBackupEnabled = false;
+let automaticBackupWriteChain = Promise.resolve();
+let automaticBackupVersion = 0;
+
+function cloneData(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function isValidTemplateData(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (!Array.isArray(value.groups) || !Array.isArray(value.categories)) return false;
+  const validGroup = group => group && typeof group.id === 'string' && group.id && typeof group.label === 'string';
+  const validCategory = category => category
+    && typeof category.id === 'string' && category.id
+    && typeof category.groupId === 'string' && category.groupId
+    && typeof category.label === 'string'
+    && typeof category.template === 'string';
+  return value.groups.every(validGroup) && value.categories.every(validCategory);
+}
+
+function isUsableTemplateData(value) {
+  return isValidTemplateData(value) && value.groups.length > 0 && value.categories.length > 0;
+}
+
+function readPrimaryDataState() {
   try {
-    const s = localStorage.getItem('tmpl_data_v4_staff');
-    return normalizeData(s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)));
-  } catch { return normalizeData(JSON.parse(JSON.stringify(DEFAULT_DATA))); }
+    const raw = localStorage.getItem(PRIMARY_STORAGE_KEY);
+    if (raw === null) return { data: null, usable: false };
+    const data = JSON.parse(raw);
+    return { data, usable: isUsableTemplateData(data) };
+  } catch {
+    return { data: null, usable: false };
+  }
+}
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function backupChecksum(text) {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function makeAutomaticBackupSnapshot(data) {
+  const payload = { appId: BACKUP_APP_ID, data: cloneData(data) };
+  const payloadText = JSON.stringify(payload);
+  return {
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    dateKey: localDateKey(),
+    updatedAt: new Date().toISOString(),
+    checksum: backupChecksum(payloadText),
+    payload,
+  };
+}
+
+function isValidAutomaticBackupSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || snapshot.schemaVersion !== BACKUP_SCHEMA_VERSION) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(snapshot.dateKey || ''))) return false;
+  if (typeof snapshot.updatedAt !== 'string' || Number.isNaN(Date.parse(snapshot.updatedAt))) return false;
+  if (!snapshot.payload || snapshot.payload.appId !== BACKUP_APP_ID || !isUsableTemplateData(snapshot.payload.data)) return false;
+  try {
+    return backupChecksum(JSON.stringify(snapshot.payload)) === snapshot.checksum;
+  } catch {
+    return false;
+  }
+}
+
+function backupCutoffDateKey() {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (BACKUP_RETENTION_DAYS - 1));
+  return localDateKey(cutoff);
+}
+
+function openAutomaticBackupDatabase() {
+  if (!window.indexedDB) return Promise.reject(new Error('IndexedDB unavailable'));
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(AUTO_BACKUP_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(AUTO_BACKUP_STORE_NAME)) {
+        database.createObjectStore(AUTO_BACKUP_STORE_NAME, { keyPath: 'dateKey' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
+  });
+}
+
+function runBackupTransaction(database, mode, action) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(AUTO_BACKUP_STORE_NAME, mode);
+    const store = transaction.objectStore(AUTO_BACKUP_STORE_NAME);
+    let result;
+    try {
+      result = action(store);
+    } catch (error) {
+      transaction.abort();
+      reject(error);
+      return;
+    }
+    transaction.oncomplete = () => resolve(result);
+    transaction.onerror = () => reject(transaction.error || new Error('IndexedDB transaction failed'));
+    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB transaction aborted'));
+  });
+}
+
+function readIndexedAutomaticBackups(database) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(AUTO_BACKUP_STORE_NAME, 'readonly');
+    const request = transaction.objectStore(AUTO_BACKUP_STORE_NAME).getAll();
+    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+    request.onerror = () => reject(request.error || new Error('IndexedDB read failed'));
+  });
+}
+
+async function saveIndexedAutomaticBackup(snapshot) {
+  const database = await openAutomaticBackupDatabase();
+  try {
+    await runBackupTransaction(database, 'readwrite', store => store.put(snapshot));
+    const snapshots = await readIndexedAutomaticBackups(database);
+    const cutoff = backupCutoffDateKey();
+    const expiredKeys = snapshots.filter(item => item.dateKey < cutoff).map(item => item.dateKey);
+    if (expiredKeys.length > 0) {
+      await runBackupTransaction(database, 'readwrite', store => expiredKeys.forEach(key => store.delete(key)));
+    }
+  } finally {
+    database.close();
+  }
+}
+
+async function loadIndexedAutomaticBackups() {
+  const database = await openAutomaticBackupDatabase();
+  try {
+    return await readIndexedAutomaticBackups(database);
+  } finally {
+    database.close();
+  }
+}
+
+function queueAutomaticBackup(data) {
+  if (!automaticBackupEnabled || !isUsableTemplateData(data)) return;
+  const snapshot = makeAutomaticBackupSnapshot(data);
+  const version = ++automaticBackupVersion;
+  automaticBackupWriteChain = automaticBackupWriteChain
+    .catch(() => {})
+    .then(() => version === automaticBackupVersion ? saveIndexedAutomaticBackup(snapshot) : undefined)
+    .catch(() => {});
+}
+
+async function recoverPrimaryDataFromAutomaticBackup() {
+  if (readPrimaryDataState().usable) return false;
+  let snapshots = [];
+  try {
+    snapshots = await loadIndexedAutomaticBackups();
+  } catch {
+    return false;
+  }
+  const candidates = snapshots
+    .filter(isValidAutomaticBackupSnapshot)
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  for (const snapshot of candidates) {
+    try {
+      localStorage.setItem(PRIMARY_STORAGE_KEY, JSON.stringify(snapshot.payload.data));
+      return true;
+    } catch {
+      // Try the next valid daily snapshot.
+    }
+  }
+  return false;
+}
+
+async function requestPersistentAppStorage() {
+  try {
+    if (navigator.storage && typeof navigator.storage.persist === 'function') await navigator.storage.persist();
+  } catch {
+    // IndexedDB remains available in browsers that decline persistent storage.
+  }
+}
+
+function getData() {
+  const state = readPrimaryDataState();
+  return normalizeData(state.usable ? state.data : cloneData(DEFAULT_DATA));
 }
 
 function saveData(data) {
-  localStorage.setItem('tmpl_data_v4_staff', JSON.stringify(data));
+  const safeData = cloneData(data);
+  try {
+    localStorage.setItem(PRIMARY_STORAGE_KEY, JSON.stringify(safeData));
+  } catch {
+    // Keep the current operation usable when the primary store is unavailable.
+  }
+  queueAutomaticBackup(safeData);
+}
+
+async function initializeTemplateMemoStorage() {
+  await requestPersistentAppStorage();
+  await recoverPrimaryDataFromAutomaticBackup();
+  automaticBackupEnabled = true;
+  queueAutomaticBackup(getData());
+}
+
++function buildExportPayload() {
+  return {
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    appId: BACKUP_APP_ID,
+    exportedAt: new Date().toISOString(),
+    payload: { data: cloneData(getData()) },
+  };
+}
+
+function exportLocalData() {
+  const payload = buildExportPayload();
+  const dateKey = localDateKey();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = `テンプレートメモ帳_バックアップ_${dateKey}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function triggerImportLocalData() {
+  const input = document.getElementById('importDataInput');
+  input.value = '';
+  input.click();
+}
+
+function resetEditorAfterImport() {
+  currentCatId = null;
+  document.getElementById('editorPanel').classList.remove('visible');
+  document.getElementById('editorPlaceholder').style.display = 'flex';
+  renderSidebar();
+}
+
+function importLocalDataFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || ''));
+      const importedData = parsed?.appId === BACKUP_APP_ID ? parsed.payload?.data : null;
+      if (!isUsableTemplateData(importedData)) throw new Error('invalid backup');
+      saveData(normalizeData(cloneData(importedData)));
+      await automaticBackupWriteChain;
+      resetEditorAfterImport();
+      alert('データを読み込みました。');
+    } catch {
+      alert('読み込みに失敗しました。テンプレートメモ帳のバックアップJSONを選択してください。');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
 }
 
 // ── 状態 ──
@@ -1063,7 +1353,10 @@ function selectCat(id) {
   document.getElementById('editorGroupName').textContent = group ? group.label : '';
   document.getElementById('editorSep').style.display = group ? '' : 'none';
   document.getElementById('catLabel').textContent = cat.label;
-  document.getElementById('noteArea').value = cat.template;
+  const noteArea = document.getElementById('noteArea');
+  noteArea.value = cat.template;
+  noteArea.scrollTop = 0;
+  noteArea.scrollLeft = 0;
   document.getElementById('editorPlaceholder').style.display = 'none';
   document.getElementById('editorPanel').classList.add('visible');
   document.getElementById('noteArea').focus({ preventScroll: true });
@@ -1120,6 +1413,9 @@ function closeGroupModal() { document.getElementById('groupModalOverlay').classL
 
 document.getElementById('btnAddGroup').onclick = () => openGroupModal(null);
 document.getElementById('undoDelete').onclick = undoDelete;
+document.getElementById('btnBackup').onclick = exportLocalData;
+document.getElementById('btnImport').onclick = triggerImportLocalData;
+document.getElementById('importDataInput').onchange = event => importLocalDataFromFile(event.target.files?.[0]);
 document.getElementById('groupModalClose').onclick = closeGroupModal;
 document.getElementById('groupModalCancel').onclick = closeGroupModal;
 document.getElementById('groupModalOverlay').onclick = (e) => { if (e.target === e.currentTarget) closeGroupModal(); };
@@ -1239,7 +1535,7 @@ document.getElementById('btnCopy').onclick = async () => {
   setTimeout(() => { btn.textContent = '📋 コピー'; btn.classList.remove('copied'); }, 1800);
 };
 
-renderSidebar();
+initializeTemplateMemoStorage().finally(renderSidebar);
 
 
 document.addEventListener('click', () => {

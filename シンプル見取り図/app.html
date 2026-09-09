@@ -560,6 +560,9 @@ h1 {
   <h1>シンプル見取り図</h1>
   <button class="btn btn-soft" onclick="clearAll()">リセット</button>
   <button class="btn btn-primary" onclick="exportPNG()">フォルダ保存</button>
+  <button class="btn btn-soft" type="button" onclick="exportBackup()">バックアップ</button>
+  <button class="btn btn-soft" type="button" onclick="document.getElementById('backup-import-file').click()">データ挿入</button>
+  <input id="backup-import-file" type="file" accept="application/json,.json" hidden onchange="importBackupFile(event)">
   <div class="spacer"></div>
   <img class="header-logo" src="./ktm-logo.jpg" alt="K.T.M Keep Trust Meaning">
 </header>
@@ -632,6 +635,13 @@ h1 {
 <script>
 const templates = [];
 const TEMPLATE_STORAGE_KEY = "simple-mitorizu-templates";
+const APP_STATE_STORAGE_KEY = "simple-mitorizu-current-state";
+const BACKUP_DATABASE_NAME = "simple-mitorizu-auto-backups";
+const BACKUP_STORE_NAME = "daily_snapshots";
+const BACKUP_APP_ID = "simple-mitorizu";
+const BACKUP_RETENTION_DAYS = 30;
+let persistenceTimer = null;
+let isRestoringAppData = false;
 
 const itemCatalog = {
   bed: { name: "ベッド", type: "bed", w: 84, h: 118, cols: 3, rows: 4.2 },
@@ -777,6 +787,255 @@ function getSavedTemplates() {
   }
 }
 
+function todayBackupKey() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function cloneSerializable(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function getDrawPathData() {
+  return Array.from(document.querySelectorAll("#layer-draw path.canvas-draw")).map((path) => ({
+    points: getDrawPathGridPoints(path, previousGridStepX || gridStep("x"), previousGridStepY || gridStep("y"))
+  })).filter((path) => path.points.length);
+}
+
+function getTextElementData() {
+  return Array.from(document.querySelectorAll("#text-overlay .canvas-text")).map((element) => ({
+    text: element.textContent || "",
+    left: element.style.left || "0px",
+    top: element.style.top || "0px",
+    fontSize: Number(element.dataset.fontSize) || currentTextSize,
+    direction: element.dataset.direction === "v" ? "v" : "h"
+  })).filter((element) => element.text.trim());
+}
+
+function getAppData() {
+  return {
+    app: BACKUP_APP_ID,
+    version: 1,
+    savedAt: new Date().toISOString(),
+    project: {
+      rooms: rooms.map((room) => ({ ...room })),
+      erasedFloorPlanWalls: Array.from(erasedFloorPlanWalls),
+      drawPaths: getDrawPathData(),
+      texts: getTextElementData()
+    },
+    templates: getSavedTemplates()
+  };
+}
+
+function isValidAppData(data) {
+  return Boolean(
+    data &&
+    data.app === BACKUP_APP_ID &&
+    data.version === 1 &&
+    data.project &&
+    Array.isArray(data.project.rooms) &&
+    Array.isArray(data.project.erasedFloorPlanWalls) &&
+    Array.isArray(data.project.drawPaths) &&
+    Array.isArray(data.project.texts) &&
+    Array.isArray(data.templates)
+  );
+}
+
+function hasProjectContent(data) {
+  return data.project.rooms.length || data.project.drawPaths.length || data.project.texts.length || data.templates.length;
+}
+
+function getUsualSavedData() {
+  try {
+    const data = JSON.parse(localStorage.getItem(APP_STATE_STORAGE_KEY) || "");
+    return isValidAppData(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveUsualAppData(data) {
+  try {
+    localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function openBackupDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("IndexedDB is unavailable"));
+      return;
+    }
+    const request = indexedDB.open(BACKUP_DATABASE_NAME, 1);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(BACKUP_STORE_NAME)) db.createObjectStore(BACKUP_STORE_NAME, { keyPath: "date" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveDailySnapshot(data) {
+  try {
+    const db = await openBackupDatabase();
+    const date = todayBackupKey();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(BACKUP_STORE_NAME, "readwrite");
+      const store = transaction.objectStore(BACKUP_STORE_NAME);
+      store.put({ date, updatedAt: new Date().toISOString(), payload: { data: cloneSerializable(data) } });
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS);
+      const cutoffKey = cutoff.toISOString().slice(0, 10);
+      store.getAllKeys().onsuccess = (event) => event.target.result.forEach((key) => {
+        if (String(key) < cutoffKey) store.delete(key);
+      });
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  } catch {}
+}
+
+async function getLatestValidBackup() {
+  try {
+    const db = await openBackupDatabase();
+    const snapshots = await new Promise((resolve, reject) => {
+      const request = db.transaction(BACKUP_STORE_NAME, "readonly").objectStore(BACKUP_STORE_NAME).getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return snapshots
+      .sort((first, second) => String(second.date).localeCompare(String(first.date)))
+      .map((snapshot) => snapshot?.payload?.data)
+      .find(isValidAppData) || null;
+  } catch {
+    return null;
+  }
+}
+
+function createRestoredDrawPath(pathData) {
+  const points = Array.isArray(pathData?.points) ? pathData.points.filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y)) : [];
+  if (!points.length) return;
+  const path = svgEl("path", {
+    fill: "none",
+    stroke: "#000",
+    "stroke-width": LINE_STROKE_WIDTH,
+    "vector-effect": "non-scaling-stroke",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  });
+  path.classList.add("canvas-draw");
+  path.style.pointerEvents = "stroke";
+  path.addEventListener("pointerdown", (event) => selectDrawElement(event, path));
+  document.getElementById("layer-draw").appendChild(path);
+  drawPathFromGridPoints(path, points);
+}
+
+function configureRestoredTextElement(element) {
+  element.addEventListener("pointerdown", (event) => startTextElementInteraction(event, element));
+  element.addEventListener("blur", () => {
+    if (!element.textContent.trim()) {
+      if (selectedDrawElement === element) clearDrawSelection();
+      element.remove();
+    }
+    queueAppPersistence();
+  });
+  element.addEventListener("input", () => {
+    updateTextDrawElement(element);
+    if (selectedDrawElement === element) showTextHandles(element);
+    queueAppPersistence();
+  });
+}
+
+function restoreAppData(data) {
+  if (!isValidAppData(data)) return false;
+  isRestoringAppData = true;
+  rooms = data.project.rooms.map((room) => createRoom(room));
+  erasedFloorPlanWalls = new Set(data.project.erasedFloorPlanWalls);
+  selectedRoomId = null;
+  clearDrawSelection();
+  document.getElementById("layer-draw").innerHTML = "";
+  document.getElementById("text-overlay").innerHTML = "";
+  data.project.drawPaths.forEach(createRestoredDrawPath);
+  data.project.texts.forEach((textData) => {
+    const element = document.createElement("div");
+    element.className = "canvas-text-editor canvas-text";
+    element.style.left = textData.left;
+    element.style.top = textData.top;
+    element.dataset.fontSize = Number(textData.fontSize) || currentTextSize;
+    element.dataset.direction = textData.direction === "v" ? "v" : "h";
+    element.contentEditable = "true";
+    element.spellcheck = false;
+    element.textContent = textData.text;
+    updateTextDrawElement(element);
+    configureRestoredTextElement(element);
+    document.getElementById("text-overlay").appendChild(element);
+  });
+  try {
+    localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(data.templates));
+  } catch {}
+  syncCanvasItemsToGrid();
+  syncFloorPlansToGrid();
+  renderTemplateButtons();
+  renderAll(false);
+  isRestoringAppData = false;
+  return true;
+}
+
+function queueAppPersistence() {
+  if (isRestoringAppData) return;
+  clearTimeout(persistenceTimer);
+  persistenceTimer = setTimeout(() => {
+    const data = getAppData();
+    saveUsualAppData(data);
+    saveDailySnapshot(data);
+  }, 250);
+}
+
+async function initializeSavedAppData() {
+  const usualData = getUsualSavedData();
+  const data = usualData && hasProjectContent(usualData) ? usualData : await getLatestValidBackup();
+  if (data) restoreAppData(data);
+  else {
+    renderTemplateButtons();
+    renderAll();
+  }
+}
+
+function exportBackup() {
+  const fileDate = todayBackupKey();
+  const backup = { app: BACKUP_APP_ID, exportedAt: new Date().toISOString(), payload: { data: getAppData() } };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `simple-mitorizu-backup-${fileDate}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+async function importBackupFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  try {
+    const backup = JSON.parse(await file.text());
+    const data = backup?.app === BACKUP_APP_ID ? backup.payload?.data : null;
+    if (!isValidAppData(data)) {
+      alert("このファイルはシンプル見取り図のバックアップではありません。");
+      return;
+    }
+    if (!window.confirm("現在の見取り図とテンプレートを、このバックアップの内容に置き換えますか？")) return;
+    restoreAppData(data);
+    saveUsualAppData(data);
+    await saveDailySnapshot(data);
+  } catch {
+    alert("バックアップファイルを読み込めませんでした。");
+  }
+}
+
 function saveTemplate() {
   if (!rooms.length) return;
   const name = window.prompt("テンプレート名を入力してください", "新しい見取り図");
@@ -790,6 +1049,7 @@ function saveTemplate() {
   });
   localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(saved));
   renderTemplateButtons();
+  queueAppPersistence();
 }
 
 function deleteSavedTemplate(id, name) {
@@ -797,6 +1057,7 @@ function deleteSavedTemplate(id, name) {
   const saved = getSavedTemplates().filter((template) => template.id !== id);
   localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(saved));
   renderTemplateButtons();
+  queueAppPersistence();
 }
 
 function getCanvasItem(mode) {
@@ -855,6 +1116,8 @@ function applyTemplate(template) {
   selectedRoomId = null;
   syncCanvasItemsToGrid();
   syncFloorPlansToGrid();
+  renderAll(false);
+  queueAppPersistence();
   showToast(`${template.name} を読み込みました`);
 }
 
@@ -1331,6 +1594,7 @@ function svgEl(name, attrs) {
 
 function renderAll(showHint = true) {
   renderSVG(showHint);
+  queueAppPersistence();
 }
 
 function startDrag(event, id) {
@@ -1941,17 +2205,7 @@ function startTextDraw(event) {
   text.contentEditable = "true";
   text.spellcheck = false;
   updateTextDrawElement(text);
-  text.addEventListener("pointerdown", (textEvent) => startTextElementInteraction(textEvent, text));
-  text.addEventListener("blur", () => {
-    if (!text.textContent.trim()) {
-      if (selectedDrawElement === text) clearDrawSelection();
-      text.remove();
-    }
-  });
-  text.addEventListener("input", () => {
-    updateTextDrawElement(text);
-    if (selectedDrawElement === text) showTextHandles(text);
-  });
+  configureRestoredTextElement(text);
   document.getElementById("text-overlay").appendChild(text);
   actionHistory.push(() => {
     if (text.isConnected) text.remove();
@@ -2842,6 +3096,7 @@ function setTextSize(size) {
   if (selectedDrawElement?.classList.contains("canvas-text")) {
     selectedDrawElement.dataset.fontSize = size;
     updateTextDrawElement(selectedDrawElement);
+    queueAppPersistence();
   }
 }
 
@@ -2852,6 +3107,7 @@ function setTextDir(dir) {
   if (selectedDrawElement?.classList.contains("canvas-text")) {
     selectedDrawElement.dataset.direction = dir;
     updateTextDrawElement(selectedDrawElement);
+    queueAppPersistence();
   }
 }
 
@@ -3008,10 +3264,8 @@ async function exportPNG() {
   image.src = source;
 }
 
-renderTemplateButtons();
 renderItemPalette();
 renderDoorPalette();
-renderAll();
 const canvas = document.getElementById("svg-main");
 previousGridStepX = gridStep("x");
 previousGridStepY = gridStep("y");
@@ -3053,6 +3307,7 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape" && currentDrawMode) setDrawMode(currentDrawMode);
 });
+initializeSavedAppData();
 </script>
 <script type="module" src="./pwa-install.js"></script>
 </body>

@@ -130,6 +130,8 @@ header h1{font-size:19px;font-weight:800;white-space:nowrap}
   <button class="btn-header" onclick="openKagami()">📄 FAXかがみ</button>
   <button class="btn-header" onclick="openModal('add-person')">👤 利用者 新規登録</button>
   <button class="btn-header" onclick="openModal('add-facility-global')">🏥 事業所 新規登録</button>
+  <button class="btn-header" onclick="exportBackupData()">バックアップ</button>
+  <button class="btn-header" onclick="triggerBackupImport()">データ挿入</button>
 </header>
 <div class="layout">
   <aside class="sidebar" id="sidebar"></aside>
@@ -209,22 +211,30 @@ header h1{font-size:19px;font-weight:800;white-space:nowrap}
 </div>
 
 <div class="toast" id="toast"></div>
+<input type="file" id="backupImportInput" accept=".json,application/json" style="display:none" onchange="importBackupData(this.files[0])">
 
 <script>
 const STORAGE_KEY='fax_address_book_v2';
 const ORDER_KEY='fax_name_order_v2';
 const TEMPLATE_KEY='fax_kagami_templates_v2';
+const AUTO_BACKUP_DB_NAME='fax_address_book_auto_backup_v1';
+const AUTO_BACKUP_STORE_NAME='daily_snapshots';
+const AUTO_BACKUP_RETENTION_DAYS=30;
+const AUTO_BACKUP_SCHEMA_VERSION=1;
+const BACKUP_EXPORT_SCHEMA_VERSION=1;
+const BACKUP_APP_ID='fax-address-book';
 const INITIAL_DATA=[];
 ['fax_address_book_v1','fax_name_order_v1','fax_kagami_templates_v1'].forEach(k=>localStorage.removeItem(k));
 
 function loadData(){try{const s=localStorage.getItem(STORAGE_KEY);if(s)return JSON.parse(s);}catch(e){}return JSON.parse(JSON.stringify(INITIAL_DATA));}
-function saveData(){localStorage.setItem(STORAGE_KEY,JSON.stringify(allData));}
+function saveData(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(allData));}catch(e){}queueAutomaticBackup();}
+let automaticBackupEnabled=false,automaticBackupWriteChain=Promise.resolve(),automaticBackupVersion=0;
 let allData=loadData();
 (function(){let c=false;allData.forEach(r=>{if(r.category==='薬局'||r.category==='病院・クリニック・歯科'){r.category='病院・薬局・歯科';c=true;}});if(c)saveData();})();
 
 let selectedName=null,selectedCategory=null,editIndex=null,lastDeleted=null,undoTimer=null;
 function loadOrder(){try{const s=localStorage.getItem(ORDER_KEY);if(s)return JSON.parse(s);}catch(e){}return null;}
-function saveOrder(n){localStorage.setItem(ORDER_KEY,JSON.stringify(n));}
+function saveOrder(n){try{localStorage.setItem(ORDER_KEY,JSON.stringify(n));}catch(e){}queueAutomaticBackup();}
 function getDisplayName(n){if(!n)return'';const p=n.split(/[\s　]+/);return p.length>1?p.slice(1).join(' '):n;}
 function getUniqueNames(){const seen=new Set();const dn=allData.filter(r=>{if(!r.name||seen.has(r.name))return false;seen.add(r.name);return true;}).map(r=>r.name);const saved=loadOrder();if(!saved)return dn;const ord=saved.filter(n=>dn.includes(n));dn.forEach(n=>{if(!ord.includes(n))ord.push(n);});return ord;}
 function getCategories(){const c=new Set();allData.forEach(r=>{if(r.category)c.add(r.category);});return Array.from(c).sort();}
@@ -467,8 +477,30 @@ const DEFAULT_TEMPLATES=[
   {id:'tpl_2',name:'照会',body:'○○　御中\n担当　○○様\n\nお世話になっております。\n○○居宅介護支援事業所　○○です。\n\n以下の件についてご照会申し上げます。\n\n【照会内容】\n\n\n【対象者】\n氏名：\n生年月日：\n\nご回答のほど、よろしくお願いいたします。\n\n━━━━━━━━━━━━━━━━\n○○居宅介護支援事業所\nTEL：xxx-xxxx-xxxx\nFAX：xxx-xxxx-xxxx\n━━━━━━━━━━━━━━━━'}
 ];
 function loadTemplates(){try{const s=localStorage.getItem(TEMPLATE_KEY);if(s)return JSON.parse(s);}catch(e){}return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));}
-function saveTemplates(){localStorage.setItem(TEMPLATE_KEY,JSON.stringify(templates));}
+function saveTemplates(){try{localStorage.setItem(TEMPLATE_KEY,JSON.stringify(templates));}catch(e){}queueAutomaticBackup();}
 let templates=loadTemplates();
+
+function localDateKey(date=new Date()){const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');return `${y}-${m}-${d}`;}
+function backupChecksum(text){let hash=2166136261;for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16).padStart(8,'0');}
+function cloneBackupData(value){return JSON.parse(JSON.stringify(value));}
+function buildBackupData(){return {records:cloneBackupData(allData),order:cloneBackupData(loadOrder()||[]),templates:cloneBackupData(templates)};}
+function isValidBackupData(data){if(!data||typeof data!=='object'||!Array.isArray(data.records)||!Array.isArray(data.order)||!Array.isArray(data.templates))return false;return data.records.every(r=>r&&typeof r==='object'&&typeof r.name==='string'&&r.name.trim()!==''&&[r.facility,r.fax,r.category].every(v=>v===null||typeof v==='string'))&&data.order.every(n=>typeof n==='string')&&data.templates.every(t=>t&&typeof t==='object'&&typeof t.id==='string'&&typeof t.name==='string'&&typeof t.body==='string');}
+function buildBackupPayload(){return {appId:BACKUP_APP_ID,schemaVersion:BACKUP_EXPORT_SCHEMA_VERSION,data:buildBackupData()};}
+function makeAutomaticBackupSnapshot(){const payload=buildBackupPayload(),text=JSON.stringify(payload);return {schemaVersion:AUTO_BACKUP_SCHEMA_VERSION,dateKey:localDateKey(),updatedAt:new Date().toISOString(),checksum:backupChecksum(text),payload};}
+function isValidAutomaticBackupSnapshot(snapshot){if(!snapshot||typeof snapshot!=='object'||snapshot.schemaVersion!==AUTO_BACKUP_SCHEMA_VERSION||!/^\d{4}-\d{2}-\d{2}$/.test(String(snapshot.dateKey||''))||!snapshot.payload||typeof snapshot.checksum!=='string'||Number.isNaN(Date.parse(snapshot.updatedAt||'')))return false;try{return snapshot.checksum===backupChecksum(JSON.stringify(snapshot.payload))&&snapshot.payload.appId===BACKUP_APP_ID&&snapshot.payload.schemaVersion===BACKUP_EXPORT_SCHEMA_VERSION&&isValidBackupData(snapshot.payload.data);}catch(e){return false;}}
+function backupCutoffDateKey(){const cutoff=new Date();cutoff.setHours(0,0,0,0);cutoff.setDate(cutoff.getDate()-(AUTO_BACKUP_RETENTION_DAYS-1));return localDateKey(cutoff);}
+function openAutomaticBackupDatabase(){if(!window.indexedDB)return Promise.reject(new Error('IndexedDB unavailable'));return new Promise((resolve,reject)=>{const request=window.indexedDB.open(AUTO_BACKUP_DB_NAME,1);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(AUTO_BACKUP_STORE_NAME))db.createObjectStore(AUTO_BACKUP_STORE_NAME,{keyPath:'dateKey'});};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('IndexedDB open failed'));});}
+function readIndexedAutomaticBackups(db){return new Promise((resolve,reject)=>{const transaction=db.transaction(AUTO_BACKUP_STORE_NAME,'readonly'),request=transaction.objectStore(AUTO_BACKUP_STORE_NAME).getAll();request.onsuccess=()=>resolve(Array.isArray(request.result)?request.result:[]);request.onerror=()=>reject(request.error||new Error('IndexedDB read failed'));transaction.onerror=()=>reject(transaction.error||new Error('IndexedDB read failed'));});}
+async function saveIndexedAutomaticBackup(snapshot){const db=await openAutomaticBackupDatabase();try{await new Promise((resolve,reject)=>{const transaction=db.transaction(AUTO_BACKUP_STORE_NAME,'readwrite');transaction.objectStore(AUTO_BACKUP_STORE_NAME).put(snapshot);transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error||new Error('IndexedDB write failed'));});const snapshots=await readIndexedAutomaticBackups(db),cutoff=backupCutoffDateKey(),expired=snapshots.filter(s=>s.dateKey<cutoff).map(s=>s.dateKey);if(expired.length)await new Promise((resolve,reject)=>{const transaction=db.transaction(AUTO_BACKUP_STORE_NAME,'readwrite'),store=transaction.objectStore(AUTO_BACKUP_STORE_NAME);expired.forEach(key=>store.delete(key));transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error||new Error('IndexedDB cleanup failed'));});}finally{db.close();}}
+async function loadIndexedAutomaticBackups(){const db=await openAutomaticBackupDatabase();try{return await readIndexedAutomaticBackups(db);}finally{db.close();}}
+function queueAutomaticBackup(){if(!automaticBackupEnabled)return;let snapshot;try{snapshot=makeAutomaticBackupSnapshot();}catch(e){return;}const version=++automaticBackupVersion;automaticBackupWriteChain=automaticBackupWriteChain.catch(()=>{}).then(()=>version===automaticBackupVersion?saveIndexedAutomaticBackup(snapshot):undefined).catch(()=>{});}
+function readPrimaryDataState(){try{const recordsText=localStorage.getItem(STORAGE_KEY);if(!recordsText)return null;const orderText=localStorage.getItem(ORDER_KEY),templatesText=localStorage.getItem(TEMPLATE_KEY);const data={records:JSON.parse(recordsText),order:orderText?JSON.parse(orderText):[],templates:templatesText?JSON.parse(templatesText):cloneBackupData(DEFAULT_TEMPLATES)};return isValidBackupData(data)?data:null;}catch(e){return null;}}
+function restoreBackupPayload(payload){if(!payload||payload.appId!==BACKUP_APP_ID||payload.schemaVersion!==BACKUP_EXPORT_SCHEMA_VERSION||!isValidBackupData(payload.data))return false;try{const data=cloneBackupData(payload.data);allData=data.records;templates=data.templates;localStorage.setItem(STORAGE_KEY,JSON.stringify(data.records));localStorage.setItem(ORDER_KEY,JSON.stringify(data.order));localStorage.setItem(TEMPLATE_KEY,JSON.stringify(data.templates));return true;}catch(e){return false;}}
+async function recoverPrimaryDataFromAutomaticBackup(){const primary=readPrimaryDataState();if(primary&&primary.records.length)return false;let snapshots=[];try{snapshots=await loadIndexedAutomaticBackups();}catch(e){}const candidates=snapshots.filter(isValidAutomaticBackupSnapshot).sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));for(const snapshot of candidates){if(restoreBackupPayload(snapshot.payload))return true;}return false;}
+async function requestPersistentAppStorage(){try{if(navigator.storage&&typeof navigator.storage.persist==='function')await navigator.storage.persist();}catch(e){}}
+function exportBackupData(){const payload={...buildBackupPayload(),exportedAt:new Date().toISOString()};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`FAXアドレス帳_バックアップ_${localDateKey()}.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function triggerBackupImport(){const input=document.getElementById('backupImportInput');input.value='';input.click();}
+function importBackupData(file){if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const payload=JSON.parse(String(reader.result||''));if(!payload||payload.appId!==BACKUP_APP_ID||payload.schemaVersion!==BACKUP_EXPORT_SCHEMA_VERSION||!isValidBackupData(payload.data))throw new Error('invalid');if(!confirm('現在のFAXアドレス帳データをバックアップ内容で置き換えますか？'))return;if(!restoreBackupPayload(payload))throw new Error('restore failed');selectedName=null;selectedCategory=null;render();queueAutomaticBackup();showToast('バックアップデータを読み込みました');}catch(e){alert('読み込みに失敗しました。FAXアドレス帳のバックアップJSONを選択してください。');}};reader.readAsText(file,'utf-8');}
 let selectedTplId=null;
 function openKagami(){document.getElementById('kagamiOverlay').classList.add('open');renderKagamiList();if(templates.length&&!selectedTplId)selectTemplate(templates[0].id);else renderKagamiEditor();}
 function closeKagami(){document.getElementById('kagamiOverlay').classList.remove('open');}
@@ -492,7 +524,15 @@ function saveTemplate(){const name=document.getElementById('tplName').value.trim
 function addNewTemplate(){const t={id:'tpl_'+Date.now(),name:'新しいテンプレート',body:''};templates.push(t);saveTemplates();selectedTplId=t.id;renderKagamiList();renderKagamiEditor();setTimeout(()=>document.getElementById('tplName').select(),50);}
 function deleteTemplate(id){const tpl=templates.find(t=>t.id===id);if(!tpl||!confirm('「'+tpl.name+'」を削除しますか？'))return;templates=templates.filter(t=>t.id!==id);saveTemplates();selectedTplId=templates.length?templates[0].id:null;renderKagamiList();renderKagamiEditor();showToast('削除しました');}
 
-render();
+async function initializeApp(){
+  await requestPersistentAppStorage();
+  const restored=await recoverPrimaryDataFromAutomaticBackup();
+  automaticBackupEnabled=true;
+  render();
+  queueAutomaticBackup();
+  if(restored)showToast('保存データを自動バックアップから復元しました');
+}
+void initializeApp();
 </script>
 <script type="module" src="./pwa-install.js"></script>
 </body>

@@ -261,6 +261,7 @@
     }
 
     .pencil-tool,
+    .pencil-circle-size,
     .pencil-action,
     .pencil-page-btn {
       width: auto;
@@ -278,6 +279,30 @@
       border-color: var(--accent);
       background: var(--accent);
       color: #fff;
+    }
+
+    .pencil-circle-size {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pencil-circle-size::before {
+      width: var(--circle-size);
+      height: var(--circle-size);
+      border-radius: 50%;
+      background: #111827;
+      content: "";
+    }
+
+    .pencil-circle-size.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .pencil-circle-size.active::before {
+      background: #fff;
     }
 
     .pencil-action.active {
@@ -734,10 +759,15 @@
         <span class="pencil-palette-label">ツール</span>
         <button class="pencil-tool active" type="button" data-pencil-tool="text">文字入力</button>
         <button class="pencil-tool" type="button" data-pencil-tool="pen">ペン</button>
-        <button class="pencil-tool" type="button" data-pencil-tool="blackCircle">見え消し（黒丸）</button>
         <button class="pencil-tool" type="button" data-pencil-tool="blackout">黒塗り四角</button>
         <button class="pencil-tool" type="button" data-pencil-tool="whiteout">白塗り四角</button>
         <button class="pencil-tool" type="button" data-pencil-tool="rect">四角枠</button>
+      </div>
+      <div class="pencil-palette-row" aria-label="見え消しのサイズ">
+        <span class="pencil-palette-label">見え消し</span>
+        <button class="pencil-circle-size active" type="button" data-circle-size="small" style="--circle-size:8px">小</button>
+        <button class="pencil-circle-size" type="button" data-circle-size="medium" style="--circle-size:12px">中</button>
+        <button class="pencil-circle-size" type="button" data-circle-size="large" style="--circle-size:16px">大</button>
       </div>
       <div class="pencil-palette-row">
         <span class="pencil-palette-label">色</span>
@@ -752,6 +782,10 @@
         <button id="pencilUndoBtn" class="pencil-action" type="button">元に戻す</button>
         <button id="pencilClearBtn" class="pencil-action" type="button">このページを消去</button>
         <button id="pencilOcrBtn" class="pencil-action" type="button">文字を読み取る</button>
+      </div>
+      <div class="pencil-palette-row">
+        <span class="pencil-palette-label">結合</span>
+        <button id="pencilToMergeBtn" class="pencil-action" type="button">PDF結合へ移す</button>
       </div>
     </div>
     <div id="pencilPageControl" class="pencil-page-control hidden" aria-label="PDFペンシルのページ切替">
@@ -806,10 +840,12 @@
     const pencilPalette = document.getElementById("pencilPalette");
     const pencilPageControl = document.getElementById("pencilPageControl");
     const pencilToolButtons = Array.from(document.querySelectorAll(".pencil-tool"));
+    const pencilCircleSizeButtons = Array.from(document.querySelectorAll(".pencil-circle-size"));
     const pencilColorButtons = Array.from(document.querySelectorAll(".pencil-color"));
     const pencilUndoBtn = document.getElementById("pencilUndoBtn");
     const pencilClearBtn = document.getElementById("pencilClearBtn");
     const pencilOcrBtn = document.getElementById("pencilOcrBtn");
+    const pencilToMergeBtn = document.getElementById("pencilToMergeBtn");
     const pencilPreviousBtn = document.getElementById("pencilPreviousBtn");
     const pencilNextBtn = document.getElementById("pencilNextBtn");
     const pencilZoomInBtn = document.getElementById("pencilZoomInBtn");
@@ -835,6 +871,7 @@
     let pencilCurrentPageIndex = 0;
     let pencilZoom = 1;
     let pencilTool = "text";
+    let blackCircleSize = "small";
     let pencilColor = "#111827";
     let pencilDraft = null;
     let pencilSelection = null;
@@ -848,6 +885,7 @@
     let blackThreshold = 172;
     let sizeScale = 1;
     let orientationWorkerPromise = null;
+    const blackCircleDiameters = { small: 0.018, medium: 0.028, large: 0.04 };
     const manualOrientationDirections = { merge: 0, care: 0, burden: 0, pencil: 0 };
     const manualOrientationEnabled = { merge: false, care: false, burden: false, pencil: false };
     const manualUpsideDown = { merge: false, care: false, burden: false, pencil: false };
@@ -858,6 +896,7 @@
       pencil: emptyModeState()
     };
     let currentDocType = "merge";
+    let sharedInputFiles = [];
 
     const setStatus = (text) => { statusEl.textContent = text; };
     const selectedDocType = () => document.querySelector("input[name='docType']:checked").value;
@@ -866,12 +905,17 @@
     const isPencilMode = () => selectedDocType() === "pencil";
 
     document.querySelectorAll("input[name='docType']").forEach((input) => {
-      input.addEventListener("change", () => {
+      input.addEventListener("change", async () => {
         saveModeState(currentDocType);
         currentDocType = selectedDocType();
         updateRotationButtons();
         updateControlsVisibility();
         loadModeState(currentDocType);
+        if (sharedInputFiles.length && !hasCurrentModeData()) {
+          modeStates[currentDocType] = emptyModeState();
+          loadModeState(currentDocType);
+          await processFilesForCurrentMode(sharedInputFiles);
+        }
       });
     });
 
@@ -912,6 +956,15 @@
       });
     });
 
+    pencilCircleSizeButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        blackCircleSize = button.dataset.circleSize;
+        pencilTool = "blackCircle";
+        updatePencilPalette();
+        saveModeState(currentDocType);
+      });
+    });
+
     pencilColorButtons.forEach((button) => {
       button.addEventListener("click", () => {
         pencilColor = button.dataset.pencilColor;
@@ -934,6 +987,10 @@
       setStatus(pencilOcrMode
         ? "文字を読み取る範囲をドラッグしてください。"
         : "文字の読み取りを中止しました。");
+    });
+
+    pencilToMergeBtn.addEventListener("click", async () => {
+      await movePencilPdfToMerge();
     });
 
     document.addEventListener("click", (event) => {
@@ -1094,7 +1151,7 @@
     }
 
     function makeOrientationPreview(canvas) {
-      const maxSide = 1200;
+      const maxSide = 700;
       const scale = Math.min(1, maxSide / Math.max(canvas.width, canvas.height));
       if (scale === 1) return canvas;
       const preview = document.createElement("canvas");
@@ -1105,19 +1162,24 @@
     }
 
     async function detectPageRotationCorrections(canvases, fileName) {
+      if (!canvases.length) return [];
       const worker = await getOrientationWorker();
-      const corrections = [];
-      for (let index = 0; index < canvases.length; index++) {
-        setStatus(`${fileName} ${index + 1}/${canvases.length}ページの向きを自動判定中です。`);
-        // First apply the established landscape baseline. OSD only decides whether it is upside down.
-        const baseline = normalizeOrientation(cropDocument(canvases[index]));
-        const { data } = await worker.detect(makeOrientationPreview(baseline));
-        const orientation = data.orientation_degrees ?? 0;
-        const confidence = data.orientation_confidence ?? 0;
-        corrections.push(orientation === 180 && confidence >= 8 ? 180 : 0);
-        await nextFrame();
-      }
-      return corrections;
+      setStatus(`${fileName} 1ページ目の向きを自動判定中です。`);
+      // Care-insurance documents in one file use the same orientation. Checking once avoids OCR per page.
+      const baseline = normalizeOrientation(cropDocument(canvases[0]));
+      const { data } = await worker.detect(makeOrientationPreview(baseline));
+      const orientation = data.orientation_degrees ?? 0;
+      const confidence = data.orientation_confidence ?? 0;
+      const correction = orientation === 180 && confidence >= 8 ? 180 : 0;
+      return canvases.map(() => correction);
+    }
+
+    function warmOrientationWorker() {
+      if (orientationWorkerPromise) return;
+      void getOrientationWorker().catch((error) => {
+        console.warn("Failed to prepare orientation worker.", error);
+        orientationWorkerPromise = null;
+      });
     }
 
     updateRotationButtons();
@@ -1314,7 +1376,8 @@
     }
 
     function resetLoadedFiles() {
-      const type = selectedDocType();
+      sharedInputFiles = [];
+      resetAllModeStates();
       loadedCanvases = [];
       sourceCanvases = [];
       outputCanvases = [];
@@ -1326,21 +1389,34 @@
       pencilAnnotations = [];
       pencilCurrentPageIndex = 0;
       pencilZoom = 1;
+      blackCircleSize = "small";
       pencilDraft = null;
       pencilSelection = null;
       pencilResize = null;
       pencilMove = null;
       pencilOcrMode = false;
       pencilOcrDraft = null;
-      manualOrientationDirections[type] = 0;
-      manualOrientationEnabled[type] = false;
-      manualUpsideDown[type] = false;
       setActionButtonsDisabled(true);
       showPlaceholder();
       updateRotationButtons();
       updateControlsVisibility();
       setStatus(modeStatusText());
       saveModeState(currentDocType);
+    }
+
+    function resetAllModeStates() {
+      Object.keys(modeStates).forEach((type) => {
+        modeStates[type] = emptyModeState();
+        manualOrientationDirections[type] = 0;
+        manualOrientationEnabled[type] = false;
+        manualUpsideDown[type] = false;
+      });
+    }
+
+    function hasCurrentModeData() {
+      const state = modeStates[currentDocType] || emptyModeState();
+      const hasOutput = isMergeMode() ? mergeFiles.length > 0 : outputCanvases.length > 0;
+      return hasOutput && state.inputFileCount === sharedInputFiles.length;
     }
 
     function emptyModeState() {
@@ -1356,6 +1432,8 @@
         pencilAnnotations: [],
         pencilCurrentPageIndex: 0,
         pencilZoom: 1,
+        blackCircleSize: "small",
+        inputFileCount: 0,
         blackThreshold: 172,
         sizeScale: 1
       };
@@ -1374,6 +1452,8 @@
         pencilAnnotations: clonePencilAnnotations(pencilAnnotations),
         pencilCurrentPageIndex,
         pencilZoom,
+        blackCircleSize,
+        inputFileCount: sharedInputFiles.length,
         blackThreshold,
         sizeScale
       };
@@ -1392,6 +1472,7 @@
       pencilAnnotations = clonePencilAnnotations(state.pencilAnnotations || []);
       pencilCurrentPageIndex = Math.min(state.pencilCurrentPageIndex || 0, Math.max(0, loadedCanvases.length - 1));
       pencilZoom = state.pencilZoom || 1;
+      blackCircleSize = state.blackCircleSize || "small";
       pencilDraft = null;
       pencilSelection = null;
       pencilResize = null;
@@ -1433,16 +1514,65 @@
     }
 
     async function loadFiles(files) {
+      if (isMergeMode() && mergeFiles.length) {
+        sharedInputFiles.push(...files);
+        await processFilesForCurrentMode(files);
+        return;
+      }
+      sharedInputFiles = [...files];
+      resetAllModeStates();
+      loadModeState(currentDocType);
+      if (isMergeMode()) warmOrientationWorker();
+      await processFilesForCurrentMode(sharedInputFiles);
+    }
+
+    async function movePencilPdfToMerge() {
+      if (!isPencilMode() || !outputCanvases.length) return;
+      saveModeState(currentDocType);
+      const previousSharedInputFiles = [...sharedInputFiles];
+      const previousModeStates = { ...modeStates };
+      const previousManualOrientationDirections = { ...manualOrientationDirections };
+      const previousManualOrientationEnabled = { ...manualOrientationEnabled };
+      const previousManualUpsideDown = { ...manualUpsideDown };
+      setActionButtonsDisabled(true);
+      showLoading();
+      try {
+        const editedPdf = new File(
+          [buildPencilPdfBlob(outputCanvases)],
+          "PDFペンシル編集済み.pdf",
+          { type: "application/pdf" }
+        );
+        sharedInputFiles = [editedPdf];
+        resetAllModeStates();
+        document.querySelector('input[name="docType"][value="merge"]').checked = true;
+        currentDocType = "merge";
+        updateRotationButtons();
+        updateControlsVisibility();
+        loadModeState(currentDocType);
+        await processFilesForCurrentMode(sharedInputFiles);
+        setStatus("編集済みPDFを結合へ移しました。ほかのPDFをドラッグして追加できます。");
+      } catch (error) {
+        console.error(error);
+        sharedInputFiles = previousSharedInputFiles;
+        Object.assign(modeStates, previousModeStates);
+        Object.assign(manualOrientationDirections, previousManualOrientationDirections);
+        Object.assign(manualOrientationEnabled, previousManualOrientationEnabled);
+        Object.assign(manualUpsideDown, previousManualUpsideDown);
+        document.querySelector('input[name="docType"][value="pencil"]').checked = true;
+        currentDocType = "pencil";
+        updateRotationButtons();
+        updateControlsVisibility();
+        loadModeState(currentDocType);
+        setStatus("編集済みPDFを結合へ移せませんでした。");
+        showPencilEditor();
+        setActionButtonsDisabled(false);
+      }
+    }
+
+    async function processFilesForCurrentMode(files) {
       setStatus(`${files.length}件を読み込み中です。`);
       showLoading();
       setActionButtonsDisabled(true);
-      if (!isMergeMode()) {
-        loadedCanvases = [];
-        sourceCanvases = [];
-        outputCanvases = [];
-        pageRotationCorrections = [];
-        orientationDetectionFailed = false;
-      }
       try {
         if (isMergeMode()) {
           for (const file of files) {
@@ -1475,6 +1605,7 @@
           pencilAnnotations = loadedCanvases.map(() => []);
           pencilCurrentPageIndex = 0;
           pencilZoom = 1;
+          blackCircleSize = "small";
           pencilSelection = null;
           pencilResize = null;
           pencilMove = null;
@@ -2136,7 +2267,7 @@
       pencilMove = null;
       repaintPencilCanvas(canvas);
       if (pencilTool === "blackCircle") {
-        const diameter = 0.018;
+        const diameter = blackCircleDiameters[blackCircleSize];
         const height = diameter * canvas.width / canvas.height;
         pencilAnnotations[pencilCurrentPageIndex].push({
           type: "blackCircle",
@@ -2278,11 +2409,15 @@
       pencilToolButtons.forEach((button) => {
         button.classList.toggle("active", button.dataset.pencilTool === pencilTool);
       });
+      pencilCircleSizeButtons.forEach((button) => {
+        button.classList.toggle("active", pencilTool === "blackCircle" && button.dataset.circleSize === blackCircleSize);
+      });
       pencilColorButtons.forEach((button) => {
         button.classList.toggle("active", button.dataset.pencilColor === pencilColor);
       });
       pencilOcrBtn.classList.toggle("active", pencilOcrMode);
       pencilOcrBtn.disabled = !loadedCanvases.length;
+      pencilToMergeBtn.disabled = !outputCanvases.length;
       pencilPageLabel.textContent = pageCount ? `${pencilCurrentPageIndex + 1} / ${pageCount}` : "1 / 1";
       pencilPreviousBtn.disabled = pencilCurrentPageIndex <= 0;
       pencilNextBtn.disabled = !pageCount || pencilCurrentPageIndex >= pageCount - 1;

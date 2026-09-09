@@ -1701,7 +1701,8 @@ const levelChoices = ['支1', '支2', '1', '2', '3', '4', '5'];
 let currentData = [];
 let cachedAllData = null;
 let automaticBackupEnabled = false;
-let automaticBackupTimer = null;
+let automaticBackupWriteChain = Promise.resolve();
+let automaticBackupVersion = 0;
 let modalIndex = -1;
 let visitPickerYear = 0;
 let visitPickerMonth = 0;
@@ -2135,11 +2136,17 @@ function queueAutomaticBackup(all) {
   if (!automaticBackupEnabled) return;
   const snapshot = makeAutomaticBackupSnapshot(all);
   if (!snapshot) return;
-  window.clearTimeout(automaticBackupTimer);
-  automaticBackupTimer = window.setTimeout(() => {
-    saveFallbackAutomaticBackup(snapshot);
-    void saveIndexedAutomaticBackup(snapshot).catch(() => {});
-  }, 120);
+  saveFallbackAutomaticBackup(snapshot);
+
+  // Serialise writes so that a slower earlier save cannot overwrite a newer edit.
+  const version = ++automaticBackupVersion;
+  automaticBackupWriteChain = automaticBackupWriteChain
+    .catch(() => {})
+    .then(() => {
+      if (version !== automaticBackupVersion) return undefined;
+      return saveIndexedAutomaticBackup(snapshot);
+    })
+    .catch(() => {});
 }
 
 function restoreAutomaticBackupPayload(payload) {

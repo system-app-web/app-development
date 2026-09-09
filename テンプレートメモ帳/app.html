@@ -14,10 +14,13 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  html, body { height: 100%; overflow: hidden; }
+
   body {
     font-family: 'Meiryo', 'Yu Gothic', sans-serif;
     background: #eef2f7;
-    min-height: 100vh;
+    min-height: 0;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     color: #2d3748;
@@ -43,7 +46,7 @@
     display: flex;
     flex: 1;
     overflow: hidden;
-    height: calc(100vh - 52px);
+    min-height: 0;
   }
 
   /* ── サイドバー ── */
@@ -54,6 +57,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
     min-width: 200px;
     max-width: 80%;
   }
@@ -97,7 +101,9 @@
 
   .cat-list {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 6px 0;
   }
   .cat-list::-webkit-scrollbar { width: 5px; }
@@ -324,6 +330,8 @@
   /* ── 右エディタ ── */
   .editor-area {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -341,6 +349,7 @@
 
   .editor-panel {
     flex: 1;
+    min-height: 0;
     display: none;
     flex-direction: column;
     overflow: hidden;
@@ -373,7 +382,7 @@
     color: #2d3748;
   }
 
-  .actions { display: flex; gap: 8px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
   .btn {
     padding: 4px 11px;
@@ -397,6 +406,7 @@
 
   .editor-body {
     flex: 1;
+    min-height: 0;
     padding: 16px 20px 10px;
     display: flex;
     flex-direction: column;
@@ -414,13 +424,14 @@
     line-height: 1.9;
     color: #2d3748;
     resize: none;
+    overscroll-behavior: contain;
     transition: border-color 0.2s;
     background: white;
     box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
   .editor-body textarea:focus { outline: none; border-color: #4a7c9e; }
-  .editor-save-row { display: flex; justify-content: flex-end; padding: 6px 2px 8px; }
-  .btn-save { background: #4a7c9e; color: white; border: none; border-radius: 7px; padding: 7px 22px; font-size: 0.85rem; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+  .editor-save-row { display: none; }
+  .btn-save { background: #4a7c9e; color: white; border: none; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; font-family: inherit; font-weight: 600; cursor: pointer; transition: all 0.15s; }
   .btn-save:hover { filter: brightness(0.88); }
   .btn-save.saved { background: #38a169; }
 
@@ -529,6 +540,7 @@
           <span class="cat-label-main" id="catLabel"></span>
         </div>
         <div class="actions">
+          <button class="btn btn-save" id="btnSave">保存</button>
           <button class="btn btn-edit" id="btnEdit">編集</button>
           <button class="btn btn-del" id="btnDel">削除</button>
           <button class="btn btn-copy" id="btnCopy">📋 コピー</button>
@@ -536,7 +548,6 @@
       </div>
       <div class="editor-body">
         <textarea id="noteArea" spellcheck="false"></textarea>
-        <div class="editor-save-row"><button class="btn-save" id="btnSave">保存</button></div>
       </div>
     </div>
   </div>
@@ -1120,20 +1131,8 @@ function renderSidebar() {
     // グループヘッダー
     const header = document.createElement('div');
     header.className = 'group-header';
-    header.draggable = true;
     header.dataset.groupId = group.id;
 
-    header.addEventListener('dragstart', e => {
-      dragType = 'group'; dragId = group.id;
-      e.dataTransfer.effectAllowed = 'move';
-      setTimeout(() => header.classList.add('dragging'), 0);
-    });
-    header.addEventListener('dragend', () => {
-      header.classList.remove('dragging');
-      document.querySelectorAll('.drag-over-group,.drag-over-cat').forEach(el => {
-        el.classList.remove('drag-over-group','drag-over-cat');
-      });
-    });
     header.addEventListener('dragover', e => {
       if (dragType !== 'group') return;
       e.preventDefault();
@@ -1158,13 +1157,25 @@ function renderSidebar() {
     handle.className = 'drag-handle';
     handle.textContent = '⠿';
     handle.title = 'ドラッグで並び替え';
+    handle.draggable = true;
+    handle.addEventListener('dragstart', e => {
+      dragType = 'group'; dragId = group.id;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => header.classList.add('dragging'), 0);
+    });
+    handle.addEventListener('dragend', () => {
+      header.classList.remove('dragging');
+      document.querySelectorAll('.drag-over-group,.drag-over-cat').forEach(el => {
+        el.classList.remove('drag-over-group','drag-over-cat');
+      });
+    });
 
     const toggle = document.createElement('button');
     toggle.className = 'group-toggle';
     toggle.textContent = collapsed ? '▶' : '▼';
     toggle.onclick = (e) => {
       e.stopPropagation();
-      collapsedGroups[group.id] = !collapsedGroups[group.id];
+      collapsedGroups[group.id] = collapsed ? false : true;
       renderSidebar();
     };
 
@@ -1217,7 +1228,7 @@ function renderSidebar() {
     header.appendChild(gBtns);
     header.addEventListener('click', (e) => {
       if (e.target.closest('.drag-handle, .group-btns')) return;
-      collapsedGroups[group.id] = !collapsedGroups[group.id];
+      collapsedGroups[group.id] = collapsed ? false : true;
       renderSidebar();
     });
     list.appendChild(header);

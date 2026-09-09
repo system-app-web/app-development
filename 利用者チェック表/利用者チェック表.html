@@ -1675,6 +1675,7 @@ const AUTO_BACKUP_STORE_NAME = 'daily_snapshots';
 const AUTO_BACKUP_FALLBACK_KEY = 'riyosha_check_auto_backup_fallback_v1';
 const AUTO_BACKUP_RETENTION_DAYS = 30;
 const AUTO_BACKUP_SCHEMA_VERSION = 1;
+const AUTO_BACKUP_DB_VERSION = 2;
 const CHK = ['monita', 'sikien', 'drive', 'hand', 'fax'];
 const BASE_MOVABLE_COLUMN_KEYS = ['yuko', 'level', 'planL', 'planS', 'visit', 'monita', 'sikien', 'drive', 'hand', 'fax', 'meeting', 'seho'];
 const DEFAULT_COLUMN_LABELS = {
@@ -2067,7 +2068,7 @@ function saveFallbackAutomaticBackup(snapshot) {
 function openAutomaticBackupDatabase() {
   if (!window.indexedDB) return Promise.reject(new Error('IndexedDB unavailable'));
   return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(AUTO_BACKUP_DB_NAME, 1);
+    const request = window.indexedDB.open(AUTO_BACKUP_DB_NAME, AUTO_BACKUP_DB_VERSION);
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(AUTO_BACKUP_STORE_NAME)) {
@@ -2129,6 +2130,20 @@ async function loadIndexedAutomaticBackups() {
     return await readIndexedAutomaticBackups(database);
   } finally {
     database.close();
+  }
+}
+
+async function initializeAutomaticBackupDatabase() {
+  try {
+    const database = await openAutomaticBackupDatabase();
+    try {
+      await readIndexedAutomaticBackups(database);
+      return true;
+    } finally {
+      database.close();
+    }
+  } catch {
+    return false;
   }
 }
 
@@ -4841,6 +4856,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 
 async function initializeApp() {
   await requestPersistentAppStorage();
+  await initializeAutomaticBackupDatabase();
   await recoverPrimaryDataFromAutomaticBackup();
   automaticBackupEnabled = true;
 

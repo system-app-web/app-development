@@ -1230,7 +1230,7 @@
           return;
         }
         if (isPencilMode()) {
-          await saveSingleBlob(buildPencilPdfBlob(outputCanvases), "PDFペンシル.pdf");
+          await saveSingleBlob(await buildPencilPdfBlob(sharedInputFiles), "PDFペンシル.pdf");
           setStatus("書き込み済みPDFを保存しました。");
           return;
         }
@@ -1538,7 +1538,7 @@
       showLoading();
       try {
         const editedPdf = new File(
-          [buildPencilPdfBlob(outputCanvases)],
+          [await buildPencilPdfBlob(sharedInputFiles)],
           "PDFペンシル編集済み.pdf",
           { type: "application/pdf" }
         );
@@ -1722,7 +1722,9 @@
       const previews = [];
       for (let pageNumber = 1; pageNumber <= Math.min(pageCount, pdf.numPages); pageNumber++) {
         const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 0.45 });
+        // The thumbnail is displayed at 170px wide, so render above that size
+        // to keep fine document text and ruled lines readable on high-DPI screens.
+        const viewport = page.getViewport({ scale: 0.8 });
         const canvas = document.createElement("canvas");
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
@@ -2478,14 +2480,46 @@
       return objectsToPdfBlobFromPageImages(pageImages);
     }
 
-    function buildPencilPdfBlob(canvases) {
-      return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildPencilPageJpeg(canvas)));
+    async function buildPencilPdfBlob(files) {
+      const editedPdf = await PDFDocument.create();
+      let pageIndex = 0;
+
+      for (const file of files) {
+        const sourceFile = await prepareMergeFile(file);
+        const sourcePdf = await PDFDocument.load(await sourceFile.arrayBuffer(), { ignoreEncryption: true });
+        const copiedPages = await editedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
+
+        for (const copiedPage of copiedPages) {
+          const targetPage = editedPdf.addPage(copiedPage);
+          const sourceCanvas = loadedCanvases[pageIndex];
+          const annotations = pencilAnnotations[pageIndex] || [];
+          if (sourceCanvas && annotations.length) {
+            await drawPencilAnnotationsOnPdfPage(editedPdf, targetPage, sourceCanvas, annotations);
+          }
+          pageIndex += 1;
+        }
+      }
+
+      return new Blob([await editedPdf.save()], { type: "application/pdf" });
     }
 
-    function buildPencilPageJpeg(canvas, dpi = DPI) {
-      const { canvas: doc, page } = buildMergedPageCanvas(canvas, dpi);
-      const jpegData = atob(doc.toDataURL("image/jpeg", 0.92).split(",")[1]);
-      return { data: jpegData, width: doc.width, height: doc.height, page };
+    async function drawPencilAnnotationsOnPdfPage(pdf, page, sourceCanvas, annotations) {
+      const overlay = document.createElement("canvas");
+      overlay.width = sourceCanvas.width;
+      overlay.height = sourceCanvas.height;
+      const context = overlay.getContext("2d");
+      annotations.filter((annotation) => annotation.type !== "text")
+        .forEach((annotation) => drawPencilAnnotation(context, overlay, annotation));
+      annotations.filter((annotation) => annotation.type === "text")
+        .forEach((annotation) => drawPencilAnnotation(context, overlay, annotation));
+
+      const overlayImage = await pdf.embedPng(overlay.toDataURL("image/png"));
+      page.drawImage(overlayImage, {
+        x: 0,
+        y: 0,
+        width: page.getWidth(),
+        height: page.getHeight()
+      });
     }
 
     function buildOutputPdfBlob(canvases, dpi = DPI) {

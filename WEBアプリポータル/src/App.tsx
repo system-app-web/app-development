@@ -2,10 +2,11 @@ import { Header } from './components/Header';
 import { AppList } from './components/AppList';
 import { Footer } from './components/Footer';
 import { PortalNotices } from './components/PortalNotices';
+import { LoginGate } from './components/LoginGate';
 
 export default function App() {
   return (
-    <>
+    <LoginGate>
       <main>
         <section className="portal-visual" aria-label="リーホ ポータルアプリ">
           <img
@@ -19,6 +20,6 @@ export default function App() {
         <AppList />
       </main>
       <Footer />
-    </>
+    </LoginGate>
   );
 }

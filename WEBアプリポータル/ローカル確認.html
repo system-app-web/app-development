@@ -3,133 +3,257 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WEBアプリポータル - ローカル確認</title>
-<style>
-  * { box-sizing: border-box; }
-  body { margin: 0; min-width: 320px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; color: #e6edf7; background: #0a1019; }
-  button, input { font: inherit; }
-  .access-gate { display: flex; flex-direction: column; min-height: 100vh; padding: 24px; }
-  .access-gate-header, .access-gate-footer { display: flex; align-items: center; justify-content: space-between; width: min(1060px, 100%); margin: 0 auto; }
-  .access-gate-header { padding: 4px 2px 28px; border-bottom: 1px solid #273445; }
-  .access-gate-brand { display: inline-flex; align-items: center; gap: 11px; color: #fff; font-size: 16px; font-weight: 700; }
-  .access-gate-mark { display: grid; width: 30px; height: 30px; border: 1px solid #75b9ff; place-items: center; color: #75b9ff; font-size: 12px; font-weight: 800; }
-  .access-gate-session, .access-gate-footer, .access-gate-panel > p { color: #91a1b7; font-size: 11px; font-weight: 700; letter-spacing: .1em; }
-  .access-gate-layout { display: grid; grid-template-columns: minmax(0, 1fr) 365px; gap: 48px; align-items: center; width: min(1060px, 100%); min-height: 620px; margin: auto; }
-  .access-gate-notice { max-width: 570px; }
-  .access-gate-eyebrow { display: flex; align-items: center; gap: 9px; margin: 0 0 22px; color: #76baff; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
-  .access-gate-eyebrow span { width: 7px; height: 7px; border-radius: 50%; background: #3ad38b; box-shadow: 0 0 0 4px rgba(58, 211, 139, .11); }
-  h1 { margin: 0; color: #fff; font-size: 38px; line-height: 1.12; letter-spacing: 0; }
-  .access-gate-divider { width: 46px; height: 2px; margin: 29px 0 25px; background: #329dff; }
-  .access-gate-intro { margin: 0; color: #b8c4d4; font-size: 14px; line-height: 1.8; }
-  .access-gate-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; margin: 28px 0 0; padding: 0; list-style: none; color: #8e9daf; font-size: 11px; letter-spacing: .04em; }
-  .access-gate-list li::before { margin-right: 8px; color: #65b2ff; content: "+"; }
-  .access-gate-panel { padding: 30px; border: 1px solid #2b394c; border-radius: 8px; background: #111a27; box-shadow: 0 18px 45px rgba(0, 0, 0, .24); }
-  .access-gate-panel > p { margin: 0 0 6px; }
-  .access-gate-panel h2 { margin: 0 0 26px; color: #fff; font-size: 22px; }
-  label { display: block; margin: 17px 0 8px; color: #a6b4c5; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
-  label span { color: #6e7e91; font-weight: 500; letter-spacing: 0; }
-  input { width: 100%; height: 44px; padding: 0 13px; border: 1px solid #405167; border-radius: 4px; outline: none; color: #edf5ff; background: #0c1420; font-size: 14px; }
-  input:focus { border-color: #75b9ff; box-shadow: 0 0 0 3px rgba(117, 185, 255, .18); }
-  input::placeholder { color: #53657a; }
-  .access-gate-verify, .access-gate-install { width: 100%; border-radius: 4px; font-size: 11px; font-weight: 800; letter-spacing: .08em; cursor: pointer; }
-  .access-gate-verify { height: 46px; margin-top: 25px; border: 0; color: #07121f; background: #74baff; }
-  .access-gate-install { height: 43px; margin-top: 12px; border: 1px solid #49637e; color: #c7e2ff; background: transparent; }
-  .access-gate-panel-foot { margin: 22px 0 0; color: #718197; font-size: 10px; line-height: 1.6; text-align: center; }
-  .access-gate-footer { padding-top: 22px; border-top: 1px solid #273445; }
-  .access-gate-footer span:first-child::before { color: #7cbcff; content: "● "; }
-  .portal { display: none; min-height: 100vh; color: #172033; background: #fff; }
-  .portal-header { width: min(1180px, calc(100% - 40px)); margin: 12px auto 0; padding: 6px 0; }
-  .portal-header img { display: block; width: 158px; height: 100px; object-fit: cover; object-position: center; }
-  .portal-main { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 18px 0 72px; }
-  .portal-main h1 { color: #172033; font-size: 28px; }
-  .app-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; margin-top: 20px; }
-  .app-card { display: flex; flex-direction: column; min-height: 246px; padding: 22px; border: 1px solid #d9e6f2; border-radius: 16px; background: #fff; box-shadow: 0 18px 45px rgba(23, 65, 110, .12); }
-  .app-card-top { display: flex; align-items: center; gap: 14px; }
-  .app-card-top img { width: 58px; height: 58px; border-radius: 18px; object-fit: cover; }
-  .app-card h2 { margin: 0; font-size: 18px; line-height: 1.35; }
-  .app-card p { flex: 1; margin: 18px 0 10px; color: #40516a; font-size: 16px; line-height: 1.7; }
-  .trial { flex: initial !important; margin: 0 0 16px !important; color: #c4541b !important; font-size: 14px !important; font-weight: 800; }
-  .app-button { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 14px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #1176d8, #45b7f5); box-shadow: 0 12px 22px rgba(17, 118, 216, .2); font-size: 16px; font-weight: 900; text-decoration: none; }
-  .app-button.disabled { color: #8fa0b3; background: #eef3f7; box-shadow: none; }
-  @media (max-width: 980px) { .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 760px) {
-    .access-gate { min-height: 100svh; padding: 20px; }
-    .access-gate-header { padding-bottom: 20px; }
-    .access-gate-brand { gap: 8px; font-size: 12px; }
-    .access-gate-session { display: none; }
-    .access-gate-layout { grid-template-columns: 1fr; gap: 35px; min-height: auto; margin: 0; padding: 38px 0; }
-    h1 { font-size: 30px; }
-    .access-gate-list { grid-template-columns: 1fr; }
-    .access-gate-panel { padding: 25px; }
-    .access-gate-footer { gap: 10px; align-items: flex-start; flex-direction: column; }
-    .portal-header { width: calc(100% - 24px); margin-top: 6px; padding: 4px 0; }
-    .portal-header img { width: 120px; height: 76px; }
-    .portal-main { width: calc(100% - 28px); padding-top: 12px; }
-    .portal-main h1 { font-size: 24px; }
-    .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    .app-card { min-height: 212px; padding: 14px; }
-    .app-card-top { gap: 10px; }
-    .app-card-top img { width: 46px; height: 46px; border-radius: 14px; }
-    .app-card h2 { font-size: 16px; }
-    .app-card p { margin: 14px 0 8px; font-size: 14px; line-height: 1.55; }
-    .app-button { min-height: 42px; padding: 10px 8px; border-radius: 12px; font-size: 14px; }
-  }
-</style>
+  <title>リーホ - ログイン確認</title>
+  <style>
+    :root { color: #182a21; background: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; }
+    * { box-sizing: border-box; }
+    body { min-width: 320px; min-height: 100vh; margin: 0; background: #fff; }
+    button, input, select { font: inherit; }
+    .login-page { position: relative; display: grid; min-height: 100vh; padding: 34px 24px 108px; place-items: center; }
+    .login-layout { width: min(460px, 100%); text-align: center; }
+    .riho-logo { display: block; width: min(340px, 82vw); height: 190px; margin: 0 auto 18px; object-fit: contain; }
+    .login-card { padding: 30px; border: 1px solid #dce9df; border-radius: 8px; background: #fff; box-shadow: 0 12px 28px rgba(17, 62, 38, .08); text-align: left; }
+    .login-card h1 { margin: 0; color: #173d2a; font-size: 1.3rem; letter-spacing: 0; text-align: center; }
+    .login-card > p { margin: 8px 0 26px; color: #66776d; font-size: .88rem; line-height: 1.7; text-align: center; }
+    .field { margin-top: 18px; }
+    label { display: block; margin-bottom: 8px; color: #315441; font-size: .88rem; font-weight: 700; }
+    input, select { width: 100%; height: 48px; padding: 0 13px; border: 1px solid #c9dbcf; border-radius: 6px; outline: 0; color: #172a20; background: #fff; font-size: 1rem; }
+    select { cursor: pointer; }
+    input:focus, select:focus { border-color: #24935c; box-shadow: 0 0 0 3px rgba(36, 147, 92, .13); }
+    input::placeholder { color: #a2b0a6; }
+    .request-button, .verify-button { display: flex; width: 100%; align-items: center; justify-content: center; border-radius: 6px; font-size: .96rem; font-weight: 700; cursor: pointer; }
+    .request-button { height: 44px; margin-top: 20px; border: 1px solid #91bda2; color: #216640; background: #fff; }
+    .verify-button { height: 50px; margin-top: 26px; border: 0; color: #fff; background: #168750; box-shadow: 0 8px 16px rgba(22, 135, 80, .18); }
+    .request-button:hover { background: #f3faf5; }
+    .verify-button:hover { background: #0d7642; }
+    .status { min-height: 22px; margin: 14px 0 0; color: #52665a; font-size: .8rem; line-height: 1.55; text-align: center; }
+    .status.is-error { color: #b54437; }
+    .status.is-success { color: #187443; }
+    .safety-tools { margin-top: 21px; border-top: 1px solid #e6eee8; color: #627166; font-size: .78rem; }
+    .safety-tools summary { padding-top: 16px; cursor: pointer; text-align: center; }
+    .safety-actions { display: flex; gap: 8px; padding-top: 12px; }
+    .safety-actions button { flex: 1; height: 36px; border: 1px solid #d2e0d5; border-radius: 5px; color: #3e5d49; background: #fff; cursor: pointer; }
+    .company-logo { position: absolute; right: 26px; bottom: 20px; display: block; width: 98px; height: 78px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(80, 44, 25, .12)); }
+    @media (max-width: 560px) {
+      .login-page { padding: 20px 18px 94px; place-items: start center; }
+      .login-layout { margin-top: 20px; }
+      .riho-logo { width: min(292px, 86vw); height: 165px; margin-bottom: 10px; }
+      .login-card { padding: 24px 20px; }
+      .company-logo { right: 16px; bottom: 13px; width: 80px; height: 64px; }
+    }
+  </style>
 </head>
 <body>
+  <main class="login-page">
+    <section class="login-layout" aria-labelledby="login-title">
+      <img class="riho-logo" src="./public/riho-title.png" alt="リーホ 介護業務効率化ポータルアプリ">
+      <form class="login-card" id="login-form">
+        <h1 id="login-title">アプリ一覧へログイン</h1>
+        <p>社員名と社員PINを入力し、端末認証を行ってください。</p>
 
-<main id="access-gate" class="access-gate">
-  <header class="access-gate-header">
-    <div class="access-gate-brand"><span class="access-gate-mark">KTM</span><span>KTM CARE APPLICATIONS</span></div>
-    <span class="access-gate-session">SECURE SESSION REQUIRED</span>
-  </header>
-  <div class="access-gate-layout">
-    <section class="access-gate-notice">
-      <p class="access-gate-eyebrow"><span></span>AUTHORIZED PERSONNEL ONLY</p>
-      <h1>RESTRICTED<br>SYSTEM ACCESS</h1>
-      <div class="access-gate-divider"></div>
-      <p class="access-gate-intro">This internal application portal is protected under administrator control. Access attempts may be monitored and verified against registered security information.</p>
-      <ul class="access-gate-list">
-        <li>ACCESS LOGGING ENABLED</li><li>SECURITY CREDENTIAL CHECK</li><li>ADMINISTRATOR CONTROLLED</li><li>UNAUTHORIZED USE PROHIBITED</li>
-      </ul>
+        <div class="field">
+          <label for="employee">社員名</label>
+          <select id="employee" name="employee" required>
+            <option value="">社員名を選択</option>
+            <option>都外川　洋介</option><option>岡　喜久美</option><option>白石　貴弘</option><option>宮地　淳</option>
+            <option>池田　淳</option><option>井上　真澄</option><option>竹山　亮子</option><option>楠　悦子</option>
+            <option>佐藤　和夫</option><option>石田　由美子</option><option>岩田　明日香</option><option>谷川　義和</option>
+            <option>藤嶋　孝信</option><option>深井　貴将</option><option>藤井　由美</option><option>浦越　拓哉</option>
+            <option>永野　暢俊</option><option>松尾　修</option><option>和田　真由美</option><option>山川　篤徳</option>
+            <option>三橋　彩佳</option><option>名守　佑香</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="password">社員PIN</label>
+          <input id="password" name="password" type="password" inputmode="numeric" autocomplete="off" maxlength="3" placeholder="3桁のPINを入力" required>
+        </div>
+
+        <button class="request-button" id="request-button" type="button">端末認証を申請</button>
+
+        <div class="field">
+          <label for="one-time-password">認証ワンタイムパスワード</label>
+          <input id="one-time-password" name="one-time-password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6桁の認証コード" required>
+        </div>
+
+        <button class="verify-button" type="submit">認証してアプリ一覧へ</button>
+        <p class="status" id="status" aria-live="polite"></p>
+
+        <details class="safety-tools">
+          <summary>確認用データ管理</summary>
+          <div class="safety-actions">
+            <button type="button" id="export-button">バックアップ</button>
+            <button type="button" id="import-button">データ挿入</button>
+            <input id="import-file" type="file" accept="application/json" hidden>
+          </div>
+        </details>
+      </form>
     </section>
-    <section class="access-gate-panel">
-      <p>KTM INTERNAL PORTAL</p><h2>VERIFY ACCESS</h2>
-      <label for="administrator-id">ADMINISTRATOR ID</label><input id="administrator-id" type="text" placeholder="Enter your ID">
-      <label for="security-key">SECURITY KEY</label><input id="security-key" type="password" placeholder="Enter your password">
-      <label for="one-time-password">ONE-TIME PASSWORD <span>(optional)</span></label><input id="one-time-password" type="text" placeholder="Enter code">
-      <button class="access-gate-verify" type="button" onclick="openPortal()">VERIFY ACCESS</button>
-      <button class="access-gate-install" type="button" onclick="openPortal()">INSTALL APPLICATIONS</button>
-      <p class="access-gate-panel-foot">By proceeding, you confirm that you are an authorized user.</p>
-    </section>
-  </div>
-  <footer class="access-gate-footer"><span>ACCESS CONTROL ACTIVE</span><span>KTM CARE · INTERNAL USE ONLY</span></footer>
-</main>
+    <img class="company-logo" src="./public/ktm-logo.png" alt="KTM Keep Trust Meaning">
+  </main>
 
-<main id="portal" class="portal">
-  <header class="portal-header"><img src="./public/2207.jpg" alt="KTM Keep Trust Meaning ロゴ"></header>
-  <section class="portal-main">
-    <h1>アプリ一覧</h1>
-    <div class="app-grid">
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/genogram.png" alt=""><h2>かんたんジェノグラム</h2></div><p>家族関係を図で整理</p><a class="app-button" href="https://easy-genogram-app.vercel.app" target="_blank">このアプリを開く</a></article>
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/floor-plan.png" alt=""><h2>シンプル見取り図</h2></div><p>施設・住居の見取り図を作成</p><p class="trial">試作公開中</p><a class="app-button" href="https://easy-floor-plan.vercel.app" target="_blank">このアプリを開く</a></article>
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/assessment.svg" alt=""><h2>アセスメントシート</h2></div><p>利用者支援のアセスメントを整理</p><span class="app-button disabled">調整中</span></article>
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/pdf-converter.png" alt=""><h2>PDF変換アプリ</h2></div><p>証書PDFの変換・結合</p><a class="app-button" href="https://pdf-converter-app-six.vercel.app" target="_blank">このアプリを開く</a></article>
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/user-checklist.png" alt=""><h2>利用者チェック表</h2></div><p>利用者状況を確認・記録</p><a class="app-button" href="https://riyosha-check-app.vercel.app" target="_blank">このアプリを開く</a></article>
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/fax-address-book.png" alt=""><h2>FAXアドレス帳</h2></div><p>FAX送信先管理</p><a class="app-button" href="https://fax-address-book.vercel.app" target="_blank">このアプリを開く</a></article>
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/template-notes.png" alt=""><h2>テンプレートメモ帳</h2></div><p>文例管理</p><p class="trial">試作公開中</p><a class="app-button" href="https://template-memo.vercel.app" target="_blank">このアプリを開く</a></article>
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/shortcut-memo.svg" alt=""><h2>ショートカットメモ</h2></div><p>よく使うキーボード操作を管理</p><a class="app-button" href="https://shortcut-list.vercel.app" target="_blank">このアプリを開く</a></article>
-      <article class="app-card"><div class="app-card-top"><img src="./public/app-icons/pdf-converter.png" alt=""><h2>提供票自動振り分け</h2></div><p>提供票PDFを事業所別に振り分け</p><span class="app-button disabled">調整中</span></article>
-    </div>
-  </section>
-</main>
+  <script>
+    const APP_ID = 'ktm-portal-access-preview';
+    const AUTH_SERVICE_URL = 'https://script.google.com/macros/s/AKfycbyBLa2UzLgaxu7wb6GKqIJ_uiEbet4fW1QjCGGh83_Yb1JdJrq0ygF2ai6O5oJencw-/exec';
+    const STORAGE_KEY = `${APP_ID}:state`;
+    const DEVICE_ID_KEY = `${APP_ID}:device-id`;
+    const DATABASE_NAME = 'KTM Portal Access Preview Backup';
+    const STORE_NAME = 'daily_snapshots';
+    const employeeSelect = document.getElementById('employee');
+    const passwordInput = document.getElementById('password');
+    const otpInput = document.getElementById('one-time-password');
+    const status = document.getElementById('status');
+    let state = { employee: '', latestRequest: null, session: null };
 
-<script>
-  function openPortal() {
-    document.getElementById('access-gate').style.display = 'none';
-    document.getElementById('portal').style.display = 'block';
-    window.scrollTo(0, 0);
-  }
-</script>
+    const isValidState = (value) => value && typeof value === 'object' && typeof value.employee === 'string';
+    const todayKey = () => new Date().toISOString().slice(0, 10);
+    function setStatus(message, type = '') { status.textContent = message; status.className = `status${type ? ` is-${type}` : ''}`; }
+    function applyState() { employeeSelect.value = state.employee || ''; }
+
+    function getDeviceId() {
+      const existing = localStorage.getItem(DEVICE_ID_KEY);
+      if (existing) return existing;
+      const deviceId = crypto.randomUUID();
+      localStorage.setItem(DEVICE_ID_KEY, deviceId);
+      return deviceId;
+    }
+
+    async function callAuthService(action, payload) {
+      const response = await fetch(AUTH_SERVICE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, payload }),
+        redirect: 'follow',
+      });
+      const result = await response.json();
+      if (!result.ok) throw new Error(result.message || '認証処理に失敗しました。');
+      return result;
+    }
+
+    function isEmployeePinValid() {
+      const index = Array.from(employeeSelect.options).findIndex((option) => option.value === employeeSelect.value);
+      return index > 0 && passwordInput.value === String(index).padStart(3, '0');
+    }
+
+    function openBackupDatabase() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DATABASE_NAME, 1);
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains(STORE_NAME)) request.result.createObjectStore(STORE_NAME, { keyPath: 'date' });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function saveDailySnapshot() {
+      const database = await openBackupDatabase();
+      const snapshot = { date: todayKey(), savedAt: new Date().toISOString(), payload: { data: state } };
+      await new Promise((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        store.put(snapshot);
+        store.getAll().onsuccess = (event) => {
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 30);
+          for (const item of event.target.result) if (new Date(`${item.date}T00:00:00`) < cutoff) store.delete(item.date);
+        };
+        transaction.oncomplete = resolve;
+        transaction.onerror = () => reject(transaction.error);
+      });
+      database.close();
+    }
+
+    async function restoreLatestBackup() {
+      const database = await openBackupDatabase();
+      const snapshots = await new Promise((resolve, reject) => {
+        const request = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      database.close();
+      const newestFirst = snapshots.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+      return newestFirst.find((item) => isValidState(item?.payload?.data))?.payload?.data || null;
+    }
+
+    async function persistState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      try { await saveDailySnapshot(); } catch (error) { console.warn('IndexedDB backup could not be saved.', error); }
+    }
+
+    async function initialize() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (isValidState(stored)) state = stored;
+        else {
+          const restored = await restoreLatestBackup();
+          if (restored) { state = restored; localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+        }
+      } catch (error) {
+        const restored = await restoreLatestBackup();
+        if (restored) state = restored;
+      }
+      applyState();
+    }
+
+    employeeSelect.addEventListener('change', async () => { state.employee = employeeSelect.value; await persistState(); });
+    document.getElementById('request-button').addEventListener('click', async () => {
+      if (!employeeSelect.value || !passwordInput.value) { setStatus('社員名と社員PINを入力してください。', 'error'); return; }
+      if (!isEmployeePinValid()) { setStatus('社員名または社員PINが正しくありません。', 'error'); return; }
+      try {
+        const result = await callAuthService('requestDeviceApproval', {
+          employeeName: employeeSelect.value,
+          employeePin: passwordInput.value,
+          deviceId: getDeviceId(),
+          deviceName: `${navigator.platform || '端末'} / ${navigator.language}`,
+          browser: navigator.userAgent,
+        });
+        state = { employee: employeeSelect.value, latestRequest: { requestId: result.requestId, requestedAt: new Date().toISOString(), status: 'requested' }, session: null };
+        await persistState();
+        setStatus('管理者へ認証コードを送信しました。届いた6桁のコードを入力してください。', 'success');
+      } catch (error) { setStatus(error.message || '端末認証の申請に失敗しました。', 'error'); }
+    });
+    document.getElementById('login-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!employeeSelect.value || !passwordInput.value || !/^\d{6}$/.test(otpInput.value) || !state.latestRequest?.requestId) {
+        setStatus('端末認証を申請後、6桁の認証コードを入力してください。', 'error');
+        return;
+      }
+      if (!isEmployeePinValid()) { setStatus('社員名または社員PINが正しくありません。', 'error'); return; }
+      try {
+        const result = await callAuthService('verifyOneTimePassword', {
+          requestId: state.latestRequest.requestId,
+          code: otpInput.value,
+          deviceId: getDeviceId(),
+        });
+        state = { employee: result.employeeName, latestRequest: { requestedAt: new Date().toISOString(), status: 'approved' }, session: { accessToken: result.accessToken } };
+        await persistState();
+        window.location.assign('./ポータルトップ確認.html');
+      } catch (error) { setStatus(error.message || '端末認証に失敗しました。', 'error'); }
+    });
+    document.getElementById('export-button').addEventListener('click', () => {
+      const backup = JSON.stringify({ appId: APP_ID, exportedAt: new Date().toISOString(), payload: { data: state } }, null, 2);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([backup], { type: 'application/json' }));
+      link.download = `KTM-portal-login-backup-${todayKey()}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+    document.getElementById('import-button').addEventListener('click', () => document.getElementById('import-file').click());
+    document.getElementById('import-file').addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const backup = JSON.parse(await file.text());
+        if (backup.appId !== APP_ID || !isValidState(backup?.payload?.data)) throw new Error('Invalid backup');
+        state = backup.payload.data;
+        applyState();
+        await persistState();
+        setStatus('確認用データを読み込みました。', 'success');
+      } catch (error) { setStatus('この画面のバックアップとして読み込めませんでした。', 'error'); }
+      event.target.value = '';
+    });
+    initialize();
+  </script>
 </body>
 </html>

@@ -10,11 +10,11 @@
     <link rel="apple-touch-icon" href="./app-icon.png" />
     <link rel="icon" type="image/png" href="./app-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <meta http-equiv="refresh" content="0; url=./app.html" />
+    <script src="https://app-development-gray.vercel.app/portal-auth-guard.js"></script>
     <title>PDF変換アプリ</title>
   </head>
   <body>
-    <script>location.replace('./app.html');</script>
+    <script>document.addEventListener('ktm-auth-ready', () => location.replace(`./app.html${location.search}${location.hash}`), { once: true });</script>
     <a href="./app.html">PDF変換アプリを開く</a>
   </body>
 </html>

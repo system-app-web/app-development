@@ -1,4 +1,5 @@
 import type { PortalApp } from '../data/appData';
+import { createAppAccessUrl } from '../lib/portalAccess';
 
 type AppCardProps = {
   app: PortalApp;
@@ -30,7 +31,7 @@ export function AppCard({ app }: AppCardProps) {
         </button>
       ) : (
         <div className="app-card-actions">
-          <a className="button primary" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}を新しいタブで開く`}>
+          <a className="button primary" href={createAppAccessUrl(app.url)} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}を新しいタブで開く`}>
             このアプリを開く
           </a>
           {app.installUrl ? (

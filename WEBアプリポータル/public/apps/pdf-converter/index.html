@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="refresh" content="0; url=./PDF変換アプリ.html" />
+    <script src="/portal-auth-guard.js"></script>
     <title>PDF変換アプリ</title>
   </head>
   <body>
-    <script>location.replace('./PDF変換アプリ.html');</script>
+    <script>document.addEventListener('ktm-auth-ready', () => location.replace(`./PDF変換アプリ.html${location.search}${location.hash}`), { once: true });</script>
     <a href="./PDF変換アプリ.html">PDF変換アプリを開く</a>
   </body>
 </html>

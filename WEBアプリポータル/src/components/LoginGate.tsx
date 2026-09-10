@@ -1,8 +1,7 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { DEVICE_ID_KEY, getDeviceId, getStoredSession, SESSION_KEY, type DeviceSession } from '../lib/portalAccess';
 
 const AUTH_SERVICE_URL = 'https://script.google.com/macros/s/AKfycbyBLa2UzLgaxu7wb6GKqIJ_uiEbet4fW1QjCGGh83_Yb1JdJrq0ygF2ai6O5oJencw-/exec';
-const DEVICE_ID_KEY = 'ktm-portal:device-id';
-const SESSION_KEY = 'ktm-portal:device-session';
 
 const EMPLOYEES = [
   '都外川　洋介', '岡　喜久美', '白石　貴弘', '宮地　淳', '池田　淳', '井上　真澄',
@@ -10,11 +9,6 @@ const EMPLOYEES = [
   '藤嶋　孝信', '深井　貴将', '藤井　由美', '浦越　拓哉', '永野　暢俊', '松尾　修',
   '和田　真由美', '山川　篤徳', '三橋　彩佳', '名守　佑香',
 ];
-
-type DeviceSession = {
-  accessToken: string;
-  employeeName: string;
-};
 
 type PendingRequest = {
   requestId: string;
@@ -30,21 +24,36 @@ type AuthResponse = {
   valid?: boolean;
 };
 
-function getDeviceId() {
-  const existing = localStorage.getItem(DEVICE_ID_KEY);
-  if (existing) return existing;
-  const created = crypto.randomUUID();
-  localStorage.setItem(DEVICE_ID_KEY, created);
-  return created;
-}
+const APP_ORIGINS = new Set([
+  'https://easy-genogram-app.vercel.app',
+  'https://easy-floor-plan.vercel.app',
+  'https://assessment-sheet-app.vercel.app',
+  'https://pdf-converter-app-six.vercel.app',
+  'https://riyosha-check-app.vercel.app',
+  'https://fax-address-book.vercel.app',
+  'https://template-memo.vercel.app',
+  'https://shortcut-list.vercel.app',
+  'https://service-slip-sorter.vercel.app',
+]);
 
-function getStoredSession(): DeviceSession | null {
+function getReturnUrl() {
+  const value = new URLSearchParams(window.location.search).get('returnTo');
+  if (!value) return null;
   try {
-    const parsed = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-    return parsed && typeof parsed.accessToken === 'string' && typeof parsed.employeeName === 'string' ? parsed : null;
+    const url = new URL(value);
+    return APP_ORIGINS.has(url.origin) ? url : null;
   } catch {
     return null;
   }
+}
+
+function sendToRequestedApp(session: DeviceSession) {
+  const returnUrl = getReturnUrl();
+  if (!returnUrl) return false;
+  returnUrl.searchParams.set('ktmDeviceId', getDeviceId());
+  returnUrl.searchParams.set('ktmAccessToken', session.accessToken);
+  window.location.replace(returnUrl.toString());
+  return true;
 }
 
 async function callAuthService(action: string, payload: Record<string, string>): Promise<AuthResponse> {
@@ -87,6 +96,10 @@ export function LoginGate({ children }: { children: ReactNode }) {
       setSession(null);
     }).finally(() => setCheckingSession(false));
   }, []);
+
+  useEffect(() => {
+    if (session && !checkingSession) sendToRequestedApp(session);
+  }, [checkingSession, session]);
 
   async function requestApproval() {
     if (!employeeName || !/^\d{3}$/.test(employeePin)) {

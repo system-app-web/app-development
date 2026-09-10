@@ -18,6 +18,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
+      <head>
+        <script src="https://app-development-gray.vercel.app/portal-auth-guard.js" />
+      </head>
       <body>{children}</body>
     </html>
   );

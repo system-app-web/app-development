@@ -85,7 +85,9 @@
 
     // Let approved devices open without waiting for the network. The validation still
     // runs immediately in the background and sends revoked devices back to the portal.
-    queueMicrotask(allowAccess);
+    // The small timer lets lightweight entry pages register their redirect handler
+    // before the ready event is emitted.
+    setTimeout(allowAccess, 0);
     validateAccess(session);
   }
 

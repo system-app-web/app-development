@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useState } from 'react';
 import { DEVICE_ID_KEY, getDeviceId, getStoredSession, SESSION_KEY, type DeviceSession } from '../lib/portalAccess';
 
 const AUTH_SERVICE_URL = 'https://script.google.com/macros/s/AKfycbyBLa2UzLgaxu7wb6GKqIJ_uiEbet4fW1QjCGGh83_Yb1JdJrq0ygF2ai6O5oJencw-/exec';
@@ -70,7 +70,6 @@ async function callAuthService(action: string, payload: Record<string, string>):
 
 export function LoginGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<DeviceSession | null>(() => getStoredSession());
-  const [checkingSession, setCheckingSession] = useState(() => Boolean(getStoredSession()));
   const [employeeName, setEmployeeName] = useState(() => getStoredSession()?.employeeName || '');
   const [employeePin, setEmployeePin] = useState('');
   const [oneTimePassword, setOneTimePassword] = useState('');
@@ -83,6 +82,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
     const stored = getStoredSession();
     if (!stored) return;
 
+    // Existing approved devices can enter immediately. Revocation is checked in the background.
     void callAuthService('validateDeviceSession', {
       deviceId: getDeviceId(),
       accessToken: stored.accessToken,
@@ -94,12 +94,12 @@ export function LoginGate({ children }: { children: ReactNode }) {
     }).catch(() => {
       localStorage.removeItem(SESSION_KEY);
       setSession(null);
-    }).finally(() => setCheckingSession(false));
+    });
   }, []);
 
-  useEffect(() => {
-    if (session && !checkingSession) sendToRequestedApp(session);
-  }, [checkingSession, session]);
+  useLayoutEffect(() => {
+    if (session) sendToRequestedApp(session);
+  }, [session]);
 
   async function requestApproval() {
     if (!employeeName || !/^\d{3}$/.test(employeePin)) {
@@ -158,7 +158,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
     }
   }
 
-  if (session && !checkingSession) return <>{children}</>;
+  if (session) return <>{children}</>;
 
   return (
     <main className="login-shell">

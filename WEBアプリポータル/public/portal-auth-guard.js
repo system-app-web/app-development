@@ -62,7 +62,20 @@
     document.dispatchEvent(new Event('ktm-auth-ready'));
   }
 
-  async function checkAccess() {
+  function validateAccess(session) {
+    const deviceId = getDeviceId();
+    void callAuthService('validateDeviceSession', { deviceId, accessToken: session.accessToken })
+      .then((result) => {
+        if (!result.valid) throw new Error('未承認の端末です。');
+        return callAuthService('writeUsageLog', { deviceId, accessToken: session.accessToken, appName: document.title || '名称未取得' });
+      })
+      .catch(() => {
+        localStorage.removeItem(SESSION_KEY);
+        returnToPortal();
+      });
+  }
+
+  function checkAccess() {
     receivePortalSession();
     const session = getSession();
     if (!session) {
@@ -70,16 +83,10 @@
       return;
     }
 
-    try {
-      const deviceId = getDeviceId();
-      const result = await callAuthService('validateDeviceSession', { deviceId, accessToken: session.accessToken });
-      if (!result.valid) throw new Error('未承認の端末です。');
-      void callAuthService('writeUsageLog', { deviceId, accessToken: session.accessToken, appName: document.title || '名称未取得' });
-      allowAccess();
-    } catch (_) {
-      localStorage.removeItem(SESSION_KEY);
-      returnToPortal();
-    }
+    // Let approved devices open without waiting for the network. The validation still
+    // runs immediately in the background and sends revoked devices back to the portal.
+    queueMicrotask(allowAccess);
+    validateAccess(session);
   }
 
   void checkAccess();

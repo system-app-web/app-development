@@ -31,7 +31,7 @@ export function AppCard({ app }: AppCardProps) {
         </button>
       ) : (
         <div className="app-card-actions">
-          <a className="button primary" href={createAppAccessUrl(app.url)} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}を新しいタブで開く`}>
+          <a className="button primary" href={createAppAccessUrl(app.url)} aria-label={`${app.name}を開く`}>
             このアプリを開く
           </a>
           {app.installUrl ? (

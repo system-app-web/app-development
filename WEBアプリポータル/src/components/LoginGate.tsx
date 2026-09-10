@@ -91,10 +91,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
         localStorage.removeItem(SESSION_KEY);
         setSession(null);
       }
-    }).catch(() => {
-      localStorage.removeItem(SESSION_KEY);
-      setSession(null);
-    });
+    }).catch(() => {});
   }, []);
 
   useLayoutEffect(() => {

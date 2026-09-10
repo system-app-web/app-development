@@ -14,7 +14,7 @@
     <title>PDF変換アプリ</title>
   </head>
   <body>
-    <script>document.addEventListener('ktm-auth-ready', () => location.replace(`./app.html${location.search}${location.hash}`), { once: true });</script>
+    <script>const openApp = () => location.replace(`./app.html${location.search}${location.hash}`); window.ktmAuthReady ? openApp() : document.addEventListener('ktm-auth-ready', openApp, { once: true });</script>
     <a href="./app.html">PDF変換アプリを開く</a>
   </body>
 </html>

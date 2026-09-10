@@ -7,7 +7,7 @@
     <title>利用者チェック表</title>
   </head>
   <body>
-    <script>document.addEventListener('ktm-auth-ready', () => location.replace(`./利用者チェック表.html${location.search}${location.hash}`), { once: true });</script>
+    <script>const openApp = () => location.replace(`./利用者チェック表.html${location.search}${location.hash}`); window.ktmAuthReady ? openApp() : document.addEventListener('ktm-auth-ready', openApp, { once: true });</script>
     <a href="./利用者チェック表.html">利用者チェック表を開く</a>
   </body>
 </html>

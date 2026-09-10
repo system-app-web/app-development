@@ -59,6 +59,7 @@
 
   function allowAccess() {
     document.documentElement.classList.remove('ktm-auth-checking');
+    window.ktmAuthReady = true;
     document.dispatchEvent(new Event('ktm-auth-ready'));
   }
 
@@ -66,13 +67,15 @@
     const deviceId = getDeviceId();
     void callAuthService('validateDeviceSession', { deviceId, accessToken: session.accessToken })
       .then((result) => {
-        if (!result.valid) throw new Error('未承認の端末です。');
-        return callAuthService('writeUsageLog', { deviceId, accessToken: session.accessToken, appName: document.title || '名称未取得' });
+        if (!result.valid) {
+          localStorage.removeItem(SESSION_KEY);
+          returnToPortal();
+          return;
+        }
+        void callAuthService('writeUsageLog', { deviceId, accessToken: session.accessToken, appName: document.title || '名称未取得' }).catch(() => {});
       })
-      .catch(() => {
-        localStorage.removeItem(SESSION_KEY);
-        returnToPortal();
-      });
+      // A temporary connection error must never log out an approved device.
+      .catch(() => {});
   }
 
   function checkAccess() {

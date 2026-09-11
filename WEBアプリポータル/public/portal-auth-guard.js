@@ -6,6 +6,14 @@
   const DEVICE_ID_KEY = 'ktm-portal:device-id';
   const SESSION_KEY = 'ktm-portal:device-session';
 
+  // Finder previews use file:// URLs and must remain usable without publishing.
+  // Authentication only applies to the deployed HTTPS applications.
+  if (location.protocol === 'file:') {
+    window.ktmAuthReady = true;
+    setTimeout(() => document.dispatchEvent(new Event('ktm-auth-ready')), 0);
+    return;
+  }
+
   document.documentElement.classList.add('ktm-auth-checking');
   const style = document.createElement('style');
   style.textContent = '.ktm-auth-checking body{visibility:hidden!important}';

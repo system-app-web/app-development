@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useState } from 'react';
-import { DEVICE_ID_KEY, getDeviceId, getStoredSession, SESSION_KEY, type DeviceSession } from '../lib/portalAccess';
+import { clearStoredSession, getDeviceId, getStoredSession, saveStoredSession, type DeviceSession } from '../lib/portalAccess';
 
 const AUTH_SERVICE_URL = 'https://script.google.com/macros/s/AKfycbyBLa2UzLgaxu7wb6GKqIJ_uiEbet4fW1QjCGGh83_Yb1JdJrq0ygF2ai6O5oJencw-/exec';
 
@@ -9,7 +9,7 @@ const EMPLOYEES = [
   '藤嶋　孝信', '深井　貴将', '藤井　由美', '浦越　拓哉', '永野　暢俊', '松尾　修',
   '和田　真由美', '山川　篤徳', '三橋　彩佳', '名守　佑香',
 ];
-const ADMINISTRATOR_NAME = '浦越　拓哉';
+const RECOVERY_CODE_USERS = new Set(['浦越　拓哉', '都外川　洋介']);
 
 type PendingRequest = {
   requestId: string;
@@ -78,7 +78,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isAdministrator = employeeName === ADMINISTRATOR_NAME;
+  const canUseRecoveryCode = RECOVERY_CODE_USERS.has(employeeName);
 
   useEffect(() => {
     const stored = getStoredSession();
@@ -90,7 +90,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
       accessToken: stored.accessToken,
     }).then((result) => {
       if (!result.valid) {
-        localStorage.removeItem(SESSION_KEY);
+        clearStoredSession();
         setSession(null);
       }
     }).catch(() => {});
@@ -146,7 +146,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
       });
       if (!result.accessToken || !result.employeeName) throw new Error('端末認証を確認できませんでした。');
       const approvedSession = { accessToken: result.accessToken, employeeName: result.employeeName };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(approvedSession));
+      saveStoredSession(approvedSession);
       setSession(approvedSession);
       setIsError(false);
     } catch (error) {
@@ -177,7 +177,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
       });
       if (!result.accessToken || !result.employeeName) throw new Error('管理者認証を確認できませんでした。');
       const approvedSession = { accessToken: result.accessToken, employeeName: result.employeeName };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(approvedSession));
+      saveStoredSession(approvedSession);
       setSession(approvedSession);
       setIsError(false);
     } catch (error) {
@@ -194,7 +194,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
     <main className="login-shell">
       <section className="login-content" aria-labelledby="login-title">
         <img className="login-riho-logo" src={`${import.meta.env.BASE_URL}riho-title.png`} alt="リーホ 介護業務効率化ポータルアプリ" />
-        <form className="login-form" onSubmit={isAdministrator ? verifyAdministrator : verifyApproval}>
+        <form className="login-form" onSubmit={canUseRecoveryCode ? verifyAdministrator : verifyApproval}>
           <h1 id="login-title">アプリ一覧へログイン</h1>
           <p>社員名と社員PINを入力し、端末認証を行ってください。</p>
 
@@ -212,15 +212,15 @@ export function LoginGate({ children }: { children: ReactNode }) {
           <label htmlFor="employee-pin">社員PIN</label>
           <input id="employee-pin" value={employeePin} onChange={(event) => setEmployeePin(event.target.value.replace(/\D/g, '').slice(0, 3))} inputMode="numeric" autoComplete="off" type="password" placeholder="3桁のPINを入力" required />
 
-          {!isAdministrator && <button className="login-request" type="button" onClick={requestApproval} disabled={isSubmitting}>
+          {!canUseRecoveryCode && <button className="login-request" type="button" onClick={requestApproval} disabled={isSubmitting}>
             {isSubmitting ? '送信中...' : '端末認証を申請'}
           </button>}
 
-          <label htmlFor="one-time-password">{isAdministrator ? '管理者用認証コード' : '認証ワンタイムパスワード'}</label>
-          <input id="one-time-password" value={oneTimePassword} onChange={(event) => setOneTimePassword(isAdministrator ? event.target.value.slice(0, 32) : event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode={isAdministrator ? 'text' : 'numeric'} autoComplete={isAdministrator ? 'current-password' : 'one-time-code'} type={isAdministrator ? 'password' : 'text'} placeholder={isAdministrator ? '管理者用コードを入力' : '6桁の認証コード'} disabled={!isAdministrator && !pendingRequest} required />
+          <label htmlFor="one-time-password">{canUseRecoveryCode ? '管理者用認証コード' : '認証ワンタイムパスワード'}</label>
+          <input id="one-time-password" value={oneTimePassword} onChange={(event) => setOneTimePassword(canUseRecoveryCode ? event.target.value.slice(0, 32) : event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode={canUseRecoveryCode ? 'text' : 'numeric'} autoComplete={canUseRecoveryCode ? 'current-password' : 'one-time-code'} type={canUseRecoveryCode ? 'password' : 'text'} placeholder={canUseRecoveryCode ? '管理者用コードを入力' : '6桁の認証コード'} disabled={!canUseRecoveryCode && !pendingRequest} required />
 
-          <button className="login-verify" type="submit" disabled={isAdministrator ? isSubmitting : !pendingRequest || isSubmitting}>
-            {isAdministrator ? '管理者として認証' : '認証してアプリ一覧へ'}
+          <button className="login-verify" type="submit" disabled={canUseRecoveryCode ? isSubmitting : !pendingRequest || isSubmitting}>
+            {canUseRecoveryCode ? '管理者として認証' : '認証してアプリ一覧へ'}
           </button>
           {message && <p className={`login-status${isError ? ' is-error' : ''}`} aria-live="polite">{message}</p>}
         </form>

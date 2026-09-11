@@ -21,7 +21,7 @@ const SHEETS = {
 const CODE_LIFETIME_MINUTES = 10;
 const REQUEST_LIMIT = 3;
 const REQUEST_LIMIT_WINDOW_MINUTES = 30;
-const ADMINISTRATOR_NAME = '浦越　拓哉';
+const RECOVERY_CODE_USERS = new Set(['浦越　拓哉', '都外川　洋介']);
 
 function doPost(event) {
   try {
@@ -148,7 +148,7 @@ function verifyAdministratorAccess_(payload) {
   const employee = findEmployee_(employeeName);
   const configuredCode = getScriptProperties_().getProperty(CONFIG_KEYS.administratorRecoveryCode);
 
-  if (employeeName !== ADMINISTRATOR_NAME || !employee || normalizePin_(employee.pin) !== normalizePin_(employeePin) || !configuredCode || recoveryCode !== configuredCode) {
+  if (!RECOVERY_CODE_USERS.has(employeeName) || !employee || normalizePin_(employee.pin) !== normalizePin_(employeePin) || !configuredCode || recoveryCode !== configuredCode) {
     throw new Error('管理者認証情報が正しくありません。');
   }
 

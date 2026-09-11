@@ -105,13 +105,15 @@
 
   /* ドラッグ */
   .drag-over-group { border-top: 2px solid rgba(255,255,255,0.45); }
-  .drag-over-cat   { border-top: 2px solid #4a7c9e; }
+  .drag-over-cat   { border-top: 2px solid rgba(255,255,255,0.45); }
+  .cat-drop-indicator { height: 3px; margin: 1px 10px 1px 24px; background: rgba(255,255,255,0.75); box-shadow: 0 0 5px rgba(255,255,255,0.65); pointer-events: none; }
   .dragging        { opacity: 0.4; }
 
   .drag-handle {
     color: rgba(255,255,255,0.18);
     font-size: 0.8rem;
     cursor: grab;
+    touch-action: none;
     padding: 0 6px 0 4px;
     flex-shrink: 0;
     user-select: none;
@@ -214,6 +216,7 @@
 
   /* カテゴリ行 */
   .cat-item {
+    position: relative;
     display: flex;
     align-items: center;
     margin: 2px 10px 2px 24px;
@@ -283,6 +286,8 @@
     transition: all 0.15s;
   }
   .cat-btn.copy { border-color: rgba(74,124,158,0.6); color: #7ec8e3; }
+  .cat-btn.move { width: 28px; padding: 4px 0; border-color: rgba(255,255,255,0.22); color: rgba(255,255,255,0.75); }
+  .cat-btn.move:hover { background: rgba(255,255,255,0.12); color: white; }
   .cat-btn.copy:hover { background: rgba(74,124,158,0.3); color: white; }
   .cat-btn.copy.copied { background: rgba(56,161,105,0.3); border-color: #38a169; color: #9ae6b4; }
   .cat-btn.edit { border-color: rgba(255,255,255,0.22); color: rgba(255,255,255,0.65); }
@@ -599,6 +604,8 @@
 
 <script>
 // ── デフォルトデータ ──
+const AI_OUTPUT_COPY_INSTRUCTION = '生成した文の最後に文字数は入れないこと。トリプルクリックでその文を選択してコピペするため。項目名など頭に載せる場合は改行して生成してください。';
+
 const DEFAULT_AI_PROMPTS = [
   {
     "id": "ai_assessment",
@@ -685,6 +692,11 @@ const DEFAULT_AI_PROMPT_ORDER = [
   'ai_medication_info',
 ];
 DEFAULT_AI_PROMPTS.sort((a, b) => DEFAULT_AI_PROMPT_ORDER.indexOf(a.id) - DEFAULT_AI_PROMPT_ORDER.indexOf(b.id));
+DEFAULT_AI_PROMPTS.forEach(prompt => {
+  if (!prompt.template.includes(AI_OUTPUT_COPY_INSTRUCTION)) {
+    prompt.template = `${prompt.template.trimEnd()}\n\n${AI_OUTPUT_COPY_INSTRUCTION}`;
+  }
+});
 
 const DEFAULT_SUPPORT_PROGRESS = [
   {
@@ -801,6 +813,12 @@ function normalizeData(data) {
       data.categories.push({ ...prompt });
     }
   });
+  const aiPromptIds = new Set(DEFAULT_AI_PROMPTS.map(prompt => prompt.id));
+  data.categories.forEach(category => {
+    if (aiPromptIds.has(category.id) && !category.template.includes(AI_OUTPUT_COPY_INSTRUCTION)) {
+      category.template = `${category.template.trimEnd()}\n\n${AI_OUTPUT_COPY_INSTRUCTION}`;
+    }
+  });
   const carePlan2 = data.categories.find(c => c.id === 'ai_care_plan_2');
   const legacyCarePlan2 = '【理由記載】で【サービス内容】を利用される。ケアプラン2表「ニーズ」「長期」「短期」「サービス内容」を記載して。\n＊福祉用具であれば理由付けも記載して「～必要」で〆る';
   if (carePlan2?.template === legacyCarePlan2) {
@@ -824,15 +842,6 @@ function normalizeData(data) {
   if (nursingNeed?.template.includes('◆認知機能の低下により')) {
     nursingNeed.template = DEFAULT_SUPPORT_PROGRESS.find(p => p.id === 'support_home_nursing_doctor_confirmation').template;
   }
-  const defaultAiPromptRanks = new Map(DEFAULT_AI_PROMPT_ORDER.map((id, index) => [id, index]));
-  data.categories.sort((a, b) => {
-    const aRank = defaultAiPromptRanks.get(a.id);
-    const bRank = defaultAiPromptRanks.get(b.id);
-    if (aRank !== undefined && bRank !== undefined) return aRank - bRank;
-    if (aRank !== undefined) return -1;
-    if (bRank !== undefined) return 1;
-    return 0;
-  });
   DEFAULT_SUPPORT_PROGRESS.forEach(prompt => {
     if (!data.categories.some(c => c.id === prompt.id)) {
       data.categories.push({ ...prompt });
@@ -1307,48 +1316,56 @@ function renderSidebar() {
   }
 }
 
+function startCategoryDrag(e, cat, item) {
+  e.preventDefault();
+  const marker = document.createElement('div');
+  marker.className = 'cat-drop-indicator';
+  let targetId = null;
+  let before = true;
+  item.classList.add('dragging');
+  const move = event => {
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('.cat-item');
+    if (!target || target === item) return;
+    const rect = target.getBoundingClientRect();
+    before = event.clientY < rect.top + rect.height / 2;
+    target.parentNode.insertBefore(marker, before ? target : target.nextSibling);
+    targetId = target.dataset.catId;
+  };
+  const end = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', end);
+    marker.remove();
+    item.classList.remove('dragging');
+    if (!targetId) return;
+    const data = getData();
+    const fromIndex = data.categories.findIndex(c => c.id === cat.id);
+    const targetIndex = data.categories.findIndex(c => c.id === targetId);
+    if (fromIndex < 0 || targetIndex < 0) return;
+    const targetGroupId = data.categories[targetIndex].groupId;
+    const [moved] = data.categories.splice(fromIndex, 1);
+    const refreshedTargetIndex = data.categories.findIndex(c => c.id === targetId);
+    moved.groupId = targetGroupId;
+    data.categories.splice(refreshedTargetIndex + (before ? 0 : 1), 0, moved);
+    saveData(data);
+    renderSidebar();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', end);
+}
+
 function makeCatItem(cat, groupId) {
   const item = document.createElement('div');
   item.className = 'cat-item' + (currentCatId === cat.id ? ' active' : '');
-  item.draggable = true;
+  item.draggable = false;
   item.dataset.catId = cat.id;
-
-  item.addEventListener('dragstart', e => {
-    dragType = 'cat'; dragId = cat.id;
-    e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => item.classList.add('dragging'), 0);
-  });
-  item.addEventListener('dragend', () => {
-    item.classList.remove('dragging');
-    document.querySelectorAll('.drag-over-group,.drag-over-cat').forEach(el => {
-      el.classList.remove('drag-over-group','drag-over-cat');
-    });
-  });
-  item.addEventListener('dragover', e => {
-    if (dragType !== 'cat' || dragId === cat.id) return;
-    e.preventDefault();
-    document.querySelectorAll('.drag-over-cat').forEach(el => el.classList.remove('drag-over-cat'));
-    item.classList.add('drag-over-cat');
-  });
-  item.addEventListener('drop', e => {
-    e.preventDefault();
-    item.classList.remove('drag-over-cat');
-    if (dragType !== 'cat' || dragId === cat.id) return;
-    const d = getData();
-    const fromIdx = d.categories.findIndex(c => c.id === dragId);
-    const toIdx   = d.categories.findIndex(c => c.id === cat.id);
-    const [moved] = d.categories.splice(fromIdx, 1);
-    moved.groupId = cat.groupId;
-    d.categories.splice(toIdx, 0, moved);
-    saveData(d);
-    renderSidebar();
-  });
 
   // ドラッグハンドル
   const handle = document.createElement('span');
   handle.className = 'drag-handle';
   handle.textContent = '⠿';
   handle.title = 'ドラッグで並び替え';
+  handle.draggable = false;
+  handle.addEventListener('pointerdown', e => startCategoryDrag(e, cat, item));
 
   const bar = document.createElement('div');
   bar.className = 'cat-color-bar';

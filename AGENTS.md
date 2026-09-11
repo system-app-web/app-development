@@ -6,6 +6,7 @@
 - Do not start a Vercel deployment, redeployment, promotion, publishing action, or hosting configuration unless the user explicitly asks to deploy in the current task.
 - Treat `commit`, `push`, and `deploy` as separate actions. Editing files does not imply any of them.
 - Do not start a local web server, open a hosted preview, or check a site on the web unless the user explicitly asks for web-based confirmation.
+- `こぷで` is an explicit instruction to commit the current task's intended changes and push them to GitHub. It also expresses the user's intent to deploy the related release; Vercel dashboard operations remain manual unless a deployment method is explicitly available.
 
 # New App Data Protection Check
 

@@ -9,6 +9,7 @@
 const CONFIG_KEYS = {
   spreadsheetId: 'SPREADSHEET_ID',
   adminEmail: 'ADMIN_EMAIL',
+  administratorRecoveryCode: 'ADMINISTRATOR_RECOVERY_CODE',
 };
 
 const SHEETS = {
@@ -20,6 +21,7 @@ const SHEETS = {
 const CODE_LIFETIME_MINUTES = 10;
 const REQUEST_LIMIT = 3;
 const REQUEST_LIMIT_WINDOW_MINUTES = 30;
+const ADMINISTRATOR_NAME = '浦越　拓哉';
 
 function doPost(event) {
   try {
@@ -33,6 +35,9 @@ function doPost(event) {
         break;
       case 'verifyOneTimePassword':
         result = verifyOneTimePassword_(payload);
+        break;
+      case 'verifyAdministratorAccess':
+        result = verifyAdministratorAccess_(payload);
         break;
       case 'validateDeviceSession':
         result = validateDeviceSession_(payload);
@@ -131,20 +136,39 @@ function verifyOneTimePassword_(payload) {
   }
   if (hash_(code) !== request.codeHash) throw new Error('認証コードが正しくありません。');
 
+  properties.deleteProperty(pendingKey);
+  return approveDevice_(request.employeeName, deviceId, 'ポータルログイン', requestId);
+}
+
+function verifyAdministratorAccess_(payload) {
+  const employeeName = requiredText_(payload.employeeName, '社員名');
+  const employeePin = requiredText_(payload.employeePin, '社員PIN');
+  const recoveryCode = requiredText_(payload.recoveryCode, '管理者用認証コード');
+  const deviceId = requiredText_(payload.deviceId, '端末ID');
+  const employee = findEmployee_(employeeName);
+  const configuredCode = getScriptProperties_().getProperty(CONFIG_KEYS.administratorRecoveryCode);
+
+  if (employeeName !== ADMINISTRATOR_NAME || !employee || normalizePin_(employee.pin) !== normalizePin_(employeePin) || !configuredCode || recoveryCode !== configuredCode) {
+    throw new Error('管理者認証情報が正しくありません。');
+  }
+
+  checkRequestLimit_(employeeName, deviceId);
+  return approveDevice_(employeeName, deviceId, '管理者固定コード認証');
+}
+
+function approveDevice_(employeeName, deviceId, auditAction, requestId) {
   const now = new Date();
   const accessToken = `${Utilities.getUuid()}${Utilities.getUuid()}`.replace(/-/g, '');
-  properties.setProperty(`device:${hash_(deviceId)}`, JSON.stringify({
-    employeeName: request.employeeName,
+  getScriptProperties_().setProperty(`device:${hash_(deviceId)}`, JSON.stringify({
+    employeeName,
     deviceId,
     tokenHash: hash_(accessToken),
     approvedAt: now.toISOString(),
     expiresAt: null,
   }));
-  properties.deleteProperty(pendingKey);
-  updateApprovalStatus_(requestId, '承認済み', '端末利用期限: 無期限（管理者が無効化するまで）', now);
-  getSheet_(SHEETS.audit).appendRow([now, request.employeeName, hash_(deviceId), 'ポータルログイン', '', '成功']);
-
-  return { accessToken, expiresAt: null, employeeName: request.employeeName };
+  if (requestId) updateApprovalStatus_(requestId, '承認済み', '端末利用期限: 無期限（管理者が無効化するまで）', now);
+  getSheet_(SHEETS.audit).appendRow([now, employeeName, hash_(deviceId), auditAction, '', '成功']);
+  return { accessToken, expiresAt: null, employeeName };
 }
 
 function validateDeviceSession_(payload) {

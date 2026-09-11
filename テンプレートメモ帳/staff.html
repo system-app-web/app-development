@@ -515,6 +515,7 @@
   <h1>📋 テンプレートメモ帳</h1>
   <div class="header-actions">
     <button class="undo-delete" id="undoDelete" type="button" disabled>↶ 戻す</button>
+    <button class="header-utility" id="btnRefresh" type="button">更新</button>
     <button class="header-utility backup" id="btnBackup" type="button">バックアップ</button>
     <button class="header-utility import" id="btnImport" type="button">データ挿入</button>
   </div>
@@ -1070,6 +1071,8 @@ function saveData(data) {
   }
   queueAutomaticBackup(safeData);
 }
+
+document.getElementById('btnRefresh').addEventListener('click', () => window.location.reload());
 
 async function initializeTemplateMemoStorage() {
   await requestPersistentAppStorage();

@@ -193,6 +193,29 @@ a {
   align-items: center;
 }
 
+.header-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.logout-button {
+  margin: 0 0 6px;
+  padding: 3px 5px;
+  border: 0;
+  background: transparent;
+  color: rgba(52, 73, 91, 0.68);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.logout-button:hover,
+.logout-button:focus-visible {
+  color: #1d4f67;
+  text-decoration: underline;
+}
+
 .portal-title {
   position: relative;
 }
@@ -706,6 +729,15 @@ a {
 
   .site-header {
     padding: 6px 10px;
+  }
+
+  .header-actions {
+    gap: 4px;
+  }
+
+  .logout-button {
+    margin-bottom: 4px;
+    font-size: 0.66rem;
   }
 
   .portal-title-logo {

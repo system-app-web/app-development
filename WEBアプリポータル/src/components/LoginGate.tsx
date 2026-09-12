@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useState } from 'react';
 import { clearStoredSession, getDeviceId, getStoredSession, saveStoredSession, type DeviceSession } from '../lib/portalAccess';
+import { PortalLogoutContext } from '../lib/portalAuthContext';
 
 const AUTH_SERVICE_URL = 'https://script.google.com/macros/s/AKfycbyBLa2UzLgaxu7wb6GKqIJ_uiEbet4fW1QjCGGh83_Yb1JdJrq0ygF2ai6O5oJencw-/exec';
 
@@ -85,7 +86,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
     if (!stored) return;
 
     // Existing approved devices can enter immediately. Revocation is checked in the background.
-    void callAuthService('validateDeviceSession', {
+    void callAuthService('adoptDeviceSession', {
       deviceId: getDeviceId(),
       accessToken: stored.accessToken,
     }).then((result) => {
@@ -188,7 +189,21 @@ export function LoginGate({ children }: { children: ReactNode }) {
     }
   }
 
-  if (session) return <>{children}</>;
+  function logout() {
+    const stored = getStoredSession();
+    if (stored) {
+      void callAuthService('revokeDeviceSession', {
+        deviceId: getDeviceId(),
+        accessToken: stored.accessToken,
+      }).catch(() => {});
+    }
+    clearStoredSession();
+    setSession(null);
+  }
+
+  if (session) {
+    return <PortalLogoutContext.Provider value={logout}>{children}</PortalLogoutContext.Provider>;
+  }
 
   return (
     <main className="login-shell">

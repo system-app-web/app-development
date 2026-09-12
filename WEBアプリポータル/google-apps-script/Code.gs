@@ -42,6 +42,12 @@ function doPost(event) {
       case 'validateDeviceSession':
         result = validateDeviceSession_(payload);
         break;
+      case 'adoptDeviceSession':
+        result = adoptDeviceSession_(payload);
+        break;
+      case 'revokeDeviceSession':
+        result = revokeDeviceSession_(payload);
+        break;
       case 'writeUsageLog':
         result = writeUsageLog_(payload);
         break;
@@ -181,6 +187,44 @@ function validateDeviceSession_(payload) {
   if (device.expiresAt && new Date(device.expiresAt) < new Date()) return { valid: false, reason: '端末認証の期限が切れました。' };
   if (hash_(accessToken) !== device.tokenHash) return { valid: false, reason: '端末認証情報が一致しません。' };
   return { valid: true, employeeName: device.employeeName, expiresAt: device.expiresAt };
+}
+
+function adoptDeviceSession_(payload) {
+  const deviceId = requiredText_(payload.deviceId, '端末ID');
+  const accessToken = requiredText_(payload.accessToken, '端末認証情報');
+  const properties = getScriptProperties_();
+  const tokenHash = hash_(accessToken);
+  const devices = Object.entries(properties.getProperties())
+    .filter(([key]) => key.indexOf('device:') === 0)
+    .map(([key, value]) => ({ key, value: JSON.parse(value) }));
+  const approvedDevice = devices.find(({ value }) => value.tokenHash === tokenHash);
+
+  if (!approvedDevice) return { valid: false, reason: '未承認の端末です。' };
+  if (approvedDevice.value.expiresAt && new Date(approvedDevice.value.expiresAt) < new Date()) return { valid: false, reason: '端末認証の期限が切れました。' };
+
+  properties.setProperty(`device:${hash_(deviceId)}`, JSON.stringify({
+    ...approvedDevice.value,
+    deviceId,
+  }));
+  getSheet_(SHEETS.audit).appendRow([new Date(), approvedDevice.value.employeeName, hash_(deviceId), '端末セッション共有', '', '成功']);
+  return { valid: true, employeeName: approvedDevice.value.employeeName, expiresAt: approvedDevice.value.expiresAt };
+}
+
+function revokeDeviceSession_(payload) {
+  const deviceId = requiredText_(payload.deviceId, '端末ID');
+  const accessToken = requiredText_(payload.accessToken, '端末認証情報');
+  const properties = getScriptProperties_();
+  const tokenHash = hash_(accessToken);
+  const devices = Object.entries(properties.getProperties())
+    .filter(([key]) => key.indexOf('device:') === 0)
+    .map(([key, value]) => ({ key, value: JSON.parse(value) }));
+  const matchingDevices = devices.filter(({ value }) => value.tokenHash === tokenHash);
+
+  matchingDevices.forEach(({ key }) => properties.deleteProperty(key));
+  if (matchingDevices.length) {
+    getSheet_(SHEETS.audit).appendRow([new Date(), matchingDevices[0].value.employeeName, hash_(deviceId), 'ログアウト', '', '成功']);
+  }
+  return { loggedOut: true };
 }
 
 function writeUsageLog_(payload) {

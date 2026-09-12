@@ -194,19 +194,25 @@ a {
 }
 
 .header-actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  position: absolute;
+  top: 0;
+  right: 24px;
+  bottom: 0;
+  width: 96px;
 }
 
 .logout-button {
-  margin: 0 0 6px;
-  padding: 3px 5px;
-  border: 0;
-  background: transparent;
-  color: rgba(52, 73, 91, 0.68);
+  position: absolute;
+  top: 12px;
+  right: 0;
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid rgba(52, 104, 131, 0.62);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #315a70;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   cursor: pointer;
 }
 
@@ -240,8 +246,9 @@ a {
 }
 
 .brand {
-  position: relative;
-  align-self: flex-end;
+  position: absolute;
+  right: 0;
+  bottom: 10px;
 }
 
 .portal-visual {
@@ -732,11 +739,13 @@ a {
   }
 
   .header-actions {
-    gap: 4px;
+    right: 10px;
+    width: 68px;
   }
 
   .logout-button {
-    margin-bottom: 4px;
+    top: 8px;
+    padding: 4px 6px;
     font-size: 0.66rem;
   }
 
@@ -751,9 +760,7 @@ a {
     height: 70px;
   }
 
-  .brand {
-    align-self: flex-end;
-  }
+  .brand { bottom: 6px; }
 
   .hero,
   .app-section {

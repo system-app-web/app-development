@@ -531,6 +531,57 @@
       white-space: nowrap;
     }
 
+    .merge-preview-item.is-openable {
+      cursor: zoom-in;
+    }
+
+    .merge-pdf-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(31, 41, 55, .55);
+    }
+
+    .merge-pdf-dialog.hidden {
+      display: none;
+    }
+
+    .merge-pdf-dialog-panel {
+      position: relative;
+      width: min(1100px, 100%);
+      height: min(88vh, 900px);
+      padding: 48px 12px 12px;
+      border-radius: 7px;
+      background: #fff;
+      box-shadow: 0 12px 32px rgba(24, 39, 49, .3);
+    }
+
+    .merge-pdf-viewer {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 1px solid #9cacb2;
+      background: #fff;
+    }
+
+    .merge-pdf-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      width: auto;
+      min-height: 30px;
+      padding: 5px 11px;
+      border: 1px solid #b9c8cd;
+      border-radius: 5px;
+      background: #fff;
+      color: #40505d;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
     .merge-summary {
       font-size: 15px;
       font-weight: 700;
@@ -817,9 +868,16 @@
     </div>
   </div>
 
+  <div id="mergePdfDialog" class="merge-pdf-dialog hidden" role="dialog" aria-modal="true" aria-label="PDFプレビュー">
+    <div class="merge-pdf-dialog-panel">
+      <button id="mergePdfCloseBtn" class="merge-pdf-close" type="button">閉じる</button>
+      <iframe id="mergePdfViewer" class="merge-pdf-viewer" title="PDFプレビュー"></iframe>
+    </div>
+  </div>
+
   <script type="module">
     import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
-    import { PDFDocument } from "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm";
+    import { PDFDocument, degrees } from "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm";
     import { createWorker } from "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/+esm";
 
     const A4 = { wMm: 210, hMm: 297, wPt: 595.28, hPt: 841.89 };
@@ -857,6 +915,9 @@
     const pencilTextCancelBtn = document.getElementById("pencilTextCancelBtn");
     const pencilTextCopyBtn = document.getElementById("pencilTextCopyBtn");
     const pencilTextSaveBtn = document.getElementById("pencilTextSaveBtn");
+    const mergePdfDialog = document.getElementById("mergePdfDialog");
+    const mergePdfViewer = document.getElementById("mergePdfViewer");
+    const mergePdfCloseBtn = document.getElementById("mergePdfCloseBtn");
     const contrastButtons = Array.from(document.querySelectorAll(".contrast-btn"));
     const sizeButtons = Array.from(document.querySelectorAll(".size-btn"));
     const statusEl = document.getElementById("status");
@@ -868,6 +929,7 @@
     let mergeFiles = [];
     let mergePageCount = 0;
     let mergePreviewCanvases = [];
+    let mergePdfPreviewUrl = null;
     let pencilAnnotations = [];
     let pencilCurrentPageIndex = 0;
     let pencilZoom = 1;
@@ -1033,8 +1095,19 @@
       }
     });
 
+    mergePdfCloseBtn.addEventListener("click", closeMergePdfPreview);
+    mergePdfDialog.addEventListener("click", (event) => {
+      if (event.target === mergePdfDialog) closeMergePdfPreview();
+    });
+
     pencilTextInput.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closePencilTextEditor();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !mergePdfDialog.classList.contains("hidden")) {
+        closeMergePdfPreview();
+      }
     });
 
     pencilClearBtn.addEventListener("click", () => {
@@ -1712,6 +1785,7 @@
       previews.forEach((canvas) => {
         mergePreviewCanvases.push({
           canvas,
+          file,
           label: `No.${fileIndex}`
         });
       });
@@ -2439,9 +2513,19 @@
       if (mergePreviewCanvases.length) {
         const grid = document.createElement("div");
         grid.className = "merge-preview-grid";
-        mergePreviewCanvases.forEach(({ canvas, label }) => {
+        mergePreviewCanvases.forEach(({ canvas, file, label }) => {
           const item = document.createElement("div");
-          item.className = "merge-preview-item";
+          item.className = "merge-preview-item is-openable";
+          item.tabIndex = 0;
+          item.setAttribute("role", "button");
+          item.setAttribute("aria-label", `${label}をPDFで開く`);
+          item.addEventListener("click", () => openMergePdfPreview(file));
+          item.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              openMergePdfPreview(file);
+            }
+          });
           item.appendChild(buildPreviewSheet(canvas));
           const caption = document.createElement("div");
           caption.textContent = label;
@@ -2455,6 +2539,20 @@
       summary.innerHTML = `${mergeFiles.length}件・${mergePageCount}ページを結合します<br>上記のPDF保存または印刷（FAX送信）を押して下さい`;
       content.appendChild(summary);
       drop.appendChild(content);
+    }
+
+    function openMergePdfPreview(file) {
+      closeMergePdfPreview();
+      mergePdfPreviewUrl = URL.createObjectURL(file);
+      mergePdfViewer.src = `${mergePdfPreviewUrl}#page=1&zoom=page-width`;
+      mergePdfDialog.classList.remove("hidden");
+    }
+
+    function closeMergePdfPreview() {
+      mergePdfDialog.classList.add("hidden");
+      mergePdfViewer.removeAttribute("src");
+      if (mergePdfPreviewUrl) URL.revokeObjectURL(mergePdfPreviewUrl);
+      mergePdfPreviewUrl = null;
     }
 
     function buildPreviewSheet(canvas) {
@@ -2564,11 +2662,38 @@
       for (let index = 0; index < files.length; index++) {
         setStatus(`${index + 1}/${files.length}件目を結合中です。`);
         const sourcePdf = await PDFDocument.load(await files[index].arrayBuffer(), { ignoreEncryption: true });
-        const copiedPages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
+        for (let pageIndex = 0; pageIndex < sourcePdf.getPageCount(); pageIndex++) {
+          await addMergedPdfPage(mergedPdf, sourcePdf, pageIndex);
+        }
         await nextFrame();
       }
       return new Blob([await mergedPdf.save()], { type: "application/pdf" });
+    }
+
+    async function addMergedPdfPage(targetPdf, sourcePdf, pageIndex) {
+      const sourcePage = sourcePdf.getPage(pageIndex);
+      const rotation = ((sourcePage.getRotation().angle % 360) + 360) % 360;
+      if (rotation === 0) {
+        const [copiedPage] = await targetPdf.copyPages(sourcePdf, [pageIndex]);
+        targetPdf.addPage(copiedPage);
+        return;
+      }
+
+      const embeddedPage = await targetPdf.embedPage(sourcePage);
+      const sourceWidth = sourcePage.getWidth();
+      const sourceHeight = sourcePage.getHeight();
+      const isSideways = rotation === 90 || rotation === 270;
+      const page = targetPdf.addPage(isSideways
+        ? [sourceHeight, sourceWidth]
+        : [sourceWidth, sourceHeight]);
+
+      if (rotation === 90) {
+        page.drawPage(embeddedPage, { x: sourceHeight, y: 0, rotate: degrees(90) });
+      } else if (rotation === 180) {
+        page.drawPage(embeddedPage, { x: sourceWidth, y: sourceHeight, rotate: degrees(180) });
+      } else if (rotation === 270) {
+        page.drawPage(embeddedPage, { x: 0, y: sourceWidth, rotate: degrees(270) });
+      }
     }
 
     function printMergedPdfBlob(blob) {

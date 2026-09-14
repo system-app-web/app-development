@@ -411,7 +411,7 @@ h1 {
   padding: 2px 0 6px;
 }
 .item-control-slot.open .item-palette { display: grid; }
-.door-palette {
+.door-palette, .window-palette {
   display: none;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px 4px;
@@ -419,6 +419,7 @@ h1 {
   padding: 2px 0 6px;
 }
 .item-control-slot.doors-open .door-palette { display: grid; }
+.item-control-slot.windows-open .window-palette { display: grid; }
 .dtool-btn, .size-btn, .item-btn {
   width: 36px;
   height: 36px;
@@ -432,6 +433,12 @@ h1 {
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   color: #4b6c73;
   font-size: 15px;
+}
+.item-toggle-label {
+  display: block;
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 700;
 }
 .dtool-btn:hover, .item-btn:hover, .size-btn:hover {
   background: #edfafd;
@@ -584,12 +591,13 @@ h1 {
       <div class="item-control-heading">アイコンを選択</div>
       <div class="item-control-actions">
         <button class="dtool-btn" type="button" onclick="addFloorPlan()" title="間取りを配置" aria-label="間取りを配置"><span class="floor-plan-icon" aria-hidden="true"></span></button>
-        <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette"><svg class="palette-chair-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v7H7zM5.5 11h13v5h-13zM7 16v4M17 16v4"/></svg></button>
+        <button id="palette-toggle" class="dtool-btn" type="button" onclick="togglePalette()" title="アイテム" aria-label="アイテム" aria-expanded="false" aria-controls="item-palette"><span class="item-toggle-label" aria-hidden="true">アイ<br>テム</span></button>
         <button id="door-toggle" class="dtool-btn" type="button" onclick="toggleDoorPalette()" title="ドア" aria-label="ドア" aria-expanded="false" aria-controls="door-palette">ドア</button>
-        <button class="dtool-btn" type="button" onclick="addCanvasItem('windowItem')" title="窓を配置" aria-label="窓を配置">窓</button>
+        <button id="window-toggle" class="dtool-btn" type="button" onclick="toggleWindowPalette()" title="窓" aria-label="窓" aria-expanded="false" aria-controls="window-palette">窓</button>
       </div>
       <div id="item-palette" class="item-palette" aria-label="アイテム一覧"></div>
       <div id="door-palette" class="door-palette" aria-label="ドア一覧"></div>
+      <div id="window-palette" class="window-palette" aria-label="窓一覧"></div>
     </div>
   </div>
 
@@ -644,26 +652,74 @@ const BACKUP_RETENTION_DAYS = 30;
 let persistenceTimer = null;
 let isRestoringAppData = false;
 
+function rasterItem(name, type, image, ratio, { longestSide = 4.2, ...options } = {}) {
+  const cols = ratio >= 1 ? longestSide : longestSide * ratio;
+  const rows = ratio >= 1 ? longestSide / ratio : longestSide;
+  return {
+    name,
+    type,
+    image,
+    cols,
+    rows,
+    w: Math.round(cols * 28),
+    h: Math.round(rows * 28),
+    ...options
+  };
+}
+
 const itemCatalog = {
-  bed: { name: "ベッド", type: "bed", w: 84, h: 118, cols: 3, rows: 4.2 },
-  toiletItem: { name: "トイレ", type: "toiletItem", w: 46, h: 52, cols: 1.65, rows: 1.85 },
-  kitchenMedium: { name: "キッチン（中）", type: "kitchenMedium", w: 58, h: 132, cols: 2, rows: 4.6 },
-  kitchenLarge: { name: "キッチン（大）", type: "kitchenLarge", w: 72, h: 162, cols: 2.5, rows: 5.6 },
-  washbasin: { name: "洗面台", type: "washbasin", w: 64, h: 52, cols: 2.3, rows: 1.9 },
-  washer: { name: "洗濯機", type: "washer", w: 56, h: 56, cols: 2, rows: 2 },
-  bathSquare: { name: "正方形浴槽", type: "bathSquare", w: 56, h: 56, cols: 2, rows: 2 },
-  bathRect: { name: "長方形浴槽", type: "bathRect", w: 82, h: 54, cols: 3, rows: 2 },
-  table: { name: "長方形テーブル", type: "table", w: 86, h: 56, cols: 3.1, rows: 2.1 },
-  roundTable: { name: "丸テーブル", type: "roundTable", w: 56, h: 56, cols: 2, rows: 2 },
-  squareTable: { name: "四角テーブル", type: "squareTable", w: 56, h: 56, cols: 2, rows: 2 },
-  ovalTable: { name: "横長丸テーブル", type: "ovalTable", w: 82, h: 54, cols: 3, rows: 2 },
-  chair: { name: "椅子", type: "chair", w: 36, h: 36, cols: 1.25, rows: 1.25 },
-  sofaSingle: { name: "1人用ソファ", type: "sofaSingle", w: 50, h: 44, cols: 1.8, rows: 1.6 },
-  sofa: { name: "2人用ソファ", type: "sofa", w: 88, h: 44, cols: 3.2, rows: 1.6 },
-  sofaTriple: { name: "3人用ソファ", type: "sofaTriple", w: 126, h: 44, cols: 4.6, rows: 1.6 },
-  door: { name: "ドア", type: "door", w: 88, h: 18, cols: 3, rows: 0.65, showInPalette: false, showInDoorPalette: true },
-  swingDoor: { name: "開き戸", type: "swingDoor", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: true },
-  swingDoorReverse: { name: "開き戸（反転）", type: "swingDoorReverse", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: true },
+  bed: { name: "ベッド", type: "bed", w: 84, h: 118, cols: 3, rows: 4.2, showInPalette: false },
+  careBed: rasterItem("介護ベッド", "careBed", "care-bed.png", 493 / 856),
+  bedRails: rasterItem("ベッド（柵あり）", "bedRails", "bed-rails.png", 636 / 944),
+  bedSimple: rasterItem("ベッド（シンプル）", "bedSimple", "bed-simple.png", 515 / 880),
+  kitchen2Burner: rasterItem("キッチン（2口）", "kitchen2Burner", "kitchen-2burner.png", 849 / 335),
+  kitchen3Burner: rasterItem("キッチン（3口）", "kitchen3Burner", "kitchen-3burner.png", 1043 / 366),
+  toiletModern: rasterItem("トイレ", "toiletModern", "toilet-modern.png", 584 / 873),
+  tableRectangle: rasterItem("長方形テーブル", "tableRectangle", "table-rectangle.png", 830 / 613),
+  tableSquareImage: rasterItem("正方形テーブル", "tableSquareImage", "table-square.png", 652 / 659),
+  tvBoardSlim: rasterItem("テレビ台（細）", "tvBoardSlim", "tv-board-slim.png", 1459 / 337),
+  tableRoundImage: rasterItem("丸テーブル", "tableRoundImage", "table-round.png", 707 / 699),
+  tableOvalImage: rasterItem("楕円テーブル", "tableOvalImage", "table-oval.png", 1082 / 514),
+  chairModern: rasterItem("椅子", "chairModern", "chair-modern.png", 522 / 601),
+  sofaSingleImage: rasterItem("1人用ソファ", "sofaSingleImage", "sofa-single.png", 592 / 498),
+  sofaDoubleImage: rasterItem("2人用ソファ", "sofaDoubleImage", "sofa-double.png", 844 / 407),
+  sofaTripleImage: rasterItem("3人用ソファ", "sofaTripleImage", "sofa-triple.png", 1058 / 376),
+  tvBoardStand: rasterItem("テレビ台（脚付き）", "tvBoardStand", "tv-board-stand.png", 1238 / 285),
+  tvBoardLow: rasterItem("テレビ台（低）", "tvBoardLow", "tv-board-low.png", 1076 / 201),
+  washerModern: rasterItem("洗濯機", "washerModern", "washer-modern.png", 576 / 586),
+  bathRectangleImage: rasterItem("長方形浴槽", "bathRectangleImage", "bath-rectangle.png", 756 / 430),
+  bathSquareImage: rasterItem("正方形浴槽", "bathSquareImage", "bath-square.png", 661 / 647),
+  washbasinModern: rasterItem("洗面台", "washbasinModern", "washbasin-modern.png", 700 / 511),
+  tvBoard3Drawer: rasterItem("テレビ台（3段）", "tvBoard3Drawer", "tv-board-3drawer.png", 1374 / 348),
+  tvBoard2Drawer: rasterItem("テレビ台（2段）", "tvBoard2Drawer", "tv-board-2drawer.png", 824 / 344),
+  tvBoard: rasterItem("テレビ台", "tvBoard", "tv-board.png", 860 / 339),
+  urinal: rasterItem("小便器", "urinal", "urinal.png", 385 / 766),
+  dog: rasterItem("犬", "dog", "dog.png", 886 / 686),
+  cat: rasterItem("猫", "cat", "cat.png", 712 / 531),
+  fridge: rasterItem("冷蔵庫", "fridge", "fridge.png", 726 / 664),
+  doorSlidingDouble: rasterItem("引き違い戸", "doorSlidingDouble", "sliding-door-double.png", 569 / 54, { longestSide: 3, showInPalette: false, showInDoorPalette: true }),
+  doorSliding: rasterItem("引き戸", "doorSliding", "sliding-door.png", 394 / 46, { longestSide: 3, showInPalette: false, showInDoorPalette: true }),
+  swingDoorRight: rasterItem("開き戸（右）", "swingDoorRight", "swing-door-right.png", 526 / 565, { longestSide: 2.6, showInPalette: false, showInDoorPalette: true }),
+  swingDoorLeft: rasterItem("開き戸（左）", "swingDoorLeft", "swing-door-left.png", 500 / 567, { longestSide: 2.6, showInPalette: false, showInDoorPalette: true }),
+  windowSliding: rasterItem("窓", "windowSliding", "window-sliding.png", 494 / 57, { longestSide: 3, showInPalette: false, showInWindowPalette: true }),
+  toiletItem: { name: "トイレ", type: "toiletItem", w: 46, h: 52, cols: 1.65, rows: 1.85, showInPalette: false },
+  kitchenMedium: { name: "キッチン（中）", type: "kitchenMedium", w: 58, h: 132, cols: 2, rows: 4.6, showInPalette: false },
+  kitchenLarge: { name: "キッチン（大）", type: "kitchenLarge", w: 72, h: 162, cols: 2.5, rows: 5.6, showInPalette: false },
+  washbasin: { name: "洗面台", type: "washbasin", w: 64, h: 52, cols: 2.3, rows: 1.9, showInPalette: false },
+  washer: { name: "洗濯機", type: "washer", w: 56, h: 56, cols: 2, rows: 2, showInPalette: false },
+  bathSquare: { name: "正方形浴槽", type: "bathSquare", w: 56, h: 56, cols: 2, rows: 2, showInPalette: false },
+  bathRect: { name: "長方形浴槽", type: "bathRect", w: 82, h: 54, cols: 3, rows: 2, showInPalette: false },
+  table: { name: "長方形テーブル", type: "table", w: 86, h: 56, cols: 3.1, rows: 2.1, showInPalette: false },
+  roundTable: { name: "丸テーブル", type: "roundTable", w: 56, h: 56, cols: 2, rows: 2, showInPalette: false },
+  squareTable: { name: "四角テーブル", type: "squareTable", w: 56, h: 56, cols: 2, rows: 2, showInPalette: false },
+  ovalTable: { name: "横長丸テーブル", type: "ovalTable", w: 82, h: 54, cols: 3, rows: 2, showInPalette: false },
+  chair: { name: "椅子", type: "chair", w: 36, h: 36, cols: 1.25, rows: 1.25, showInPalette: false },
+  sofaSingle: { name: "1人用ソファ", type: "sofaSingle", w: 50, h: 44, cols: 1.8, rows: 1.6, showInPalette: false },
+  sofa: { name: "2人用ソファ", type: "sofa", w: 88, h: 44, cols: 3.2, rows: 1.6, showInPalette: false },
+  sofaTriple: { name: "3人用ソファ", type: "sofaTriple", w: 126, h: 44, cols: 4.6, rows: 1.6, showInPalette: false },
+  door: { name: "ドア", type: "door", w: 88, h: 18, cols: 3, rows: 0.65, showInPalette: false, showInDoorPalette: false },
+  swingDoor: { name: "開き戸", type: "swingDoor", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: false },
+  swingDoorReverse: { name: "開き戸（反転）", type: "swingDoorReverse", w: 72, h: 72, cols: 2.6, rows: 2.6, showInPalette: false, showInDoorPalette: false },
   windowItem: { name: "窓", type: "windowItem", w: 112, h: 28, cols: 2.5, rows: 1.25, showInPalette: false },
 };
 const ITEM_SCALE = 0.8;
@@ -1080,7 +1136,9 @@ function renderItemPalette() {
     preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
     preview.setAttribute("aria-hidden", "true");
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    if (item.type === "bed") renderBed(group, item);
+    if (item.image) renderRasterItem(group, item);
+    else if (item.type === "bed") renderBed(group, item);
+    else if (item.type === "careBed") renderCareBed(group, item);
     else renderCatalogItem(group, item);
     preview.appendChild(group);
     button.appendChild(preview);
@@ -1103,7 +1161,31 @@ function renderDoorPalette() {
     preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
     preview.setAttribute("aria-hidden", "true");
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    renderCatalogItem(group, item);
+    if (item.image) renderRasterItem(group, item);
+    else renderCatalogItem(group, item);
+    preview.appendChild(group);
+    button.appendChild(preview);
+    palette.appendChild(button);
+  });
+}
+
+function renderWindowPalette() {
+  const palette = document.getElementById("window-palette");
+  palette.innerHTML = "";
+  Object.entries(itemCatalog).filter(([, item]) => item.showInWindowPalette === true).forEach(([mode, item]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "item-btn item-preview";
+    button.title = item.name;
+    button.setAttribute("aria-label", item.name);
+    button.addEventListener("click", () => addCanvasItem(mode));
+
+    const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
+    preview.setAttribute("aria-hidden", "true");
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    if (item.image) renderRasterItem(group, item);
+    else renderCatalogItem(group, item);
     preview.appendChild(group);
     button.appendChild(preview);
     palette.appendChild(button);
@@ -1141,7 +1223,9 @@ function renderSVG(showHint = true) {
     group.classList.toggle("floorplan", room.type === "floorplan");
 
     if (room.type === "floorplan") renderFloorPlan(group, room);
+    else if (room.image || Object.values(itemCatalog).some((item) => item.type === room.type && item.image)) renderRasterItem(group, room);
     else if (room.type === "bed") renderBed(group, room);
+    else if (room.type === "careBed") renderCareBed(group, room);
     else if (Object.values(itemCatalog).some((item) => item.type === room.type)) renderCatalogItem(group, room);
     else if (room.type === "furniture") renderFurniture(group, room);
     else renderSpace(group, room);
@@ -1226,6 +1310,38 @@ function renderBed(group, room) {
     stroke,
     "stroke-width": Math.max(1, strokeWidth * 0.65)
   }));
+}
+
+function renderRasterItem(group, room) {
+  const definition = Object.values(itemCatalog).find((item) => item.type === room.type);
+  const imageName = room.image || definition?.image;
+  if (!imageName) return;
+  const isSlidingDoorImage = room.type.startsWith("door");
+  if (isSlidingDoorImage) {
+    group.appendChild(svgEl("rect", {
+      x: 0,
+      y: 0,
+      width: room.w,
+      height: room.h,
+      fill: "#fff",
+      stroke: "none",
+      "pointer-events": "none"
+    }));
+  }
+  const image = svgEl("image", {
+    href: `./${imageName}`,
+    x: 0,
+    y: 0,
+    width: room.w,
+    height: room.h,
+    preserveAspectRatio: "none"
+  });
+  image.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", `./${imageName}`);
+  group.appendChild(image);
+}
+
+function renderCareBed(group, room) {
+  renderRasterItem(group, room);
 }
 
 function renderCatalogItem(group, room) {
@@ -1861,7 +1977,7 @@ function pasteCanvasItem() {
 }
 
 function isWallItem(room) {
-  return room.type === "windowItem" || room.type === "door" || room.type.startsWith("swingDoor") || room.type.endsWith("Door") || room.type.startsWith("door");
+  return room.type === "windowItem" || room.type.startsWith("window") || room.type === "door" || room.type.startsWith("swingDoor") || room.type.endsWith("Door") || room.type.startsWith("door");
 }
 
 function snapWallItemToFloorPlan(room) {
@@ -2947,18 +3063,33 @@ function togglePalette() {
   clearEraserMode();
   const slot = document.querySelector(".item-control-slot");
   slot.classList.remove("doors-open");
+  slot.classList.remove("windows-open");
   const isOpen = slot.classList.toggle("open");
   document.getElementById("palette-toggle").setAttribute("aria-expanded", String(isOpen));
   document.getElementById("door-toggle").setAttribute("aria-expanded", "false");
+  document.getElementById("window-toggle").setAttribute("aria-expanded", "false");
 }
 
 function toggleDoorPalette() {
   clearEraserMode();
   const slot = document.querySelector(".item-control-slot");
   slot.classList.remove("open");
+  slot.classList.remove("windows-open");
   const isOpen = slot.classList.toggle("doors-open");
   document.getElementById("door-toggle").setAttribute("aria-expanded", String(isOpen));
   document.getElementById("palette-toggle").setAttribute("aria-expanded", "false");
+  document.getElementById("window-toggle").setAttribute("aria-expanded", "false");
+}
+
+function toggleWindowPalette() {
+  clearEraserMode();
+  const slot = document.querySelector(".item-control-slot");
+  slot.classList.remove("open");
+  slot.classList.remove("doors-open");
+  const isOpen = slot.classList.toggle("windows-open");
+  document.getElementById("window-toggle").setAttribute("aria-expanded", String(isOpen));
+  document.getElementById("palette-toggle").setAttribute("aria-expanded", "false");
+  document.getElementById("door-toggle").setAttribute("aria-expanded", "false");
 }
 
 function setDrawMode(mode, button) {
@@ -3204,6 +3335,9 @@ async function exportPNG() {
     const layer = document.getElementById(id);
     if (layer) exportSvg.appendChild(layer.cloneNode(true));
   });
+  exportSvg.querySelectorAll("image[href]").forEach((imageElement) => {
+    imageElement.setAttribute("href", new URL(imageElement.getAttribute("href"), window.location.href).href);
+  });
   appendExportText(exportSvg, bounds);
 
   selectedRoomId = selectedRoom;
@@ -3267,6 +3401,7 @@ async function exportPNG() {
 
 renderItemPalette();
 renderDoorPalette();
+renderWindowPalette();
 const canvas = document.getElementById("svg-main");
 previousGridStepX = gridStep("x");
 previousGridStepY = gridStep("y");

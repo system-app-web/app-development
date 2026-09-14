@@ -249,6 +249,7 @@ h1 {
   background-position: var(--grid-offset-x) var(--grid-offset-y);
   background-size: var(--grid-size) var(--grid-size);
   box-shadow: 0 22px 42px rgba(74, 166, 180, 0.10);
+  touch-action: none;
 }
 #svg-main {
   width: 100%;
@@ -697,6 +698,7 @@ const itemCatalog = {
   dog: rasterItem("犬", "dog", "dog.png", 886 / 686),
   cat: rasterItem("猫", "cat", "cat.png", 712 / 531),
   fridge: rasterItem("冷蔵庫", "fridge", "fridge.png", 726 / 664),
+  aquarium: rasterItem("水槽", "aquarium", "aquarium.png", 1465 / 973),
   doorSlidingDouble: rasterItem("引き違い戸", "doorSlidingDouble", "sliding-door-double.png", 569 / 54, { longestSide: 3, showInPalette: false, showInDoorPalette: true }),
   doorSliding: rasterItem("引き戸", "doorSliding", "sliding-door.png", 394 / 46, { longestSide: 3, showInPalette: false, showInDoorPalette: true }),
   swingDoorRight: rasterItem("開き戸（右）", "swingDoorRight", "swing-door-right.png", 526 / 565, { longestSide: 2.6, showInPalette: false, showInDoorPalette: true }),
@@ -3041,6 +3043,7 @@ window.addEventListener("resize", () => {
 
 function clearAll() {
   rooms = [];
+  setCanvasZoom(1);
   erasedFloorPlanWalls.clear();
   eraseState = null;
   clearFloorPlanWallHover();
@@ -3419,10 +3422,18 @@ canvas.addEventListener("pointerdown", placeItemOnCanvas);
 canvas.addEventListener("pointerdown", clearCanvasSelection);
 canvas.addEventListener("pointermove", updateFloorPlanWallHover);
 canvas.addEventListener("pointerleave", clearFloorPlanWallHover);
-canvas.addEventListener("wheel", (event) => {
+const canvasWrap = document.querySelector(".canvas-wrap");
+canvasWrap.addEventListener("wheel", (event) => {
   event.preventDefault();
+  if (event.ctrlKey || event.metaKey || event.deltaMode !== WheelEvent.DOM_DELTA_LINE) return;
   adjustCanvasZoom(event.deltaY < 0 ? 0.1 : -0.1);
-}, { passive: false });
+}, { capture: true, passive: false });
+["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
+  canvasWrap.addEventListener(type, (event) => event.preventDefault(), { capture: true, passive: false });
+  document.addEventListener(type, (event) => {
+    if (canvasWrap.contains(event.target)) event.preventDefault();
+  }, { capture: true, passive: false });
+});
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement || event.target.isContentEditable) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c" && copySelectedCanvasItem()) {

@@ -10,11 +10,19 @@
     <link rel="apple-touch-icon" href="./app-icon.png" />
     <link rel="icon" type="image/png" href="./app-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <script src="https://app-development-gray.vercel.app/portal-auth-guard.js"></script>
+    <script>
+      if (window.location.protocol !== 'file:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        document.write('<script src="https://app-development-gray.vercel.app/portal-auth-guard.js"><\\/script>');
+      }
+    </script>
     <title>シンプル見取り図</title>
   </head>
   <body>
-    <script>const openApp = () => location.replace(`./app.html${location.search}${location.hash}`); window.ktmAuthReady ? openApp() : document.addEventListener('ktm-auth-ready', openApp, { once: true });</script>
+    <script>
+      const openApp = () => location.replace(`./app.html${location.search}${location.hash}`);
+      if (window.location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(window.location.hostname) || window.ktmAuthReady) openApp();
+      else document.addEventListener('ktm-auth-ready', openApp, { once: true });
+    </script>
     <a href="./app.html">シンプル見取り図を開く</a>
   </body>
 </html>

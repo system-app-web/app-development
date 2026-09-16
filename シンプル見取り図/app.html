@@ -700,7 +700,7 @@ const BACKUP_RETENTION_DAYS = 30;
 let persistenceTimer = null;
 let isRestoringAppData = false;
 
-function rasterItem(name, type, image, ratio, { longestSide = 4.2, ...options } = {}) {
+function rasterItem(name, type, image, ratio, { longestSide = 3.4, ...options } = {}) {
   const cols = ratio >= 1 ? longestSide : longestSide * ratio;
   const rows = ratio >= 1 ? longestSide / ratio : longestSide;
   return {
@@ -717,21 +717,21 @@ function rasterItem(name, type, image, ratio, { longestSide = 4.2, ...options } 
 
 const itemCatalog = {
   bed: { name: "ベッド", type: "bed", w: 84, h: 118, cols: 3, rows: 4.2, showInPalette: false },
-  careBed: rasterItem("介護ベッド", "careBed", "care-bed.png", 493 / 856),
-  bedRails: rasterItem("ベッド", "bedRails", "bed-rails.png", 636 / 944),
-  bedSimple: rasterItem("布団", "bedSimple", "bed-simple.png", 515 / 880),
-  toiletModern: rasterItem("トイレ", "toiletModern", "toilet-modern.png", 584 / 873),
-  urinal: rasterItem("和式トイレ", "urinal", "urinal.png", 206 / 320),
-  washbasinModern: rasterItem("洗面台", "washbasinModern", "washbasin-modern.png", 700 / 511),
-  bathRectangleImage: rasterItem("長方形浴槽", "bathRectangleImage", "bath-rectangle.png", 756 / 430),
+  careBed: rasterItem("介護ベッド", "careBed", "care-bed.png", 493 / 856, { longestSide: 5.6 }),
+  bedRails: rasterItem("ベッド", "bedRails", "bed-rails.png", 636 / 944, { longestSide: 5.6 }),
+  bedSimple: rasterItem("布団", "bedSimple", "bed-simple.png", 515 / 880, { longestSide: 5.6 }),
+  toiletModern: rasterItem("トイレ", "toiletModern", "toilet-modern.png", 584 / 873, { longestSide: 2.5 }),
+  urinal: rasterItem("和式トイレ", "urinal", "urinal.png", 206 / 320, { longestSide: 2.5 }),
+  washbasinModern: rasterItem("洗面台", "washbasinModern", "washbasin-modern.png", 700 / 511, { longestSide: 2.5 }),
+  bathRectangleImage: rasterItem("長方形浴槽", "bathRectangleImage", "bath-rectangle.png", 756 / 430, { longestSide: 3.8 }),
   bathSquareImage: rasterItem("正方形浴槽", "bathSquareImage", "bath-square.png", 661 / 647),
-  kitchen2Burner: rasterItem("キッチン（2口）", "kitchen2Burner", "kitchen-2burner.png", 849 / 335, { longestSide: 3 }),
+  kitchen2Burner: rasterItem("キッチン（2口）", "kitchen2Burner", "kitchen-2burner.png", 849 / 335, { longestSide: 3.4 }),
   kitchen3Burner: rasterItem("キッチン（3口）", "kitchen3Burner", "kitchen-3burner.png", 1043 / 366, { longestSide: 5 }),
   fridge: rasterItem("冷蔵庫", "fridge", "fridge.png", 302 / 320),
-  washerModern: rasterItem("洗濯機", "washerModern", "washer-modern.png", 576 / 586),
+  washerModern: rasterItem("洗濯機", "washerModern", "washer-modern.png", 576 / 586, { longestSide: 2.8 }),
   tvBoardStand: rasterItem("TV", "tvBoardStand", "tv-board-stand.png", 1238 / 285),
   tvBoard: rasterItem("棚1", "tvBoard", "tv-board.png", 860 / 339),
-  tvBoardSlim: rasterItem("棚2", "tvBoardSlim", "tv-board-slim.png", 1459 / 337),
+  tvBoardSlim: rasterItem("棚2", "tvBoardSlim", "tv-board-slim.png", 1459 / 337, { longestSide: 4.2 }),
   tvBoard2Drawer: rasterItem("棚3", "tvBoard2Drawer", "tv-board-2drawer.png", 824 / 344),
   tvBoard3Drawer: rasterItem("棚4", "tvBoard3Drawer", "tv-board-3drawer.png", 1374 / 348),
   chest1: rasterItem("タンス1", "chest1", "tansu-1.png", 360 / 158, { showInPalette: false }),
@@ -740,15 +740,15 @@ const itemCatalog = {
   tableSquareImage: rasterItem("正方形テーブル", "tableSquareImage", "table-square.png", 652 / 659),
   tableRoundImage: rasterItem("丸テーブル", "tableRoundImage", "table-round.png", 707 / 699),
   tableOvalImage: rasterItem("楕円テーブル", "tableOvalImage", "table-oval.png", 1082 / 514),
-  chairModern: rasterItem("椅子", "chairModern", "chair-modern.png", 522 / 601),
-  sofaSingleImage: rasterItem("1人用ソファ", "sofaSingleImage", "sofa-single.png", 592 / 498),
-  sofaDoubleImage: rasterItem("2人用ソファ", "sofaDoubleImage", "sofa-double.png", 844 / 407),
-  sofaTripleImage: rasterItem("3人用ソファ", "sofaTripleImage", "sofa-triple.png", 1058 / 376),
+  chairModern: rasterItem("椅子", "chairModern", "chair-modern.png", 522 / 601, { longestSide: 1.45 }),
+  sofaSingleImage: rasterItem("1人用ソファ", "sofaSingleImage", "sofa-single.png", 592 / 498, { longestSide: 2.1 }),
+  sofaDoubleImage: rasterItem("2人用ソファ", "sofaDoubleImage", "sofa-double.png", 844 / 407, { longestSide: 3.6 }),
+  sofaTripleImage: rasterItem("3人用ソファ", "sofaTripleImage", "sofa-triple.png", 1058 / 376, { longestSide: 5 }),
   tvBoardLow: rasterItem("テレビ台（低）", "tvBoardLow", "tv-board-low.png", 1076 / 201, { showInPalette: false }),
-  dog: rasterItem("犬", "dog", "dog.png", 886 / 686),
-  cat: rasterItem("猫", "cat", "cat.png", 712 / 531),
-  aquarium: rasterItem("水槽", "aquarium", "aquarium.png", 1465 / 973),
-  birdCage: rasterItem("鳥かご", "birdCage", "bird-cage.png", 713 / 1072),
+  dog: rasterItem("犬", "dog", "dog.png", 886 / 686, { longestSide: 2.4 }),
+  cat: rasterItem("猫", "cat", "cat.png", 712 / 531, { longestSide: 2.4 }),
+  aquarium: rasterItem("水槽", "aquarium", "aquarium.png", 1465 / 973, { longestSide: 2.4 }),
+  birdCage: rasterItem("鳥かご", "birdCage", "bird-cage.png", 713 / 1072, { longestSide: 2.4 }),
   doorSlidingDouble: rasterItem("引き違い戸", "doorSlidingDouble", "sliding-door-double.png", 569 / 54, { longestSide: 3, showInPalette: false, showInDoorPalette: true }),
   doorSliding: rasterItem("引き戸", "doorSliding", "sliding-door.png", 394 / 46, { longestSide: 3, showInPalette: false, showInDoorPalette: true }),
   swingDoorRight: rasterItem("開き戸（右）", "swingDoorRight", "swing-door-right.png", 526 / 565, { longestSide: 2.6, showInPalette: false, showInDoorPalette: true }),
@@ -778,8 +778,8 @@ const ITEM_SCALE = 0.8;
 
 let rooms = [];
 let dragState = null;
-const LINE_STROKE_WIDTH = 4;
-const FLOOR_PLAN_STROKE_WIDTH = 4;
+const LINE_STROKE_WIDTH = 2.5;
+const FLOOR_PLAN_STROKE_WIDTH = LINE_STROKE_WIDTH;
 let erasedFloorPlanWalls = new Set();
 let eraseState = null;
 let gridMasks = [];
@@ -1066,6 +1066,10 @@ function restoreAppData(data) {
   if (!isValidAppData(data)) return false;
   isRestoringAppData = true;
   rooms = data.project.rooms.map((room) => createRoom(room));
+  migrateShelf2Size();
+  migrateChairSize();
+  migrateSofaSizes();
+  migratePetSizes();
   erasedFloorPlanWalls = new Set(data.project.erasedFloorPlanWalls);
   gridMasks = Array.isArray(data.project.gridMasks)
     ? data.project.gridMasks.map((mask) => ({
@@ -1103,6 +1107,75 @@ function restoreAppData(data) {
   renderAll(false);
   isRestoringAppData = false;
   return true;
+}
+
+function migrateShelf2Size() {
+  const shelf = itemCatalog.tvBoardSlim;
+  const previousCols = 3.4 * ITEM_SCALE;
+  const previousRows = (3.4 / (1459 / 337)) * ITEM_SCALE;
+  const nextCols = shelf.cols * ITEM_SCALE;
+  const nextRows = shelf.rows * ITEM_SCALE;
+
+  rooms.filter((room) => room.type === shelf.type).forEach((room) => {
+    if (Math.abs(room.itemCols - previousCols) > 0.01 || Math.abs(room.itemRows - previousRows) > 0.01) return;
+    room.itemCols = nextCols;
+    room.itemRows = nextRows;
+  });
+}
+
+function migrateChairSize() {
+  const chair = itemCatalog.chairModern;
+  const nextCols = chair.cols * ITEM_SCALE;
+  const nextRows = chair.rows * ITEM_SCALE;
+  const previousSizes = [2.3, 1.5, 1.2, 1.35];
+
+  rooms.filter((room) => room.type === chair.type).forEach((room) => {
+    const usesPreviousSize = previousSizes.some((size) => (
+      Math.abs(room.itemCols - (size * (522 / 601)) * ITEM_SCALE) <= 0.01 &&
+      Math.abs(room.itemRows - size * ITEM_SCALE) <= 0.01
+    ));
+    if (!usesPreviousSize) return;
+    room.itemCols = nextCols;
+    room.itemRows = nextRows;
+  });
+}
+
+function migrateSofaSizes() {
+  const previousSizes = [5.5, 4.2, 4.1, 4, 3.4, 3.2, 2.6, 2.3];
+  [itemCatalog.sofaSingleImage, itemCatalog.sofaDoubleImage, itemCatalog.sofaTripleImage].forEach((sofa) => {
+    const ratio = sofa.cols / sofa.rows;
+    const nextCols = sofa.cols * ITEM_SCALE;
+    const nextRows = sofa.rows * ITEM_SCALE;
+    rooms.filter((room) => room.type === sofa.type).forEach((room) => {
+      const usesPreviousSize = previousSizes.some((size) => {
+        const cols = (ratio >= 1 ? size : size * ratio) * ITEM_SCALE;
+        const rows = (ratio >= 1 ? size / ratio : size) * ITEM_SCALE;
+        return Math.abs(room.itemCols - cols) <= 0.01 && Math.abs(room.itemRows - rows) <= 0.01;
+      });
+      if (!usesPreviousSize) return;
+      room.itemCols = nextCols;
+      room.itemRows = nextRows;
+    });
+  });
+}
+
+function migratePetSizes() {
+  const previousSizes = [4.2, 3.4];
+  [itemCatalog.dog, itemCatalog.cat, itemCatalog.aquarium, itemCatalog.birdCage].forEach((pet) => {
+    const ratio = pet.cols / pet.rows;
+    const nextCols = pet.cols * ITEM_SCALE;
+    const nextRows = pet.rows * ITEM_SCALE;
+    rooms.filter((room) => room.type === pet.type).forEach((room) => {
+      const usesPreviousSize = previousSizes.some((size) => {
+        const cols = (ratio >= 1 ? size : size * ratio) * ITEM_SCALE;
+        const rows = (ratio >= 1 ? size / ratio : size) * ITEM_SCALE;
+        return Math.abs(room.itemCols - cols) <= 0.01 && Math.abs(room.itemRows - rows) <= 0.01;
+      });
+      if (!usesPreviousSize) return;
+      room.itemCols = nextCols;
+      room.itemRows = nextRows;
+    });
+  });
 }
 
 function queueAppPersistence() {
@@ -1290,6 +1363,8 @@ function renderSVG(showHint = true) {
   renderGridMasks();
   layerNodes.innerHTML = "";
   const drawingOrder = [...rooms].sort((first, second) => {
+    if (first.type === "tvBoardStand" && second.type !== "tvBoardStand") return 1;
+    if (second.type === "tvBoardStand" && first.type !== "tvBoardStand") return -1;
     if (first.type === "floorplan") return -1;
     if (second.type === "floorplan") return 1;
     return 0;
@@ -2035,21 +2110,25 @@ function captureViewportFloorPlanAnchor(room, plans = rooms.filter((candidate) =
   room.viewportFloorPlanReady = true;
 }
 
-function captureCanvasItemGrid(room, { allowWallAttachment = true } = {}) {
+function captureCanvasItemGrid(room) {
   const stepX = gridStep("x");
   const stepY = gridStep("y");
-  const snappedToWall = isWallItem(room) && allowWallAttachment
-    ? snapWallItemToFloorPlan(room)
-    : null;
   room.itemCols = Math.max(0.1, room.w / stepX);
   room.itemRows = Math.max(0.1, room.h / stepY);
   room.itemGridX = Math.max(0, room.x / stepX);
   room.itemGridY = Math.max(0, room.y / stepY);
-  if (isWallItem(room) && !snappedToWall) {
-    detachWallItemFromFloorPlan(room);
+  if (isWallItem(room)) {
+    const snappedWall = snapWallItemToFloorPlan(room);
+    if (!snappedWall) {
+      detachWallItemFromFloorPlan(room);
+      return;
+    }
+    room.itemGridX = Math.max(0, room.x / stepX);
+    room.itemGridY = Math.max(0, room.y / stepY);
+    attachCanvasItemToFloorPlan(room, undefined, snappedWall.plan);
     return;
   }
-  attachCanvasItemToFloorPlan(room, undefined, snappedToWall?.plan || null);
+  attachCanvasItemToFloorPlan(room);
   captureViewportFloorPlanAnchor(room);
 }
 
@@ -2076,7 +2155,7 @@ function pasteCanvasItem() {
     parentFloorPlanReady: false
   });
   rooms.push(room);
-  captureCanvasItemGrid(room, { allowWallAttachment: false });
+  captureCanvasItemGrid(room);
   copiedCanvasItem = { ...room };
   selectedRoomId = room.id;
   actionHistory.push(() => {
@@ -2096,42 +2175,37 @@ function snapWallItemToFloorPlan(room) {
   if (!isWallItem(room)) return null;
   const svg = document.getElementById("svg-main");
   if (!svg?.clientWidth || !svg.clientHeight) return null;
-  const thresholdX = 16 * (1200 / svg.clientWidth);
-  const thresholdY = 16 * (800 / svg.clientHeight);
+
+  const toleranceX = 6 * (1200 / svg.clientWidth);
+  const toleranceY = 6 * (800 / svg.clientHeight);
+  const centerX = room.x + room.w / 2;
+  const centerY = room.y + room.h / 2;
+  const isSwingDoor = room.type === "swingDoorRight" || room.type === "swingDoorLeft";
+  const visualCenterY = room.type === "doorSliding" ? room.h * 0.4 : room.h / 2;
+  const horizontalWallAnchorY = isSwingDoor ? room.h * 0.9 : visualCenterY;
+  const horizontalAnchorY = room.y + horizontalWallAnchorY;
   const candidates = [];
 
   rooms.filter((candidate) => candidate.type === "floorplan").forEach((plan) => {
-    const overlapsHorizontally = room.x + room.w > plan.x - thresholdX && room.x < plan.x + plan.w + thresholdX;
-    const overlapsVertically = room.y + room.h > plan.y - thresholdY && room.y < plan.y + plan.h + thresholdY;
-    if (overlapsHorizontally) {
-      candidates.push({ edge: "top", distance: Math.abs(room.y + room.h / 2 - plan.y), plan });
-      candidates.push({ edge: "bottom", distance: Math.abs(room.y + room.h / 2 - (plan.y + plan.h)), plan });
+    if (centerX >= plan.x && centerX <= plan.x + plan.w) {
+      candidates.push({ edge: "top", distance: Math.abs(horizontalAnchorY - plan.y), plan });
+      candidates.push({ edge: "bottom", distance: Math.abs(horizontalAnchorY - (plan.y + plan.h)), plan });
     }
-    if (overlapsVertically) {
-      candidates.push({ edge: "left", distance: Math.abs(room.x + room.w / 2 - plan.x), plan });
-      candidates.push({ edge: "right", distance: Math.abs(room.x + room.w / 2 - (plan.x + plan.w)), plan });
+    if (centerY >= plan.y && centerY <= plan.y + plan.h) {
+      candidates.push({ edge: "left", distance: Math.abs(centerX - plan.x), plan });
+      candidates.push({ edge: "right", distance: Math.abs(centerX - (plan.x + plan.w)), plan });
     }
   });
 
-  const nearest = candidates.sort((first, second) => first.distance - second.distance)[0];
+  const nearest = candidates
+    .filter((candidate) => candidate.distance <= (candidate.edge === "top" || candidate.edge === "bottom" ? toleranceY : toleranceX))
+    .sort((first, second) => first.distance - second.distance)[0];
   if (!nearest) return null;
-  const limit = nearest.edge === "top" || nearest.edge === "bottom" ? thresholdY : thresholdX;
-  if (nearest.distance > limit) return null;
 
-  const { plan } = nearest;
-  if (nearest.edge === "top") {
-    room.x = Math.max(plan.x, Math.min(plan.x + plan.w - room.w, room.x));
-    room.y = plan.y - room.h / 2;
-  } else if (nearest.edge === "bottom") {
-    room.x = Math.max(plan.x, Math.min(plan.x + plan.w - room.w, room.x));
-    room.y = plan.y + plan.h - room.h / 2;
-  } else if (nearest.edge === "left") {
-    room.x = plan.x - room.w / 2;
-    room.y = Math.max(plan.y, Math.min(plan.y + plan.h - room.h, room.y));
-  } else {
-    room.x = plan.x + plan.w - room.w / 2;
-    room.y = Math.max(plan.y, Math.min(plan.y + plan.h - room.h, room.y));
-  }
+  if (nearest.edge === "top") room.y = nearest.plan.y - horizontalWallAnchorY;
+  else if (nearest.edge === "bottom") room.y = nearest.plan.y + nearest.plan.h - horizontalWallAnchorY;
+  else if (nearest.edge === "left") room.x = nearest.plan.x - room.w / 2;
+  else room.x = nearest.plan.x + nearest.plan.w - room.w / 2;
   return nearest;
 }
 
@@ -2141,13 +2215,6 @@ function isCanvasItem(room) {
 
 function attachCanvasItemToFloorPlan(room, plans = rooms.filter((candidate) => candidate.type === "floorplan"), attachedPlan = null) {
   if (!isCanvasItem(room)) return;
-  if (!isWallItem(room)) {
-    room.parentFloorPlanId = null;
-    room.parentFloorPlanOffsetX = null;
-    room.parentFloorPlanOffsetY = null;
-    room.parentFloorPlanReady = true;
-    return;
-  }
   const definition = Object.values(itemCatalog).find((item) => item.type === room.type);
   room.itemCols ||= (definition?.cols || 1) * ITEM_SCALE;
   room.itemRows ||= (definition?.rows || 1) * ITEM_SCALE;
@@ -2608,7 +2675,7 @@ function placeItemOnCanvas(event) {
   const room = createCanvasItem(item, x - w / 2, y - h / 2);
 
   rooms.push(room);
-  captureCanvasItemGrid(room, { allowWallAttachment: false });
+  captureCanvasItemGrid(room);
   actionHistory.push(() => {
     rooms = rooms.filter((item) => item.id !== room.id);
     if (selectedRoomId === room.id) selectedRoomId = null;
@@ -2631,7 +2698,7 @@ function addCanvasItem(mode) {
   const { w, h } = getItemDimensions(item);
   const room = createCanvasItem(item, (1200 - w) / 2 + offsetX, (800 - h) / 2 + offsetY);
   rooms.push(room);
-  captureCanvasItemGrid(room, { allowWallAttachment: false });
+  captureCanvasItemGrid(room);
   selectedRoomId = room.id;
   actionHistory.push(() => {
     rooms = rooms.filter((candidate) => candidate.id !== room.id);
@@ -2775,9 +2842,7 @@ function syncFloorPlansToGrid() {
     return;
   }
 
-  rooms.filter((room) => isWallItem(room) && !room.parentFloorPlanReady).forEach((room) => {
-    attachCanvasItemToFloorPlan(room, plans);
-  });
+  rooms.filter((room) => isWallItem(room) && !room.parentFloorPlanReady).forEach(detachWallItemFromFloorPlan);
   rooms.filter((room) => isCanvasItem(room) && !isWallItem(room) && !room.viewportFloorPlanReady).forEach((room) => {
     captureViewportFloorPlanAnchor(room, plans);
   });
@@ -2837,8 +2902,8 @@ function addFloorPlan() {
   document.querySelectorAll(".dtool-btn[id^='dtool-']").forEach((button) => button.classList.remove("active"));
   const stepX = gridStep("x");
   const stepY = gridStep("y");
-  const width = stepX * 6;
-  const height = stepY * 7;
+  const width = stepX * 7;
+  const height = stepY * 8;
   const floorPlanCount = rooms.filter((room) => room.type === "floorplan").length;
   const isFirstFloorPlan = floorPlanCount === 0;
   const position = isFirstFloorPlan ? { x: 0, y: 0 } : findFloorPlanPosition(width, height);
@@ -2849,8 +2914,8 @@ function addFloorPlan() {
     y: position.y,
     w: width,
     h: height,
-    gridColumns: 6,
-    gridRows: 7,
+    gridColumns: 7,
+    gridRows: 8,
     gridX: Math.round(position.x / stepX),
     gridY: Math.round(position.y / stepY),
     layoutIndex: floorPlanCount,

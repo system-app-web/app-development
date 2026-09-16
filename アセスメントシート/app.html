@@ -204,6 +204,13 @@
     /* シンプル見取り図の起動ボタンの上には区切り線を置かない */
     .housing-floorplan .diagram-preview{border-bottom:0!important}
   </style>
+  <style>
+    /* AI転記先を示す番号。データ入力とは独立し、印刷には出さない。 */
+    .transfer-index-badge{position:absolute;z-index:4;top:5px;right:5px;display:grid;place-items:center;min-width:18px;height:18px;padding:0 4px;pointer-events:none;color:#287b8e;border:1px solid #a8dfe4;border-radius:10px;background:#f4ffff;font-size:10px;font-weight:800;line-height:1}
+    .field:has(.transfer-index-badge) textarea,.manual:has(.transfer-index-badge) textarea{padding-right:34px!important}
+    .transfer-indexes-hidden .transfer-index-badge{display:none!important}
+    @media print{.transfer-index-badge{display:none!important}}
+  </style>
 </head>
 <body>
   <main class="app">
@@ -240,8 +247,8 @@
     function setField(id,value){ const r=current(); r.fields[id]=value; if(String(id)==="1" && value.trim() && r.title.includes("未入力様アセスメント")) r.title=r.title.replace("未入力様アセスメント",`${value.trim()}様アセスメント`); r.updatedAt=new Date().toISOString(); persist(); renderChrome(); }
     function autoGrow(input){if(input.tagName!=="TEXTAREA")return;const min=parseFloat(getComputedStyle(input).minHeight)||42;if(!input.value.trim()){input.style.height="0px";const natural=Math.max(min,input.closest(".field, .manual")?.getBoundingClientRect().height||min);input.style.height=natural+"px";return}input.style.height="0px";input.style.height=Math.max(input.scrollHeight,min)+"px"}
     function controls(input,id){const box=document.createElement("span");box.className="field-controls no-print";const smaller=document.createElement("button"),larger=document.createElement("button");smaller.type=larger.type="button";smaller.textContent="A−";larger.textContent="A＋";const adjust=n=>{const r=current();r.sizes??={};const old=r.sizes[id]||13;r.sizes[id]=Math.max(10,Math.min(22,old+n));input.style.fontSize=r.sizes[id]+"px";persist()};smaller.onclick=()=>adjust(-1);larger.onclick=()=>adjust(1);box.append(smaller,larger);return box}
-    function field(id){ const value=current().fields[id]||""; const el=document.createElement("label"); el.className="field has-controls"+(long.has(+id)?" wide":""); const label=document.createElement("span"); label.innerHTML=`<small>${id}</small>${labels[id-1]}`; const input=document.createElement("textarea"); input.value=value; input.rows=1; input.style.fontSize=((current().sizes||{})[id]||13)+"px"; if(review(value)) input.classList.add("review"); input.addEventListener("input",e=>{e.target.classList.toggle("review",review(e.target.value));autoGrow(e.target);setField(id,e.target.value)}); el.append(label,input,controls(input,id)); requestAnimationFrame(()=>autoGrow(input)); return el; }
-    function manual(label,id,multi=false){const value=current().fields[id]||"";const el=document.createElement("label");el.className="manual"+(multi?" multi":"");const t=document.createElement("span");t.textContent=label;const input=document.createElement("textarea");input.value=value;input.rows=multi?4:1;input.style.fontSize=((current().sizes||{})[id]||13)+"px";if(review(value))input.classList.add("review");input.addEventListener("input",e=>{e.target.classList.toggle("review",review(e.target.value));autoGrow(e.target);setField(id,e.target.value)});el.append(t,input);requestAnimationFrame(()=>autoGrow(input));return el}
+    function field(id){ const value=current().fields[id]||""; const el=document.createElement("label"); el.className="field has-controls"+(long.has(+id)?" wide":""); const label=document.createElement("span"); label.innerHTML=`<small>${id}</small>${labels[id-1]}`; const input=document.createElement("textarea"); input.dataset.fieldId=id; input.value=value; input.rows=1; input.style.fontSize=((current().sizes||{})[id]||13)+"px"; if(review(value)) input.classList.add("review"); input.addEventListener("input",e=>{e.target.classList.toggle("review",review(e.target.value));autoGrow(e.target);setField(id,e.target.value)}); el.append(label,input,controls(input,id)); requestAnimationFrame(()=>autoGrow(input)); return el; }
+    function manual(label,id,multi=false){const value=current().fields[id]||"";const el=document.createElement("label");el.className="manual"+(multi?" multi":"");const t=document.createElement("span");t.textContent=label;const input=document.createElement("textarea");input.dataset.fieldId=id;input.value=value;input.rows=multi?4:1;input.style.fontSize=((current().sizes||{})[id]||13)+"px";if(review(value))input.classList.add("review");input.addEventListener("input",e=>{e.target.classList.toggle("review",review(e.target.value));autoGrow(e.target);setField(id,e.target.value)});el.append(t,input);requestAnimationFrame(()=>autoGrow(input));return el}
     function grid(from,to){const el=document.createElement("div");el.className="grid";for(let i=from;i<=to;i++)el.append(field(i));return el}
     function section(title,from,to){const el=document.createElement("section");el.className="section"+(title==="全体のまとめ"?" section-summary":"");el.innerHTML=`<h3>【${title}】</h3>`;el.append(grid(from,to));return el}
     function header(n,title){const h=document.createElement("header");h.className="header";h.innerHTML=`<div><strong>株式会社K.T.M　リーフケアプランニング　アセスメントシート</strong><span>${title}</span></div><b>${n}</b>`;return h}
@@ -288,7 +295,7 @@
       const currentRecord = () => { try { const records = JSON.parse(localStorage.getItem(key) || "[]"); const title = document.querySelector("#record-title")?.value; return { records, record: records.find((item) => item.title === title) || records[0] }; } catch { return { records: [], record: null }; } };
       const refreshCount = () => { const { record } = currentRecord(); if (!record) return; const empty = Object.values(record.fields || {}).filter((value) => !String(value || "").trim() || value === "記載なし" || value === "詳細不明").length; const all = 159 - Object.keys(record.fields || {}).filter((name) => /^\d+$/.test(name)).length + empty; const target = document.querySelector("#review-count"); if (target) target.textContent = String(Math.min(159, Math.max(0, all))); };
       const setValue = (id, value) => { const data = currentRecord(); if (!data.record) return; data.record.fields[id] = value; data.record.updatedAt = new Date().toISOString(); if (id === "1" && value.trim() && data.record.title.includes("未入力様アセスメント")) { data.record.title = data.record.title.replace("未入力様アセスメント", `${value.trim()}様アセスメント`); const title = document.querySelector("#record-title"); if (title) { title.value = data.record.title; title.dispatchEvent(new Event("input", { bubbles: true })); } } localStorage.setItem(key, JSON.stringify(data.records)); const row = document.querySelector(".record.active b"); if (id === "1" && row) row.textContent = value || "氏名未入力"; refreshCount(); };
-      const input = (id, extra = "") => { const { record } = currentRecord(); const cell = document.createElement("div"); cell.className = `input-cell field ${extra}`; const number = document.createElement("small"); number.textContent = id; const area = document.createElement("textarea"); area.rows = 1; area.value = record?.fields?.[id] || ""; if (!area.value || area.value === "記載なし" || area.value === "詳細不明") area.classList.add("review"); const grow = () => { const min = parseFloat(getComputedStyle(area).minHeight) || 45; if (!area.value.trim()) { area.style.height = "0px"; const natural = Math.max(min, cell.getBoundingClientRect().height); area.style.height = `${natural}px`; return; } area.style.height = "0px"; area.style.height = `${Math.max(min, area.scrollHeight)}px`; }; area.addEventListener("input", () => { area.classList.toggle("review", !area.value.trim() || area.value === "記載なし" || area.value === "詳細不明"); grow(); setValue(id, area.value); }); cell.append(number, area); requestAnimationFrame(grow); return cell; };
+      const input = (id, extra = "") => { const { record } = currentRecord(); const cell = document.createElement("div"); cell.className = `input-cell field ${extra}`; const number = document.createElement("small"); number.textContent = id; const area = document.createElement("textarea"); area.dataset.fieldId = id; area.rows = 1; area.value = record?.fields?.[id] || ""; if (!area.value || area.value === "記載なし" || area.value === "詳細不明") area.classList.add("review"); const grow = () => { const min = parseFloat(getComputedStyle(area).minHeight) || 45; if (!area.value.trim()) { area.style.height = "0px"; const natural = Math.max(min, cell.getBoundingClientRect().height); area.style.height = `${natural}px`; return; } area.style.height = "0px"; area.style.height = `${Math.max(min, area.scrollHeight)}px`; }; area.addEventListener("input", () => { area.classList.toggle("review", !area.value.trim() || area.value === "記載なし" || area.value === "詳細不明"); grow(); setValue(id, area.value); }); cell.append(number, area); requestAnimationFrame(grow); return cell; };
       const label = (text, extra = "") => { const cell = document.createElement("div"); cell.className = `label ${extra}`; cell.textContent = text; return cell; };
       const addressPanel = () => { const panel = document.createElement("div"); panel.className = "address-panel"; const postal = input("5", "address-postal"); const mark = document.createElement("span"); mark.className = "postal-mark"; mark.textContent = "〒"; postal.prepend(mark); const address = input("address-combined", "memo address-main"); panel.append(postal, address); return panel; };
       const imageBox = () => { const { record } = currentRecord(); const box = document.createElement("div"); box.className = "family-box"; const title = document.createElement("div"); title.className = "family-title"; title.textContent = "家族構成図"; const preview = document.createElement("div"); preview.className = "template-preview"; const file = document.createElement("input"); file.type = "file"; file.accept = "image/*"; file.hidden = true; const redraw = () => { preview.textContent = ""; const image = currentRecord().record?.fields?.["genogram-image"]; if (image) { const img = document.createElement("img"); img.src = image; img.alt = "家族構成図"; preview.append(img); } else preview.innerHTML = '<span class="empty">画像をクリックして選択<br>またはここへドラッグ＆ドロップ</span>'; }; const saveImage = (selected) => { if (!selected?.type?.startsWith("image/")) return; if (selected.size > 2.5 * 1024 * 1024) return alert("画像は2.5MB以下にしてください。"); const reader = new FileReader(); reader.onload = () => { setValue("genogram-image", reader.result); redraw(); }; reader.readAsDataURL(selected); }; file.onchange = () => saveImage(file.files?.[0]); preview.onclick = () => file.click(); preview.ondragover = (event) => { event.preventDefault(); }; preview.ondrop = (event) => { event.preventDefault(); saveImage(event.dataTransfer.files?.[0]); }; preview.onpaste = (event) => { const image = [...event.clipboardData.items].find((item) => item.type.startsWith("image/")); if (image) { event.preventDefault(); saveImage(image.getAsFile()); } }; const open = document.createElement("button"); open.type = "button"; open.textContent = "かんたんジェノグラムを開く"; open.onclick = () => { const url = currentRecord().record?.fields?.["genogram-url"] || "https://easy-genogram-app.vercel.app"; window.open(url, "_blank", "noopener"); }; redraw(); box.append(title, preview, file, open); return box; };
@@ -330,6 +337,7 @@
         cell.className = "field housing-field housing-aircon";
         cell.innerHTML = '<span><small>housing-aircon</small>エアコン</span>';
         const input = document.createElement("textarea");
+        input.dataset.fieldId = "housing-aircon";
         input.rows = 1;
         input.value = currentRecord().record?.fields?.["housing-aircon"] || "";
         input.classList.toggle("review", !input.value.trim());
@@ -537,6 +545,50 @@
       };
       document.addEventListener("pointerdown", event => selectCell(event.target), true);
       document.addEventListener("focusin", event => selectCell(event.target));
+    })();
+  </script>
+  <script>
+    /* AI転記先のセル番号。番号は画面専用で、入力データ・印刷には含めない。 */
+    (() => {
+      const docs = document.querySelector("#docs");
+      if (!docs) return;
+      let map = [];
+      let scheduled = false;
+      const labelFor = cell => (cell.querySelector(":scope > span")?.textContent || cell.previousElementSibling?.textContent || "").replace(/\s+/g, " ").trim();
+      const scan = () => {
+        scheduled = false;
+        let number = 0;
+        map = [];
+        docs.querySelectorAll("textarea").forEach(area => {
+          const cell = area.closest(".field, .manual");
+          if (!cell || area.id === "paste-text") return;
+          number += 1;
+          const id = cell.querySelector("small")?.textContent?.trim() || area.dataset.fieldId || "";
+          cell.dataset.transferTarget = String(number);
+          area.dataset.transferTarget = String(number);
+          let badge = cell.querySelector(":scope > .transfer-index-badge");
+          if (!badge) {
+            badge = document.createElement("span");
+            badge.className = "transfer-index-badge no-print";
+            badge.setAttribute("aria-hidden", "true");
+            cell.append(badge);
+          }
+          if (badge.textContent !== String(number)) badge.textContent = String(number);
+          map.push({ number, fieldId: id, label: labelFor(cell) });
+        });
+      };
+      const schedule = () => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(scan);
+      };
+      window.AssessmentTransferTargets = {
+        setVisible(visible) { docs.classList.toggle("transfer-indexes-hidden", !visible); },
+        getMap() { return map.map(item => ({ ...item })); },
+        refresh: schedule
+      };
+      new MutationObserver(schedule).observe(docs, { childList:true, subtree:true });
+      schedule();
     })();
   </script>
 </body>

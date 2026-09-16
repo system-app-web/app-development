@@ -39,7 +39,6 @@ export const appData: PortalApp[] = [
     description: '施設・住居の見取り図を作成',
     version: 'v1.0.0',
     status: 'preview',
-    availability: 'trial',
   },
   {
     id: 'assessment-sheet',

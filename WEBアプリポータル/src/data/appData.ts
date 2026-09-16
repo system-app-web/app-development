@@ -13,6 +13,7 @@ export type PortalApp = {
   version: string;
   status: AppStatus;
   availability?: AppAvailability;
+  adjustmentLinkAvailable?: boolean;
 };
 
 export const appData: PortalApp[] = [
@@ -50,7 +51,8 @@ export const appData: PortalApp[] = [
     description: '利用者支援のアセスメントを整理（試作版）',
     version: 'v0.2.0',
     status: 'preview',
-    availability: 'trial',
+    availability: 'adjusting',
+    adjustmentLinkAvailable: true,
   },
   {
     id: 'pdf-converter',

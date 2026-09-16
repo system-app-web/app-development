@@ -25,14 +25,14 @@ export function AppCard({ app }: AppCardProps) {
       <p className="app-description">{app.description}</p>
       {isTrial ? <p className="app-availability trial">試作公開中</p> : null}
 
-      {isAdjusting ? (
+      {isAdjusting && !app.adjustmentLinkAvailable ? (
         <button className="button disabled" type="button" aria-label={`${app.name}は調整中`} disabled>
           調整中
         </button>
       ) : (
         <div className="app-card-actions">
           <a className="button primary" href={createAppAccessUrl(app.url)} aria-label={`${app.name}を開く`}>
-            このアプリを開く
+            {isAdjusting ? '調整中' : 'このアプリを開く'}
           </a>
           {app.installUrl ? (
             <a className="button install" href={app.installUrl} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}をアプリとしてインストールする`}>

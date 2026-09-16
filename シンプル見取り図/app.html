@@ -63,6 +63,25 @@ h1 {
   object-fit: contain;
   display: block;
 }
+.header-data-actions {
+  display: grid;
+  gap: 4px;
+  justify-items: stretch;
+}
+.header-data-actions button {
+  min-width: 92px;
+  padding: 5px 10px;
+  border: 1px solid #c8dce0;
+  border-radius: 7px;
+  background: transparent;
+  color: #6f898f;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+}
+.header-data-actions button:hover { background: rgba(235, 247, 249, 0.72); }
 .btn {
   border: none;
   border-radius: 999px;
@@ -366,7 +385,7 @@ h1 {
 .canvas-zoom-level {
   min-width: 38px;
   color: #547b83;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-align: center;
 }
@@ -411,9 +430,9 @@ h1 {
 .item-palette {
   display: none;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px 4px;
+  gap: 12px 4px;
   margin-top: 12px;
-  max-height: 280px;
+  max-height: min(520px, calc(100vh - 180px));
   overflow-y: auto;
   padding: 2px 0 6px;
 }
@@ -421,7 +440,7 @@ h1 {
 .door-palette, .window-palette {
   display: none;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px 4px;
+  gap: 12px 4px;
   margin-top: 12px;
   padding: 2px 0 6px;
 }
@@ -466,10 +485,12 @@ h1 {
   stroke-linejoin: round;
 }
 .item-btn.item-preview {
-  width: 42px;
-  height: 42px;
+  width: 56px;
+  height: 62px;
   justify-self: center;
-  padding: 2px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 0;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -484,6 +505,18 @@ h1 {
   width: 38px;
   height: 38px;
   overflow: visible;
+}
+.item-preview-label {
+  display: block;
+  width: 100%;
+  min-height: 16px;
+  overflow: hidden;
+  color: currentColor;
+  font-size: 7px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
 }
 .floor-plan-icon {
   position: relative;
@@ -540,6 +573,7 @@ h1 {
     height: 42px;
     margin-left: auto;
   }
+  .header-data-actions button { min-width: 78px; padding: 4px 7px; font-size: 10px; }
   header { flex-wrap: wrap; }
   .main {
     flex-direction: column;
@@ -575,11 +609,13 @@ h1 {
   <h1>シンプル見取り図</h1>
   <button class="btn btn-soft" onclick="clearAll()">リセット</button>
   <button class="btn btn-primary" onclick="exportPNG()">フォルダ保存</button>
-  <button class="btn btn-soft header-screenshot-save screenshot-trigger" type="button" onclick="setDrawMode('screenshot', this)" title="範囲をドラッグしてクリップボードへコピーします" aria-label="スクリーンショット保存">スクリーンショット保存</button>
-  <button class="btn btn-soft" type="button" onclick="exportBackup()">バックアップ</button>
-  <button class="btn btn-soft" type="button" onclick="document.getElementById('backup-import-file').click()">データ挿入</button>
+  <button class="btn btn-primary header-screenshot-save screenshot-trigger" type="button" onclick="setDrawMode('screenshot', this)" title="範囲をドラッグしてクリップボードへコピーします" aria-label="スクリーンショット保存">スクリーンショット保存</button>
   <input id="backup-import-file" type="file" accept="application/json,.json" hidden onchange="importBackupFile(event)">
   <div class="spacer"></div>
+  <div class="header-data-actions" aria-label="データ操作">
+    <button type="button" onclick="exportBackup()">バックアップ</button>
+    <button type="button" onclick="document.getElementById('backup-import-file').click()">データ挿入</button>
+  </div>
   <img class="header-logo" src="./ktm-logo.jpg" alt="K.T.M Keep Trust Meaning">
 </header>
 
@@ -625,7 +661,7 @@ h1 {
       <span id="canvas-zoom-level" class="canvas-zoom-level" aria-live="polite">100%</span>
       <button class="dtool-btn" type="button" onclick="adjustCanvasZoom(0.1)" title="拡大" aria-label="拡大">＋</button>
     </div>
-    <button class="btn btn-soft canvas-screenshot-save screenshot-trigger" type="button" onclick="setDrawMode('screenshot', this)" title="範囲をドラッグしてクリップボードへコピーします" aria-label="スクリーンショット保存">スクリーンショット保存</button>
+    <button class="btn btn-primary canvas-screenshot-save screenshot-trigger" type="button" onclick="setDrawMode('screenshot', this)" title="範囲をドラッグしてクリップボードへコピーします" aria-label="スクリーンショット保存">スクリーンショット保存</button>
     <button class="canvas-template-save" type="button" onclick="saveTemplate()">＋テンプレートに保存</button>
 
     <div id="text-size-picker" class="floating-picker" style="top:98px;left:54px;padding:10px;flex-direction:column;align-items:center;gap:6px;">
@@ -684,9 +720,11 @@ const itemCatalog = {
   careBed: rasterItem("介護ベッド", "careBed", "care-bed.png", 493 / 856),
   bedRails: rasterItem("ベッド（柵あり）", "bedRails", "bed-rails.png", 636 / 944),
   bedSimple: rasterItem("ベッド（シンプル）", "bedSimple", "bed-simple.png", 515 / 880),
-  kitchen2Burner: rasterItem("キッチン（2口）", "kitchen2Burner", "kitchen-2burner.png", 849 / 335),
-  kitchen3Burner: rasterItem("キッチン（3口）", "kitchen3Burner", "kitchen-3burner.png", 1043 / 366),
+  kitchen2Burner: rasterItem("キッチン（2口）", "kitchen2Burner", "kitchen-2burner.png", 849 / 335, { longestSide: 3 }),
+  kitchen3Burner: rasterItem("キッチン（3口）", "kitchen3Burner", "kitchen-3burner.png", 1043 / 366, { longestSide: 5 }),
+  fridge: rasterItem("冷蔵庫", "fridge", "fridge.png", 726 / 664),
   toiletModern: rasterItem("トイレ", "toiletModern", "toilet-modern.png", 584 / 873),
+  urinal: rasterItem("和式トイレ", "urinal", "urinal.png", 385 / 766),
   tableRectangle: rasterItem("長方形テーブル", "tableRectangle", "table-rectangle.png", 830 / 613),
   tableSquareImage: rasterItem("正方形テーブル", "tableSquareImage", "table-square.png", 652 / 659),
   tvBoardSlim: rasterItem("テレビ台（細）", "tvBoardSlim", "tv-board-slim.png", 1459 / 337),
@@ -705,10 +743,8 @@ const itemCatalog = {
   tvBoard3Drawer: rasterItem("テレビ台（3段）", "tvBoard3Drawer", "tv-board-3drawer.png", 1374 / 348),
   tvBoard2Drawer: rasterItem("テレビ台（2段）", "tvBoard2Drawer", "tv-board-2drawer.png", 824 / 344),
   tvBoard: rasterItem("テレビ台", "tvBoard", "tv-board.png", 860 / 339),
-  urinal: rasterItem("小便器", "urinal", "urinal.png", 385 / 766),
   dog: rasterItem("犬", "dog", "dog.png", 886 / 686),
   cat: rasterItem("猫", "cat", "cat.png", 712 / 531),
-  fridge: rasterItem("冷蔵庫", "fridge", "fridge.png", 726 / 664),
   aquarium: rasterItem("水槽", "aquarium", "aquarium.png", 1465 / 973),
   birdCage: rasterItem("鳥かご", "birdCage", "bird-cage.png", 713 / 1072),
   doorSlidingDouble: rasterItem("引き違い戸", "doorSlidingDouble", "sliding-door-double.png", 569 / 54, { longestSide: 3, showInPalette: false, showInDoorPalette: true }),
@@ -1147,28 +1183,71 @@ function getCanvasItem(mode) {
   return itemCatalog[mode] || null;
 }
 
+const itemPaletteLabels = {
+  careBed: "介護ベッド",
+  bedRails: "柵ベッド",
+  bedSimple: "ベッド",
+  kitchen2Burner: "コンロ(小)",
+  kitchen3Burner: "コンロ(大)",
+  fridge: "冷蔵庫",
+  toiletModern: "洋式トイレ",
+  tableRectangle: "長テーブル",
+  tableSquareImage: "角テーブル",
+  tvBoardSlim: "細TV台",
+  tableRoundImage: "丸テーブル",
+  tableOvalImage: "楕円テーブル",
+  chairModern: "椅子",
+  sofaSingleImage: "1人ソファ",
+  sofaDoubleImage: "2人ソファ",
+  sofaTripleImage: "3人ソファ",
+  tvBoardStand: "脚付TV台",
+  tvBoardLow: "低TV台",
+  washerModern: "洗濯機",
+  bathRectangleImage: "長方形浴槽",
+  bathSquareImage: "角型浴槽",
+  washbasinModern: "洗面台",
+  tvBoard3Drawer: "3段TV台",
+  tvBoard2Drawer: "2段TV台",
+  tvBoard: "TV台",
+  urinal: "和式トイレ",
+  dog: "犬",
+  cat: "猫",
+  aquarium: "水槽",
+  birdCage: "鳥かご",
+  swingDoorRight: "開き戸(右)",
+  swingDoorLeft: "開き戸(左)"
+};
+
+function createPaletteItemButton(mode, item) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "item-btn item-preview";
+  button.title = item.name;
+  button.setAttribute("aria-label", item.name);
+  button.addEventListener("click", () => addCanvasItem(mode));
+
+  const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
+  preview.setAttribute("aria-hidden", "true");
+  const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  if (item.image) renderRasterItem(group, item);
+  else if (item.type === "bed") renderBed(group, item);
+  else if (item.type === "careBed") renderCareBed(group, item);
+  else renderCatalogItem(group, item);
+  preview.appendChild(group);
+
+  const label = document.createElement("span");
+  label.className = "item-preview-label";
+  label.textContent = itemPaletteLabels[mode] || item.name;
+  button.append(preview, label);
+  return button;
+}
+
 function renderItemPalette() {
   const palette = document.getElementById("item-palette");
   palette.innerHTML = "";
   Object.entries(itemCatalog).filter(([, item]) => item.showInPalette !== false).forEach(([mode, item]) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "item-btn item-preview";
-    button.title = item.name;
-    button.setAttribute("aria-label", item.name);
-    button.addEventListener("click", () => addCanvasItem(mode));
-
-    const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
-    preview.setAttribute("aria-hidden", "true");
-    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    if (item.image) renderRasterItem(group, item);
-    else if (item.type === "bed") renderBed(group, item);
-    else if (item.type === "careBed") renderCareBed(group, item);
-    else renderCatalogItem(group, item);
-    preview.appendChild(group);
-    button.appendChild(preview);
-    palette.appendChild(button);
+    palette.appendChild(createPaletteItemButton(mode, item));
   });
 }
 
@@ -1176,22 +1255,7 @@ function renderDoorPalette() {
   const palette = document.getElementById("door-palette");
   palette.innerHTML = "";
   Object.entries(itemCatalog).filter(([, item]) => item.showInDoorPalette === true).forEach(([mode, item]) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "item-btn item-preview";
-    button.title = item.name;
-    button.setAttribute("aria-label", item.name);
-    button.addEventListener("click", () => addCanvasItem(mode));
-
-    const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
-    preview.setAttribute("aria-hidden", "true");
-    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    if (item.image) renderRasterItem(group, item);
-    else renderCatalogItem(group, item);
-    preview.appendChild(group);
-    button.appendChild(preview);
-    palette.appendChild(button);
+    palette.appendChild(createPaletteItemButton(mode, item));
   });
 }
 
@@ -1199,22 +1263,7 @@ function renderWindowPalette() {
   const palette = document.getElementById("window-palette");
   palette.innerHTML = "";
   Object.entries(itemCatalog).filter(([, item]) => item.showInWindowPalette === true).forEach(([mode, item]) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "item-btn item-preview";
-    button.title = item.name;
-    button.setAttribute("aria-label", item.name);
-    button.addEventListener("click", () => addCanvasItem(mode));
-
-    const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
-    preview.setAttribute("aria-hidden", "true");
-    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    if (item.image) renderRasterItem(group, item);
-    else renderCatalogItem(group, item);
-    preview.appendChild(group);
-    button.appendChild(preview);
-    palette.appendChild(button);
+    palette.appendChild(createPaletteItemButton(mode, item));
   });
 }
 

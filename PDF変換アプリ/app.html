@@ -1376,6 +1376,7 @@
           : "印刷ダイアログを開いています。");
       } catch (error) {
         console.error(error);
+        if (isMergeMode()) showPdfWindowError(pdfWindow);
         setStatus("印刷画面を開けませんでした。");
       } finally {
         setActionButtonsDisabled(false);
@@ -2729,8 +2730,15 @@
       for (let index = 0; index < files.length; index++) {
         setStatus(`${index + 1}/${files.length}件目を結合中です。`);
         const sourcePdf = await PDFDocument.load(await files[index].arrayBuffer(), { ignoreEncryption: true });
-        for (let pageIndex = 0; pageIndex < sourcePdf.getPageCount(); pageIndex++) {
-          await addMergedPdfPage(mergedPdf, sourcePdf, pageIndex);
+        const sourcePages = sourcePdf.getPages();
+        const hasRotatedPages = sourcePages.some((page) => page.getRotation().angle % 360 !== 0);
+        if (!hasRotatedPages) {
+          const copiedPages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
+          copiedPages.forEach((page) => mergedPdf.addPage(page));
+        } else {
+          for (let pageIndex = 0; pageIndex < sourcePdf.getPageCount(); pageIndex++) {
+            await addMergedPdfPage(mergedPdf, sourcePdf, pageIndex);
+          }
         }
         await nextFrame();
       }
@@ -2769,6 +2777,12 @@
       pdfWindow.document.title = "PDFを準備中";
       pdfWindow.document.body.textContent = "PDFを準備中です。";
       return pdfWindow;
+    }
+
+    function showPdfWindowError(pdfWindow) {
+      if (!pdfWindow || pdfWindow.closed) return;
+      pdfWindow.document.title = "PDFを開けませんでした";
+      pdfWindow.document.body.textContent = "PDFを開けませんでした。このタブを閉じて、もう一度お試しください。";
     }
 
     function downloadAndOpenMergedPdf(blob, pdfWindow) {

@@ -4,18 +4,28 @@ import { createAppAccessUrl } from '../lib/portalAccess';
 type AppCardProps = {
   app: PortalApp;
   isReordering?: boolean;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
+  isSelectedForSwap?: boolean;
+  onSelectForSwap?: () => void;
 };
 
-export function AppCard({ app, isReordering = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false }: AppCardProps) {
+export function AppCard({ app, isReordering = false, isSelectedForSwap = false, onSelectForSwap }: AppCardProps) {
   const isAdjusting = app.availability === 'adjusting';
   const isTrial = app.availability === 'trial';
 
   return (
-    <article className="app-card">
+    <article className={`app-card${isReordering ? ' is-reordering' : ''}${isSelectedForSwap ? ' is-selected-for-swap' : ''}`}>
+      {isReordering ? (
+        <button
+          type="button"
+          className="app-swap-button"
+          onClick={onSelectForSwap}
+          aria-pressed={isSelectedForSwap}
+          aria-label={isSelectedForSwap ? `${app.name}を選択解除` : `${app.name}を入れ替える対象にする`}
+          title={isSelectedForSwap ? '選択解除' : '入れ替える'}
+        >
+          {isSelectedForSwap ? '選択中' : '入替'}
+        </button>
+      ) : null}
       <div className="app-card-top">
         {app.iconImage ? (
           <img className="app-icon-image" src={`${import.meta.env.BASE_URL}${app.iconImage}`} alt={`${app.name}のアイコン`} loading="lazy" />
@@ -46,17 +56,6 @@ export function AppCard({ app, isReordering = false, onMoveUp, onMoveDown, canMo
           ) : null}
         </div>
       )}
-
-      {isReordering ? (
-        <div className="app-order-controls" aria-label={`${app.name}の表示順`}>
-          <button type="button" className="app-order-button" onClick={onMoveUp} disabled={!canMoveUp} aria-label={`${app.name}を前へ移動`} title="前へ移動">
-            ↑
-          </button>
-          <button type="button" className="app-order-button" onClick={onMoveDown} disabled={!canMoveDown} aria-label={`${app.name}を後へ移動`} title="後へ移動">
-            ↓
-          </button>
-        </div>
-      ) : null}
     </article>
   );
 }

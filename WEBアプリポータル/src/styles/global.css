@@ -531,8 +531,7 @@ a {
   letter-spacing: 0;
 }
 
-.section-heading-actions,
-.app-order-controls {
+.section-heading-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -541,7 +540,7 @@ a {
 .order-edit-button,
 .order-reset-button,
 .order-finish-button,
-.app-order-button {
+.app-swap-button {
   border-radius: 6px;
   font: inherit;
   font-weight: 700;
@@ -670,35 +669,40 @@ a {
   gap: 10px;
 }
 
-.app-order-controls {
-  justify-content: flex-end;
-  margin-top: 12px;
+.app-card.is-reordering {
+  position: relative;
+  padding-top: 58px;
 }
 
-.app-order-button {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  place-items: center;
+.app-swap-button {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  min-width: 46px;
+  min-height: 30px;
+  padding: 4px 8px;
   border: 1px solid #b9dbf7;
   color: #1768ad;
   background: #ffffff;
-  font-size: 1.1rem;
+  font-size: 0.78rem;
 }
 
-.app-order-button:hover:not(:disabled),
+.app-card.is-selected-for-swap {
+  border-color: #5ca5df;
+  box-shadow: 0 0 0 3px rgba(45, 157, 230, 0.18), var(--shadow);
+}
+
+.app-swap-button[aria-pressed="true"] {
+  border-color: #167ac9;
+  color: #ffffff;
+  background: #167ac9;
+}
+
+.app-swap-button:hover,
 .order-reset-button:hover,
 .order-edit-button:hover,
 .order-finish-button:hover {
   filter: brightness(0.96);
-}
-
-.app-order-button:disabled {
-  border-color: #e0e8ef;
-  color: #a9b6c4;
-  background: #f5f7f9;
-  cursor: not-allowed;
 }
 
 .button.install {
@@ -952,13 +956,13 @@ a {
     font-size: 0.82rem;
   }
 
-  .app-order-controls {
-    margin-top: 10px;
+  .app-card.is-reordering {
+    padding-top: 52px;
   }
 
-  .app-order-button {
-    width: 32px;
-    height: 32px;
+  .app-swap-button {
+    top: 10px;
+    left: 10px;
   }
 
   .portal-notices {

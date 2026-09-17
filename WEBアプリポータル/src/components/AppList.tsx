@@ -34,24 +34,43 @@ export function AppList() {
   const employeeName = getStoredSession()?.employeeName || '';
   const [apps, setApps] = useState(() => getAppOrder(employeeName));
   const [isReordering, setIsReordering] = useState(false);
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
 
   useEffect(() => {
     setApps(getAppOrder(employeeName));
   }, [employeeName]);
 
-  function moveApp(index: number, direction: -1 | 1) {
-    const destinationIndex = index + direction;
-    if (destinationIndex < 0 || destinationIndex >= apps.length) return;
+  function selectAppForSwap(appId: string) {
+    if (!selectedAppId) {
+      setSelectedAppId(appId);
+      return;
+    }
+
+    if (selectedAppId === appId) {
+      setSelectedAppId(null);
+      return;
+    }
+
+    const selectedIndex = apps.findIndex((app) => app.id === selectedAppId);
+    const targetIndex = apps.findIndex((app) => app.id === appId);
+    if (selectedIndex < 0 || targetIndex < 0) return;
 
     const nextApps = [...apps];
-    [nextApps[index], nextApps[destinationIndex]] = [nextApps[destinationIndex], nextApps[index]];
+    [nextApps[selectedIndex], nextApps[targetIndex]] = [nextApps[targetIndex], nextApps[selectedIndex]];
     setApps(nextApps);
     saveAppOrder(employeeName, nextApps);
+    setSelectedAppId(null);
   }
 
   function resetOrder() {
     setApps(appData);
     saveAppOrder(employeeName, appData);
+    setSelectedAppId(null);
+  }
+
+  function finishReordering() {
+    setIsReordering(false);
+    setSelectedAppId(null);
   }
 
   return (
@@ -62,7 +81,7 @@ export function AppList() {
           {isReordering ? (
             <>
               <button className="order-reset-button" type="button" onClick={resetOrder}>元に戻す</button>
-              <button className="order-finish-button" type="button" onClick={() => setIsReordering(false)}>完了</button>
+              <button className="order-finish-button" type="button" onClick={finishReordering}>完了</button>
             </>
           ) : (
             <button className="order-edit-button" type="button" onClick={() => setIsReordering(true)}>並べ替え</button>
@@ -71,15 +90,13 @@ export function AppList() {
       </div>
 
       <div className="app-grid">
-        {apps.map((app, index) => (
+        {apps.map((app) => (
           <MemoizedAppCard
             key={app.id}
             app={app}
             isReordering={isReordering}
-            canMoveUp={index > 0}
-            canMoveDown={index < apps.length - 1}
-            onMoveUp={() => moveApp(index, -1)}
-            onMoveDown={() => moveApp(index, 1)}
+            isSelectedForSwap={selectedAppId === app.id}
+            onSelectForSwap={() => selectAppForSwap(app.id)}
           />
         ))}
       </div>

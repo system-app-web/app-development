@@ -3,9 +3,14 @@ import { createAppAccessUrl } from '../lib/portalAccess';
 
 type AppCardProps = {
   app: PortalApp;
+  isReordering?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 };
 
-export function AppCard({ app }: AppCardProps) {
+export function AppCard({ app, isReordering = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false }: AppCardProps) {
   const isAdjusting = app.availability === 'adjusting';
   const isTrial = app.availability === 'trial';
 
@@ -41,6 +46,17 @@ export function AppCard({ app }: AppCardProps) {
           ) : null}
         </div>
       )}
+
+      {isReordering ? (
+        <div className="app-order-controls" aria-label={`${app.name}の表示順`}>
+          <button type="button" className="app-order-button" onClick={onMoveUp} disabled={!canMoveUp} aria-label={`${app.name}を前へ移動`} title="前へ移動">
+            ↑
+          </button>
+          <button type="button" className="app-order-button" onClick={onMoveDown} disabled={!canMoveDown} aria-label={`${app.name}を後へ移動`} title="後へ移動">
+            ↓
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }

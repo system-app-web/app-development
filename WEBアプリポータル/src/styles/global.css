@@ -518,6 +518,10 @@ a {
 }
 
 .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 20px;
 }
 
@@ -525,6 +529,40 @@ a {
   margin: 0;
   font-size: 1.75rem;
   letter-spacing: 0;
+}
+
+.section-heading-actions,
+.app-order-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order-edit-button,
+.order-reset-button,
+.order-finish-button,
+.app-order-button {
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.order-edit-button,
+.order-finish-button {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid #167ac9;
+  color: #ffffff;
+  background: #167ac9;
+}
+
+.order-reset-button {
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid #b9dbf7;
+  color: #1768ad;
+  background: #ffffff;
 }
 
 .app-grid {
@@ -630,6 +668,37 @@ a {
 .app-card-actions {
   display: grid;
   gap: 10px;
+}
+
+.app-order-controls {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.app-order-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #b9dbf7;
+  color: #1768ad;
+  background: #ffffff;
+  font-size: 1.1rem;
+}
+
+.app-order-button:hover:not(:disabled),
+.order-reset-button:hover,
+.order-edit-button:hover,
+.order-finish-button:hover {
+  filter: brightness(0.96);
+}
+
+.app-order-button:disabled {
+  border-color: #e0e8ef;
+  color: #a9b6c4;
+  background: #f5f7f9;
+  cursor: not-allowed;
 }
 
 .button.install {
@@ -865,6 +934,31 @@ a {
 
   .app-section {
     padding-top: 12px;
+  }
+
+  .section-heading {
+    margin-bottom: 16px;
+  }
+
+  .section-heading h1 {
+    font-size: 1.45rem;
+  }
+
+  .order-edit-button,
+  .order-reset-button,
+  .order-finish-button {
+    min-height: 34px;
+    padding: 6px 9px;
+    font-size: 0.82rem;
+  }
+
+  .app-order-controls {
+    margin-top: 10px;
+  }
+
+  .app-order-button {
+    width: 32px;
+    height: 32px;
   }
 
   .portal-notices {

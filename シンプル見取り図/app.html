@@ -182,6 +182,9 @@ h1 {
 .item-control-slot {
   padding: 10px 12px;
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .item-control-heading {
   margin-bottom: 8px;
@@ -432,6 +435,8 @@ h1 {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px 4px;
   margin-top: 12px;
+  flex: 0 1 520px;
+  min-height: 0;
   max-height: min(520px, calc(100vh - 180px));
   overflow-y: auto;
   padding: 2px 0 6px;
@@ -442,6 +447,10 @@ h1 {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px 4px;
   margin-top: 12px;
+  flex: 0 1 520px;
+  min-height: 0;
+  max-height: min(520px, calc(100vh - 180px));
+  overflow-y: auto;
   padding: 2px 0 6px;
 }
 .item-control-slot.doors-open .door-palette { display: grid; }

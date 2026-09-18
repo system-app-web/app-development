@@ -882,8 +882,10 @@
     import { createWorker } from "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/+esm";
 
     const A4 = { wMm: 210, hMm: 297, wPt: 595.28, hPt: 841.89 };
-    const DPI = 300;
-    const PRINT_DPI = 200;
+    // Balance sharp FAX output with memory use when several pages are loaded.
+    const DPI = 320;
+    const CARE_RENDER_SCALE = DPI / 72;
+    const PENCIL_OVERLAY_DPI = DPI;
     const MM_TO_PX = DPI / 25.4;
     const originalSizes = {
       portrait: { wMm: 91, hMm: 128 },
@@ -1363,16 +1365,13 @@
       if (isMergeMode() ? !mergeFiles.length : !outputCanvases.length) return;
       setActionButtonsDisabled(true);
       try {
-        if (isMergeMode()) {
-          downloadAndOpenMergedPdf(await buildMergedPdfBlob(mergeFiles));
-        } else if (isPencilMode()) {
-          printCanvasesInCurrentWindow(outputCanvases.map(toBlackWhite), buildMergedPageCanvas);
-        } else {
-          printCanvasesInCurrentWindow(outputCanvases.map(toBlackWhite), buildA4PageCanvas);
-        }
-        setStatus(isMergeMode()
-          ? "PDFをダウンロードして開きました。PDF画面の印刷からFAX送信してください。"
-          : "印刷ダイアログを開いています。");
+        const printPdf = isMergeMode()
+          ? await buildMergedPdfBlob(mergeFiles)
+          : isPencilMode()
+            ? await buildPencilPdfBlob(sharedInputFiles)
+            : buildOutputPdfBlob(outputCanvases);
+        downloadAndOpenPdf(printPdf, isMergeMode() ? "PDF結合.pdf" : "PDF印刷用.pdf");
+        setStatus("PDFをダウンロードして開きました。PDF画面の印刷からFAX送信してください。");
       } catch (error) {
         console.error(error);
         setStatus("印刷画面を開けませんでした。");
@@ -1722,7 +1721,7 @@
         }
         for (const file of files) {
           const sources = file.type === "application/pdf" || /\.pdf$/i.test(file.name)
-            ? await renderPdfPages(file)
+            ? await renderPdfPages(file, CARE_RENDER_SCALE)
             : [await renderImage(file)];
           let corrections = sources.map(() => 0);
           if (selectedDocType() === "care") {
@@ -1791,14 +1790,14 @@
       return new File([buildPdfBlob(imageCanvas)], `${baseName}.pdf`, { type: "application/pdf" });
     }
 
-    async function renderPdfPages(file) {
+    async function renderPdfPages(file, scale = 3) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
       const data = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data }).promise;
       const canvases = [];
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
         const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 3 });
+        const viewport = page.getViewport({ scale });
         const canvas = document.createElement("canvas");
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
@@ -2636,7 +2635,7 @@
     }
 
     function buildPdfBlob(canvas) {
-      const pageImages = [buildA4PageJpeg(canvas)];
+      const pageImages = [buildA4PageMonochrome(canvas)];
       return objectsToPdfBlobFromPageImages(pageImages);
     }
 
@@ -2665,13 +2664,15 @@
         }
       }
 
-      return new Blob([await editedPdf.save()], { type: "application/pdf" });
+      return new Blob([await editedPdf.save({ useObjectStreams: false })], { type: "application/pdf" });
     }
 
     async function drawPencilAnnotationsOnPdfPage(pdf, page, sourceCanvas, annotations) {
       const overlay = document.createElement("canvas");
-      overlay.width = sourceCanvas.width;
-      overlay.height = sourceCanvas.height;
+      // Annotations are normalized coordinates, so they can be rendered more
+      // densely than the on-screen editor without re-rasterizing the source PDF.
+      overlay.width = Math.max(sourceCanvas.width, Math.round((page.getWidth() / 72) * PENCIL_OVERLAY_DPI));
+      overlay.height = Math.max(sourceCanvas.height, Math.round((page.getHeight() / 72) * PENCIL_OVERLAY_DPI));
       const context = overlay.getContext("2d");
       annotations.filter((annotation) => annotation.type !== "text")
         .forEach((annotation) => drawPencilAnnotation(context, overlay, annotation));
@@ -2688,39 +2689,7 @@
     }
 
     function buildOutputPdfBlob(canvases, dpi = DPI) {
-      return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageJpeg(canvas, dpi)));
-    }
-
-    function printCanvasesInCurrentWindow(canvases, pageBuilder) {
-      const pages = canvases.map((canvas) => pageBuilder(canvas, PRINT_DPI));
-      document.querySelector(".print-stage")?.remove();
-      document.getElementById("printStageStyle")?.remove();
-
-      const style = document.createElement("style");
-      style.id = "printStageStyle";
-      style.textContent = `@page portrait { size: 210mm 297mm; margin: 0; }
-        @page landscape { size: 297mm 210mm; margin: 0; }
-        @media print {
-          .print-stage .page.portrait { page: portrait; width: 210mm; height: 297mm; }
-          .print-stage .page.landscape { page: landscape; width: 297mm; height: 210mm; }
-        }`;
-      document.head.appendChild(style);
-
-      const stage = document.createElement("main");
-      stage.className = "print-stage";
-      pages.forEach(({ canvas, page }) => {
-        const section = document.createElement("section");
-        section.className = `page ${page.wMm > page.hMm ? "landscape" : "portrait"}`;
-        section.appendChild(canvas);
-        stage.appendChild(section);
-      });
-      document.body.appendChild(stage);
-
-      window.addEventListener("afterprint", () => {
-        stage.remove();
-        style.remove();
-      }, { once: true });
-      window.print();
+      return objectsToPdfBlobFromPageImages(canvases.map((canvas) => buildA4PageMonochrome(canvas, dpi)));
     }
 
     async function buildMergedPdfBlob(files) {
@@ -2732,14 +2701,15 @@
         copiedPages.forEach((page) => mergedPdf.addPage(page));
         await nextFrame();
       }
-      return new Blob([await mergedPdf.save()], { type: "application/pdf" });
+      // Avoid compressed object streams for broader Windows PDF/FAX compatibility.
+      return new Blob([await mergedPdf.save({ useObjectStreams: false })], { type: "application/pdf" });
     }
 
-    function downloadAndOpenMergedPdf(blob) {
+    function downloadAndOpenPdf(blob, filename) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "PDF結合.pdf";
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -2766,7 +2736,9 @@
         pageObjectIds.push(pageId);
 
         objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${page.wPt} ${page.hPt}] /Resources << /XObject << /Im${index} ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
-        objects.push(`<< /Type /XObject /Subtype /Image /Width ${pageImages[index].width} /Height ${pageImages[index].height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${pageImages[index].data.length} >>\nstream\n${pageImages[index].data}\nendstream`);
+        const image = pageImages[index];
+        const filter = image.filter ? ` /Filter ${image.filter}` : "";
+        objects.push(`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace ${image.colorSpace} /BitsPerComponent ${image.bitsPerComponent}${filter} /Length ${image.data.length} >>\nstream\n${image.data}\nendstream`);
         const content = `q\n${page.wPt} 0 0 ${page.hPt} 0 0 cm\n/Im${index} Do\nQ`;
         objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
       }
@@ -2775,10 +2747,38 @@
       return objectsToPdfBlob(objects);
     }
 
-    function buildA4PageJpeg(canvas, dpi = DPI) {
+    function buildA4PageMonochrome(canvas, dpi = DPI) {
       const { canvas: doc, page } = buildA4PageCanvas(canvas, dpi);
-      const jpegData = atob(doc.toDataURL("image/jpeg", 0.92).split(",")[1]);
-      return { data: jpegData, width: doc.width, height: doc.height, page };
+      const context = doc.getContext("2d", { willReadFrequently: true });
+      const pixels = context.getImageData(0, 0, doc.width, doc.height).data;
+      const bytesPerRow = Math.ceil(doc.width / 8);
+      const packed = new Uint8Array(bytesPerRow * doc.height);
+
+      for (let y = 0; y < doc.height; y++) {
+        for (let x = 0; x < doc.width; x++) {
+          const offset = (y * doc.width + x) * 4;
+          const isWhite = pixels[offset] + pixels[offset + 1] + pixels[offset + 2] >= 384;
+          if (isWhite) packed[y * bytesPerRow + (x >> 3)] |= 1 << (7 - (x & 7));
+        }
+      }
+
+      return {
+        data: bytesToBinaryString(packed),
+        width: doc.width,
+        height: doc.height,
+        page,
+        colorSpace: "/DeviceGray",
+        bitsPerComponent: 1
+      };
+    }
+
+    function bytesToBinaryString(bytes) {
+      const chunkSize = 0x8000;
+      let result = "";
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        result += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+      }
+      return result;
     }
 
     function buildA4PageCanvas(canvas, dpi = DPI) {
@@ -2789,6 +2789,7 @@
       doc.width = Math.round(page.wMm * pxPerMm);
       doc.height = Math.round(page.hMm * pxPerMm);
       const ctx = doc.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, doc.width, doc.height);
       const box = largePlacementBox(page);
@@ -2799,26 +2800,6 @@
       const y = Math.round((doc.height - targetH) / 2);
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(displayCanvas, x, y, targetW, targetH);
-      return { canvas: doc, page };
-    }
-
-    function buildMergedPageCanvas(canvas, dpi = DPI) {
-      const page = pageSizeForCanvas(canvas);
-      const pxPerMm = dpi / 25.4;
-      const doc = document.createElement("canvas");
-      doc.width = Math.round(page.wMm * pxPerMm);
-      doc.height = Math.round(page.hMm * pxPerMm);
-      const ctx = doc.getContext("2d");
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, doc.width, doc.height);
-      const box = { wMm: page.wMm - 10, hMm: page.hMm - 10 };
-      const fitted = fitWithin(canvas.width, canvas.height, box.wMm, box.hMm);
-      const targetW = Math.round(fitted.wMm * pxPerMm);
-      const targetH = Math.round(fitted.hMm * pxPerMm);
-      const x = Math.round((doc.width - targetW) / 2);
-      const y = Math.round((doc.height - targetH) / 2);
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(canvas, x, y, targetW, targetH);
       return { canvas: doc, page };
     }
 

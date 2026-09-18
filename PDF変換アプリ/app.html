@@ -2664,7 +2664,7 @@
         }
       }
 
-      return new Blob([await editedPdf.save({ useObjectStreams: false })], { type: "application/pdf" });
+      return new Blob([await saveFaxCompatiblePdf(editedPdf)], { type: "application/pdf" });
     }
 
     async function drawPencilAnnotationsOnPdfPage(pdf, page, sourceCanvas, annotations) {
@@ -2701,8 +2701,19 @@
         copiedPages.forEach((page) => mergedPdf.addPage(page));
         await nextFrame();
       }
-      // Avoid compressed object streams for broader Windows PDF/FAX compatibility.
-      return new Blob([await mergedPdf.save({ useObjectStreams: false })], { type: "application/pdf" });
+      return new Blob([await saveFaxCompatiblePdf(mergedPdf)], { type: "application/pdf" });
+    }
+
+    async function saveFaxCompatiblePdf(pdf) {
+      // Use a classic cross-reference table and a PDF 1.6 header. Older Windows
+      // print and FAX drivers handle this shape more consistently than PDF 1.7
+      // object streams. Page resources themselves remain untouched.
+      const bytes = await pdf.save({ useObjectStreams: false });
+      if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46
+        && bytes[4] === 0x2d && bytes[5] === 0x31 && bytes[6] === 0x2e) {
+        bytes[7] = 0x36;
+      }
+      return bytes;
     }
 
     function downloadAndOpenPdf(blob, filename) {

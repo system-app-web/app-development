@@ -510,6 +510,7 @@
       flex: 0 0 170px;
       min-width: 0;
       display: grid;
+      position: relative;
       gap: 6px;
       justify-items: center;
       color: #475569;
@@ -532,6 +533,39 @@
 
     .merge-preview-item.is-openable {
       cursor: zoom-in;
+    }
+
+    .merge-preview-delete {
+      position: absolute;
+      right: -8px;
+      bottom: 6px;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      color: #64748b;
+      cursor: pointer;
+      line-height: 1;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
+    }
+
+    .merge-preview-delete:hover,
+    .merge-preview-delete:focus-visible {
+      background: #fff0ee;
+      border-color: #e58a80;
+      color: #c8463b;
+      outline: 2px solid #e58a80;
+      outline-offset: 2px;
+    }
+
+    .merge-preview-delete svg {
+      width: 15px;
+      height: 15px;
+      stroke-width: 2;
     }
 
     .merge-pdf-dialog {
@@ -1683,7 +1717,7 @@
             mergeFiles.push(mergeFile);
             mergePageCount += pageCount;
             try {
-              await appendMergePreviews(mergeFile, mergeFiles.length);
+              await appendMergePreviews(mergeFile, mergeFiles.length, pageCount);
             } catch (error) {
               console.warn("Failed to render merge preview.", error);
             }
@@ -1807,13 +1841,14 @@
       return canvases;
     }
 
-    async function appendMergePreviews(file, fileIndex) {
+    async function appendMergePreviews(file, fileIndex, pageCount) {
       const previews = await renderPdfPreviewPages(file, 1);
       previews.forEach((canvas) => {
         mergePreviewCanvases.push({
           canvas,
           file,
-          label: `No.${fileIndex}`
+          label: `No.${fileIndex}`,
+          pageCount
         });
       });
     }
@@ -2573,7 +2608,7 @@
       if (mergePreviewCanvases.length) {
         const grid = document.createElement("div");
         grid.className = "merge-preview-grid";
-        mergePreviewCanvases.forEach(({ canvas, file, label }) => {
+        mergePreviewCanvases.forEach(({ canvas, file, label }, index) => {
           const item = document.createElement("div");
           item.className = "merge-preview-item is-openable";
           item.tabIndex = 0;
@@ -2587,6 +2622,17 @@
             }
           });
           item.appendChild(buildPreviewSheet(canvas));
+          const removeButton = document.createElement("button");
+          removeButton.className = "merge-preview-delete";
+          removeButton.type = "button";
+          removeButton.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>`;
+          removeButton.title = `${label}を削除`;
+          removeButton.setAttribute("aria-label", `${label}を削除`);
+          removeButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            removeMergeFile(index);
+          });
+          item.appendChild(removeButton);
           const caption = document.createElement("div");
           caption.textContent = label;
           item.appendChild(caption);
@@ -2599,6 +2645,27 @@
       summary.innerHTML = `${mergeFiles.length}件・${mergePageCount}ページを結合します<br>上記のPDF保存または印刷（FAX送信）を押して下さい`;
       content.appendChild(summary);
       drop.appendChild(content);
+    }
+
+    function removeMergeFile(index) {
+      const [removed] = mergeFiles.splice(index, 1);
+      if (!removed) return;
+      mergePreviewCanvases.splice(index, 1);
+      mergePreviewCanvases.forEach((preview, previewIndex) => {
+        preview.label = `No.${previewIndex + 1}`;
+      });
+      mergePageCount = mergePreviewCanvases.reduce((total, preview) => total + (preview.pageCount || 0), 0);
+      sharedInputFiles = [...mergeFiles];
+      closeMergePdfPreview();
+      saveModeState(currentDocType);
+      setActionButtonsDisabled(!mergeFiles.length);
+      if (!mergeFiles.length) {
+        showPlaceholder();
+        setStatus("PDFまたは画像をドラッグ・貼り付けすると、1つのPDFに結合します。");
+        return;
+      }
+      showMergeSummary();
+      setStatus(`${mergeFiles.length}件・${mergePageCount}ページ分のPDF結合準備が完了しました。`);
     }
 
     function openMergePdfPreview(file) {

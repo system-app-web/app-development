@@ -1949,7 +1949,7 @@
       for (let index = 0; index < loadedCanvases.length; index++) {
         const type = selectedDocType();
         const correction = pageRotationCorrections[index] ?? 0;
-        const corrected = rotateCanvas(loadedCanvases[index], correction);
+        const corrected = correction ? rotateCanvas(loadedCanvases[index], correction) : loadedCanvases[index];
         const cropped = cropDocument(corrected);
         const oriented = normalizeOrientation(cropped);
         sourceCanvases.push(addOuterMargin(oriented));
@@ -2691,11 +2691,17 @@
       if (previewLandscape) sheet.classList.add("landscape");
       const preview = document.createElement("canvas");
       const displayCanvas = canvas;
+      // The document canvas can be 600dpi. A screen-sized preview cannot show
+      // that many pixels, so cap only this disposable display copy.
+      const maxPreviewSide = 1600;
+      const previewScale = Math.min(1, maxPreviewSide / Math.max(displayCanvas.width, displayCanvas.height));
       const page = isMergeMode() ? pageSizeForCanvas(displayCanvas) : selectedPageSize();
       const box = isMergeMode() ? { wMm: page.wMm - 10, hMm: page.hMm - 10 } : largePlacementBox(page);
-      preview.width = displayCanvas.width;
-      preview.height = displayCanvas.height;
-      preview.getContext("2d").drawImage(displayCanvas, 0, 0);
+      preview.width = Math.max(1, Math.round(displayCanvas.width * previewScale));
+      preview.height = Math.max(1, Math.round(displayCanvas.height * previewScale));
+      const previewContext = preview.getContext("2d");
+      previewContext.imageSmoothingQuality = "high";
+      previewContext.drawImage(displayCanvas, 0, 0, preview.width, preview.height);
       const fitted = fitWithin(displayCanvas.width, displayCanvas.height, box.wMm, box.hMm);
       preview.style.width = `${(fitted.wMm / page.wMm) * 100}%`;
       preview.style.height = `${(fitted.hMm / page.hMm) * 100}%`;

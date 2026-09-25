@@ -920,7 +920,7 @@
     // denser source and output for sharp FAX transmission.
     const DPI = 320;
     const CARE_DPI = 600;
-    const CARE_RENDER_SCALE = CARE_DPI / 72;
+    const CARE_PREVIEW_RENDER_SCALE = 3;
     const PENCIL_OVERLAY_DPI = DPI;
     const MM_TO_PX = DPI / 25.4;
     const originalSizes = {
@@ -966,6 +966,7 @@
     let sourceCanvases = [];
     let outputCanvases = [];
     let pageRotationCorrections = [];
+    let pageInputSources = [];
     let orientationDetectionFailed = false;
     let mergeFiles = [];
     let mergePageCount = 0;
@@ -1369,25 +1370,25 @@
             setStatus(`${index + 1}/${outputCanvases.length}件目を保存中です。`);
             const handle = await outputDirectory.getFileHandle(buildSuggestedName(index), { create: true });
             const writable = await handle.createWritable();
-            await writable.write(buildPdfBlob(outputCanvases[index], CARE_DPI));
+            await writable.write(await buildHighQualityCarePdfBlob([index]));
             await writable.close();
           }
           setStatus(`${outputCanvases.length}件を同じフォルダに保存しました。`);
           return;
         }
         if (window.showSaveFilePicker) {
-          await saveSingleBlob(buildPdfBlob(outputCanvases[0], CARE_DPI), buildSuggestedName(0));
+          await saveSingleBlob(await buildHighQualityCarePdfBlob([0]), buildSuggestedName(0));
           setStatus("保存しました。");
           return;
         }
-        outputCanvases.forEach((canvas, index) => {
-          const url = URL.createObjectURL(buildPdfBlob(canvas, CARE_DPI));
+        for (let index = 0; index < outputCanvases.length; index++) {
+          const url = URL.createObjectURL(await buildHighQualityCarePdfBlob([index]));
           const link = document.createElement("a");
           link.href = url;
           link.download = buildSuggestedName(index);
           link.click();
           URL.revokeObjectURL(url);
-        });
+        }
         setStatus(`${outputCanvases.length}件をダウンロード保存しました。`);
       } catch (error) {
         console.error(error);
@@ -1405,7 +1406,7 @@
           ? await buildMergedPdfBlob(mergeFiles)
           : isPencilMode()
             ? await buildPencilPdfBlob(sharedInputFiles)
-            : buildOutputPdfBlob(outputCanvases, CARE_DPI);
+            : await buildHighQualityCarePdfBlob();
         downloadAndOpenPdf(printPdf, isMergeMode() ? "PDF結合.pdf" : "PDF印刷用.pdf");
         setStatus("PDFをダウンロードして開きました。PDF画面の印刷からFAX送信してください。");
       } catch (error) {
@@ -1519,6 +1520,7 @@
       sourceCanvases = [];
       outputCanvases = [];
       pageRotationCorrections = [];
+      pageInputSources = [];
       orientationDetectionFailed = false;
       mergeFiles = [];
       mergePageCount = 0;
@@ -1562,6 +1564,7 @@
         sourceCanvases: [],
         outputCanvases: [],
         pageRotationCorrections: [],
+        pageInputSources: [],
         orientationDetectionFailed: false,
         mergeFiles: [],
         mergePageCount: 0,
@@ -1582,6 +1585,7 @@
         sourceCanvases: [...sourceCanvases],
         outputCanvases: [...outputCanvases],
         pageRotationCorrections: [...pageRotationCorrections],
+        pageInputSources: [...pageInputSources],
         orientationDetectionFailed,
         mergeFiles: [...mergeFiles],
         mergePageCount,
@@ -1602,6 +1606,7 @@
       sourceCanvases = [...state.sourceCanvases];
       outputCanvases = [...state.outputCanvases];
       pageRotationCorrections = [...state.pageRotationCorrections];
+      pageInputSources = [...(state.pageInputSources || [])];
       orientationDetectionFailed = state.orientationDetectionFailed;
       mergeFiles = [...state.mergeFiles];
       mergePageCount = state.mergePageCount;
@@ -1756,8 +1761,9 @@
           return;
         }
         for (const file of files) {
-          const sources = file.type === "application/pdf" || /\.pdf$/i.test(file.name)
-            ? await renderPdfPages(file, CARE_RENDER_SCALE)
+          const pdfSource = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+          const sources = pdfSource
+            ? await renderPdfPages(file, CARE_PREVIEW_RENDER_SCALE)
             : [await renderImage(file)];
           let corrections = sources.map(() => 0);
           if (selectedDocType() === "care") {
@@ -1771,6 +1777,11 @@
           }
           loadedCanvases.push(...sources);
           pageRotationCorrections.push(...corrections);
+          pageInputSources.push(...sources.map((_, pageIndex) => ({
+            file,
+            isPdf: pdfSource,
+            pageNumber: pageIndex + 1
+          })));
         }
         rebuildForCurrentMode();
         saveModeState(currentDocType);
@@ -1841,6 +1852,18 @@
         canvases.push(canvas);
       }
       return canvases;
+    }
+
+    async function renderPdfPage(file, pageNumber, scale) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+      const page = await pdf.getPage(pageNumber);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      return canvas;
     }
 
     async function appendMergePreviews(file, fileIndex, pageCount) {
@@ -2712,6 +2735,52 @@
     function buildPdfBlob(canvas, dpi = DPI) {
       const pageImages = [buildA4PageMonochrome(canvas, dpi)];
       return objectsToPdfBlobFromPageImages(pageImages);
+    }
+
+    async function buildHighQualityCarePdfBlob(indices = outputCanvases.map((_, index) => index)) {
+      const pageImages = [];
+      for (let position = 0; position < indices.length; position++) {
+        const pageIndex = indices[position];
+        setStatus(`${position + 1}/${indices.length}ページを600dpiで作成中です。`);
+        const canvas = await renderHighQualityCarePage(pageIndex);
+        pageImages.push(buildA4PageMonochrome(canvas, CARE_DPI));
+        canvas.width = 1;
+        canvas.height = 1;
+        await nextFrame();
+      }
+      return objectsToPdfBlobFromPageImages(pageImages);
+    }
+
+    async function renderHighQualityCarePage(index) {
+      const source = pageInputSources[index];
+      let canvas;
+      if (source?.isPdf) {
+        canvas = await renderPdfPage(source.file, source.pageNumber, CARE_DPI / 72);
+      } else if (source?.file) {
+        canvas = await renderImage(source.file);
+      } else {
+        // Supports data that was loaded before this version of the app.
+        const fallback = document.createElement("canvas");
+        fallback.width = outputCanvases[index].width;
+        fallback.height = outputCanvases[index].height;
+        fallback.getContext("2d").drawImage(outputCanvases[index], 0, 0);
+        return fallback;
+      }
+
+      const correction = pageRotationCorrections[index] ?? 0;
+      if (correction) canvas = replaceCanvas(canvas, rotateCanvas(canvas, correction));
+      canvas = replaceCanvas(canvas, cropDocument(canvas));
+      canvas = replaceCanvas(canvas, normalizeOrientation(canvas));
+      canvas = replaceCanvas(canvas, addOuterMargin(canvas));
+      return replaceCanvas(canvas, toBlackWhite(canvas));
+    }
+
+    function replaceCanvas(previous, next) {
+      if (previous !== next) {
+        previous.width = 1;
+        previous.height = 1;
+      }
+      return next;
     }
 
     async function buildPencilPdfBlob(files) {

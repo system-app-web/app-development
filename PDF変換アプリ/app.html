@@ -916,9 +916,11 @@
     import { createWorker } from "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/+esm";
 
     const A4 = { wMm: 210, hMm: 297, wPt: 595.28, hPt: 841.89 };
-    // Balance sharp FAX output with memory use when several pages are loaded.
+    // PDF pencil overlays stay compact; single-page document conversion uses a
+    // denser source and output for sharp FAX transmission.
     const DPI = 320;
-    const CARE_RENDER_SCALE = DPI / 72;
+    const CARE_DPI = 600;
+    const CARE_RENDER_SCALE = CARE_DPI / 72;
     const PENCIL_OVERLAY_DPI = DPI;
     const MM_TO_PX = DPI / 25.4;
     const originalSizes = {
@@ -1367,19 +1369,19 @@
             setStatus(`${index + 1}/${outputCanvases.length}件目を保存中です。`);
             const handle = await outputDirectory.getFileHandle(buildSuggestedName(index), { create: true });
             const writable = await handle.createWritable();
-            await writable.write(buildPdfBlob(outputCanvases[index]));
+            await writable.write(buildPdfBlob(outputCanvases[index], CARE_DPI));
             await writable.close();
           }
           setStatus(`${outputCanvases.length}件を同じフォルダに保存しました。`);
           return;
         }
         if (window.showSaveFilePicker) {
-          await saveSingleBlob(buildPdfBlob(outputCanvases[0]), buildSuggestedName(0));
+          await saveSingleBlob(buildPdfBlob(outputCanvases[0], CARE_DPI), buildSuggestedName(0));
           setStatus("保存しました。");
           return;
         }
         outputCanvases.forEach((canvas, index) => {
-          const url = URL.createObjectURL(buildPdfBlob(canvas));
+          const url = URL.createObjectURL(buildPdfBlob(canvas, CARE_DPI));
           const link = document.createElement("a");
           link.href = url;
           link.download = buildSuggestedName(index);
@@ -1403,7 +1405,7 @@
           ? await buildMergedPdfBlob(mergeFiles)
           : isPencilMode()
             ? await buildPencilPdfBlob(sharedInputFiles)
-            : buildOutputPdfBlob(outputCanvases);
+            : buildOutputPdfBlob(outputCanvases, CARE_DPI);
         downloadAndOpenPdf(printPdf, isMergeMode() ? "PDF結合.pdf" : "PDF印刷用.pdf");
         setStatus("PDFをダウンロードして開きました。PDF画面の印刷からFAX送信してください。");
       } catch (error) {
@@ -2701,8 +2703,8 @@
       return sheet;
     }
 
-    function buildPdfBlob(canvas) {
-      const pageImages = [buildA4PageMonochrome(canvas)];
+    function buildPdfBlob(canvas, dpi = DPI) {
+      const pageImages = [buildA4PageMonochrome(canvas, dpi)];
       return objectsToPdfBlobFromPageImages(pageImages);
     }
 

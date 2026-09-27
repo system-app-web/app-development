@@ -1278,11 +1278,28 @@ function renderTemplateBtns() {
   });
   // 保存済み
   getSavedTemplates().forEach((t, i) => {
+    let chipClickTimer;
     const chip = document.createElement('span');
     chip.className = 'preset-btn';
     chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 6px 3px 9px;border:1px solid #b8d8c0;border-radius:20px;background:#f0fff4;color:#2a7a4a;cursor:pointer;transition:background 0.1s,box-shadow 0.1s;user-select:none';
     const label = document.createElement('span');
     label.textContent = t.name;
+    label.title = 'ダブルクリックで名前を変更';
+    label.ondblclick = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearTimeout(chipClickTimer);
+      const nextName = prompt('テンプレート名を変更', t.name);
+      if (nextName === null) return;
+      const name = nextName.trim();
+      if (!name || name === t.name) return;
+      const saved = getSavedTemplates();
+      saved[i] = { ...saved[i], name };
+      localStorage.setItem('genogram_templates', JSON.stringify(saved));
+      renderTemplateBtns();
+      scheduleStateSave();
+      toast(`「${name}」に変更しました`);
+    };
     const delBtn = document.createElement('span');
     delBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10" stroke="#999" stroke-width="1.8" stroke-linecap="round"/><line x1="10" y1="2" x2="2" y2="10" stroke="#999" stroke-width="1.8" stroke-linecap="round"/></svg>';
     delBtn.title = '削除';
@@ -1297,6 +1314,8 @@ function renderTemplateBtns() {
       renderTemplateBtns();
     };
     chip.onclick = () => {
+      clearTimeout(chipClickTimer);
+      chipClickTimer = setTimeout(() => {
       const isSelected = chip.dataset.selected === '1';
       document.querySelectorAll('.preset-btn').forEach(b => { b.style.background = b.style.borderRadius?.includes('20px') ? '#f0fff4' : '#f0f6ff'; b.style.boxShadow='none'; b.dataset.selected=''; });
       if (isSelected) { pid=1; persons=[mkPerson('本人','male')]; renderList(); setTemplateSelectedGuide(false); scheduleAutoGenerate({ immediate: true }); return; }
@@ -1306,6 +1325,7 @@ function renderTemplateBtns() {
       renderList();
       setTemplateSelectedGuide(true);
       scheduleAutoGenerate({ immediate: true });
+      }, 220);
     };
     chip.appendChild(label); chip.appendChild(delBtn);
     wrap.appendChild(chip);

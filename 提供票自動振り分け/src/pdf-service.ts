@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { extractPageFacts, shouldStartNewSlip, type PageFacts } from './analysis-rules';
+import { extractPageFacts, providerEvidence, shouldStartNewSlip, type PageFacts } from './analysis-rules';
 import type { AnalysisResult, PageRef, SlipGroup, SourcePdf } from './types';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -74,6 +74,7 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
         if (start) {
           current = {
             id: crypto.randomUUID(), clientName: facts.clientName ?? '', providerName: facts.providerName ?? '',
+            providerNumber: facts.providerNumber ?? '', serviceCategory: facts.serviceCategory, geminiExcerpt: '', geminiUsed: false,
             serviceMonth: facts.serviceMonth ?? '', pages: [], needsReview: false, reviewed: false, issues: [],
           };
           groups.push(current);
@@ -82,6 +83,11 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
         current.pages.push(pageRef);
         current.clientName ||= facts.clientName ?? '';
         current.providerName ||= facts.providerName ?? '';
+        current.providerNumber ||= facts.providerNumber ?? '';
+        current.serviceCategory ||= facts.serviceCategory;
+        // API候補は事業所関連の行だけ。氏名などを含むページ全文は蓄積・送信しない。
+        const evidence = providerEvidence(items);
+        if (evidence) current.geminiExcerpt = `${current.geminiExcerpt}\n${evidence}`.slice(0, 1600);
         current.serviceMonth ||= facts.serviceMonth ?? '';
         if (!facts.textFound) current.issues.push(`P${serial}: 文字情報を取得できませんでした`);
         currentFacts = { ...currentFacts, ...Object.fromEntries(Object.entries(facts).filter(([, value]) => value)) } as PageFacts;
@@ -99,8 +105,9 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
   for (const group of groups) {
     if (!group.clientName) group.issues.push('利用者名を判定できません');
     if (!group.providerName) group.issues.push('事業所名を判定できません');
+    if (!group.providerNumber) group.issues.push('10桁の事業所番号を判定できません');
     if (!group.serviceMonth) group.issues.push('提供年月を判定できません');
-    const key = `${group.clientName}|${group.providerName}|${group.serviceMonth}`;
+    const key = `${group.clientName}|${group.providerNumber || group.providerName}|${group.serviceMonth}`;
     if (group.clientName && group.providerName && seen.has(key)) {
       group.issues.push('同一利用者・同一事業所の重複の可能性');
       seen.get(key)?.issues.push('同一利用者・同一事業所の重複の可能性');
@@ -139,10 +146,11 @@ export async function createProviderPdf(provider: string, month: string, groups:
     const [page] = await output.copyPages(input, [ref.pageIndex]); output.addPage(page);
   }
   const bytes = await output.save();
-  return { name: `${safeFilename(provider)}_${safeFilename(month)}_提供票.pdf`, bytes };
+  const familyNames = [...new Set(groups.map((group) => group.clientName.trim().split(/[ 　]/)[0]).filter(Boolean))].map((name) => `${name}様`).join('、');
+  return { name: `${safeFilename(month)}　${safeFilename(provider)}提供票（${safeFilename(familyNames || '利用者名未判定')}）.pdf`, bytes };
 }
 
-export async function createZip(files: { name: string; bytes: Uint8Array }[], month: string) {
-  const zip = new JSZip(); files.forEach((file) => zip.file(file.name, file.bytes));
+export async function createZip(files: { name: string; bytes: Uint8Array; folder?: string }[], month: string) {
+  const zip = new JSZip(); files.forEach((file) => zip.file(file.folder ? `${safeFilename(file.folder)}/${file.name}` : file.name, file.bytes));
   return { name: `${safeFilename(month)}_提供票_事業所別.zip`, blob: await zip.generateAsync({ type: 'blob' }) };
 }

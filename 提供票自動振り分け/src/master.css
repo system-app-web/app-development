@@ -1,0 +1,9 @@
+.master { padding: 24px; margin-top: 18px; }
+.backup-buttons { display: flex; gap: 10px; }
+.master-table { margin-top: 14px; }
+.master-table table { min-width: 660px; }
+.master-table select { width: 100%; border: 1px solid #d8d9df; border-radius: 7px; padding: 7px 8px; font: inherit; background: #fff; }
+.empty-master { margin: 18px 0 0; padding: 13px 14px; background: #f6f8fc; border-radius: 10px; color: #5d6270; font-size: 13px; line-height: 1.6; }
+.gemini-setting { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; margin-top: 18px; padding: 12px 14px; border: 1px solid #d8e3fb; background: #f6f9ff; border-radius: 10px; font-size: 13px; }
+.gemini-setting label { font-weight: 750; color: #2458ae; }
+.gemini-setting span { color: #5e6472; font-size: 12px; }

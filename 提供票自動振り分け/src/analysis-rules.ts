@@ -6,6 +6,8 @@ export type TextItem = { text: string; x: number; y: number };
 export type PageFacts = {
   clientName?: string;
   providerName?: string;
+  providerNumber?: string;
+  serviceCategory: '居宅療養' | '';
   serviceMonth?: string;
   isSlipHeading: boolean;
   textFound: boolean;
@@ -49,15 +51,58 @@ function lineText(items: TextItem[]) {
     .map(([, row]) => row.sort((a, b) => a.x - b.x).map((item) => item.text).join(''));
 }
 
+/** Gemini補助判定に渡す場合も、事業所に関係する行だけを選ぶ。 */
+export function providerEvidence(items: TextItem[]): string {
+  return lineText(items)
+    .filter((line) => /事業所番号|事業所名|サービス事業所|居宅療養管理指導/u.test(line))
+    .filter((line) => !/被保険者|利用者氏名|利用者名/u.test(line))
+    .slice(0, 12)
+    .join('\n')
+    .slice(0, 1600);
+}
+
+/** SVF形式の提供票では、ページ下部に確定した氏名が印字される。
+ * 表の見出しにある「利用者氏名」等ではなく、被保険者氏名を優先する。 */
+function insuredName(text: string): string | undefined {
+  const match = text.match(/被保険者氏名\s*[:：]?\s*([^\s\n]{1,20})\s+([^\s\n]{1,20})\s*様?/u);
+  return match ? clean(`${match[1]} ${match[2]}`).replace(/様$/u, '') : undefined;
+}
+
+function lineValue(text: string, label: string): string | undefined {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matches = [...text.matchAll(new RegExp(`${escaped}\\s*([^\\n]+)`, 'gu'))];
+  for (const match of matches) {
+    const value = clean(match[1]).replace(/^(?:休日FLG|事業所名|サービス内容).*$/u, '').trim();
+    if (usable(value) && !/[<>_]/u.test(value)) return value;
+  }
+}
+
+/**
+ * 被保険者番号も10桁なので、別表の「事業所番号」列見出しより後の番号だけを採用する。
+ * このPDFでは同じ事業所番号が複数行に現れるが、先頭の一件で十分である。
+ */
+function providerNumberFromAppendix(text: string): string | undefined {
+  if (!/サービス提供票別表/u.test(text)) return undefined;
+  const compact = toAscii(text).replace(/[\s-]/g, '');
+  const heading = compact.indexOf('事業所番号');
+  if (heading < 0) return undefined;
+  const afterHeading = compact.slice(heading + '事業所番号'.length);
+  return afterHeading.match(/[0-9]{10}/u)?.[0];
+}
+
 export function extractPageFacts(items: TextItem[]): PageFacts {
   const lines = lineText(items);
   const text = lines.join('\n');
   // ラベル直後の値を優先。座標付きitemsを受け取るため、将来はここに位置判定を追加できます。
-  const clientName = afterLabel(text, ['利用者氏名', '利用者名', '被保険者氏名', '被保険者名']);
-  const providerName = afterLabel(text, ['サービス事業所名', 'サービス提供事業所', '提供事業所名', '事業所名']);
+  const clientName = insuredName(text) ?? afterLabel(text, ['利用者氏名', '利用者名', '被保険者氏名', '被保険者名']);
+  // 右上の名称ではなく、帳票下部のサービス事業所名／別表の公費欄を優先する。
+  const providerName = lineValue(text, '事業所名_公費') ?? lineValue(text, 'サービス事業所名') ?? afterLabel(text, ['サービス提供事業所', '提供事業所名']);
+  const providerNumber = providerNumberFromAppendix(text);
   return {
     clientName,
     providerName,
+    providerNumber,
+    serviceCategory: /居宅療養管理指導/u.test(text) ? '居宅療養' : '',
     serviceMonth: monthFrom(text),
     isSlipHeading: /サービス提供票|提供票別表|居宅サービス計画/u.test(text),
     textFound: clean(text).length > 0,

@@ -3,6 +3,7 @@ import type { AppSavedData } from './types';
 const STORAGE_KEY = 'service-slip-sorter.settings.v1';
 const DATABASE = 'service-slip-sorter-backups';
 const STORE = 'daily_snapshots';
+const OUTPUT_DIRECTORY_STORE = 'output_directory';
 
 export const emptySavedData = (): AppSavedData => ({ version: 1, providerMaster: [], geminiEnabled: false });
 
@@ -16,13 +17,33 @@ function dayKey(date = new Date()) { return date.toISOString().slice(0, 10); }
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE, 1);
+    const request = indexedDB.open(DATABASE, 2);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'day' });
+      if (!db.objectStoreNames.contains(OUTPUT_DIRECTORY_STORE)) db.createObjectStore(OUTPUT_DIRECTORY_STORE, { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+  });
+}
+
+export async function loadOutputDirectoryHandle(): Promise<FileSystemDirectoryHandle | undefined> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(OUTPUT_DIRECTORY_STORE, 'readonly').objectStore(OUTPUT_DIRECTORY_STORE).get('output');
+    request.onsuccess = () => { db.close(); resolve(request.result?.handle as FileSystemDirectoryHandle | undefined); };
+    request.onerror = () => { db.close(); reject(request.error); };
+  });
+}
+
+export async function saveOutputDirectoryHandle(handle: FileSystemDirectoryHandle) {
+  const db = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(OUTPUT_DIRECTORY_STORE, 'readwrite');
+    transaction.objectStore(OUTPUT_DIRECTORY_STORE).put({ id: 'output', handle });
+    transaction.oncomplete = () => { db.close(); resolve(); };
+    transaction.onerror = () => { db.close(); reject(transaction.error); };
   });
 }
 

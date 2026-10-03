@@ -123,7 +123,6 @@ export const appData: PortalApp[] = [
     description: '提供票PDFを事業所別に振り分け',
     version: 'v1.0.0',
     status: 'stable',
-    availability: 'adjusting',
   },
 ];
 

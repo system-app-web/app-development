@@ -47,6 +47,26 @@ export async function loadPdfFiles(files: File[], onProgress: (text: string) => 
   return { sources, duplicateFiles };
 }
 
+export async function createFilePreview(file: File): Promise<{ thumbnail: string; pageCount: number }> {
+  const bytes = await file.arrayBuffer();
+  const pdfDocument = await pdfjsLib.getDocument({ data: copyPdfData(bytes) }).promise;
+  try {
+    const page = await pdfDocument.getPage(1);
+    const initialViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(180 / initialViewport.width, 220 / initialViewport.height);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('PDFのプレビューを作成できません。');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
+    return { thumbnail: canvas.toDataURL('image/jpeg', 0.78), pageCount: pdfDocument.numPages };
+  } finally {
+    await pdfDocument.destroy();
+  }
+}
+
 export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[], onProgress: (text: string) => void): Promise<AnalysisResult> {
   const groups: SlipGroup[] = [];
   let serial = 0;
@@ -82,7 +102,12 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
         if (!current) continue;
         current.pages.push(pageRef);
         current.clientName ||= facts.clientName ?? '';
-        current.providerName ||= facts.providerName ?? '';
+        if (facts.isAppendix && facts.providerName) {
+          // 別表の「事業所名」列は主票上部の省略表示より優先します。
+          current.providerName = facts.providerName;
+        } else {
+          current.providerName ||= facts.providerName ?? '';
+        }
         current.providerNumber ||= facts.providerNumber ?? '';
         current.serviceCategory ||= facts.serviceCategory;
         // API候補は事業所関連の行だけ。氏名などを含むページ全文は蓄積・送信しない。
@@ -90,7 +115,13 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
         if (evidence) current.geminiExcerpt = `${current.geminiExcerpt}\n${evidence}`.slice(0, 1600);
         current.serviceMonth ||= facts.serviceMonth ?? '';
         if (!facts.textFound) current.issues.push(`P${serial}: 文字情報を取得できませんでした`);
-        currentFacts = { ...currentFacts, ...Object.fromEntries(Object.entries(facts).filter(([, value]) => value)) } as PageFacts;
+        currentFacts = start
+          ? facts
+          : {
+            ...currentFacts,
+            ...Object.fromEntries(Object.entries(facts).filter(([key, value]) => key !== 'isAppendix' && Boolean(value))),
+            isAppendix: facts.isAppendix,
+          } as PageFacts;
         lastSourceId = source.id;
         await sleepFrame();
       }

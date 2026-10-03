@@ -18,7 +18,7 @@ export type SlipGroup = {
   issues: string[];
 };
 
-export type DeliveryMethod = 'LINE' | 'FAX' | 'メール' | '手渡し' | '';
+export type DeliveryMethod = '居宅療養' | 'LINE' | 'FAX' | 'メール' | '手渡し' | 'その他' | '';
 
 export type ProviderMasterEntry = {
   providerNumber: string;

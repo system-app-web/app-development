@@ -118,6 +118,7 @@ export const appData: PortalApp[] = [
     id: 'service-slip-sorter',
     name: '提供票自動振り分け',
     url: 'https://service-slip-sorter.vercel.app',
+    installUrl: 'https://service-slip-sorter.vercel.app/?install=1',
     manualUrl: '',
     icon: 'pdf',
     description: '提供票PDFを事業所別に振り分け',

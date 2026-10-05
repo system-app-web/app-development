@@ -166,6 +166,7 @@ export async function renderPage(source: SourcePdf, pageIndex: number, canvas: H
 
 export const safeFilename = (name: string) => name.replace(/[\\/:*?"<>|]/g, '＿').replace(/\s+/g, ' ').trim() || '名称未設定';
 const safeFolderName = (name: string) => name.replace(/[\\/:*?"<>|]/g, '＿').trim() || '名称未設定';
+const safeZipFolderPath = (path: string) => path.split('/').filter(Boolean).map(safeFolderName).join('/');
 
 export async function createProviderPdf(provider: string, month: string, groups: SlipGroup[], sources: SourcePdf[]) {
   const output = await PDFDocument.create();
@@ -186,7 +187,7 @@ export async function createZip(files: { name: string; bytes: Uint8Array; folder
   const zip = new JSZip();
   const usedPaths = new Set<string>();
   files.forEach((file) => {
-    const folderName = file.folder ? (archiveBaseName ? safeFolderName(file.folder) : safeFilename(file.folder)) : '';
+    const folderName = file.folder ? (archiveBaseName ? safeZipFolderPath(file.folder) : safeFilename(file.folder)) : '';
     const folder = folderName ? `${folderName}/` : '';
     const extension = file.name.toLowerCase().endsWith('.pdf') ? '.pdf' : '';
     const stem = extension ? file.name.slice(0, -extension.length) : file.name;

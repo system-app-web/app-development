@@ -3,7 +3,7 @@ import './master.css';
 import './folds.css';
 import { analysePdfs, createFilePreview, createProviderPdf, createZip, loadPdfFiles, renderPage, safeFilename } from './pdf-service';
 import { DEFAULT_DELIVERY_METHODS, type AnalysisResult, type AppSavedData, type DeliveryMethodOption, type ProviderMasterEntry, type SlipGroup } from './types';
-import { emptySavedData, exportSavedData, importSavedData, loadOutputDirectoryHandle, loadSavedData, saveOutputDirectoryHandle, saveSavedData } from './storage';
+import { emptySavedData, exportSavedData, importSavedData, loadSavedData, saveSavedData } from './storage';
 import { requestGeminiSuggestion } from './gemini-service';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -14,9 +14,7 @@ let masterActionError = '';
 let deliveryMethodEditorOpen = false;
 let deliveryMethodDraft: DeliveryMethodOption[] = [];
 let downloaded = 0;
-let outputKind: 'folder' | 'zip' | undefined;
 let outputName = '';
-let outputDirectoryHandle: FileSystemDirectoryHandle | undefined;
 let scrollToTopOnNextRender = false;
 let focusSaveButtonOnNextRender = false;
 type QueuedPdf = { id: string; file: File; thumbnail?: string; pageCount?: number; previewError: boolean };
@@ -201,23 +199,21 @@ function fixedSection(key: string, title: string, meta: string, content: string)
   return `<section class="card fold-section ${key}-section"><div class="fold-summary intake-fixed-summary"><span class="fold-title">${title}</span>${meta}</div><div class="fold-body">${content}</div></section>`;
 }
 
-type DirectoryPickerWindow = Window & {
-  showDirectoryPicker?: (options: { id: string; mode: 'readwrite'; startIn: FileSystemDirectoryHandle | 'desktop' }) => Promise<FileSystemDirectoryHandle>;
-};
-
 function outputPanel(canExport: boolean, reviewCount: number, blockedCount: number, masterSetupCount: number, mixedMonths: boolean, groupCount: number, assigned: number, totalPages: number, singleFolderExport: boolean) {
-  const pickerAvailable = window.isSecureContext && typeof (window as DirectoryPickerWindow).showDirectoryPicker === 'function';
   const folderTitle = monthlyFolderTitle(result?.uniqueMonths[0] || '');
-  const reason = masterSetupCount && !singleFolderExport ? '事業所マスタで振り分け先を設定すると、保存できるようになります。' : reviewCount ? `要確認 ${reviewCount}件を確認してから保存できます。` : blockedCount ? `必須情報または振り分け先が未設定の ${blockedCount}件を先に確認してください。` : mixedMonths ? '対象年月が1か月に揃ってから保存できます。' : singleFolderExport ? `送付方法を使わず、全てのPDFを「${folderTitle}」フォルダにまとめます。` : '';
+  const reason = masterSetupCount && !singleFolderExport ? '事業所マスタで振り分け先を設定すると、保存できるようになります。' : reviewCount ? `要確認 ${reviewCount}件を確認してから保存できます。` : blockedCount ? `必須情報または振り分け先が未設定の ${blockedCount}件を先に確認してください。` : mixedMonths ? '対象年月が1か月に揃ってから保存できます。' : '';
   const statusLabel = canExport ? '保存可能' : masterSetupCount && !singleFolderExport ? '事業所マスタ未設定' : '確認が必要';
-  const downloadButton = `<button class="primary output-button output-button-large" data-action="create" ${canExport && !busy ? '' : 'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H10l2 2h7.5A1.5 1.5 0 0 1 21 9.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M3.5 11h17"/></svg>${pickerAvailable ? '保存先フォルダを選んで保存' : '振り分け完了フォルダをダウンロード'}</button>`;
+  const downloadButton = `<button class="primary output-button output-button-large" data-action="create" ${canExport && !busy ? '' : 'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H10l2 2h7.5A1.5 1.5 0 0 1 21 9.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M3.5 11h17"/></svg>${busy ? 'ZIPを作成中…' : '振り分け完了フォルダをダウンロード'}</button>`;
+  const archiveInstruction = singleFolderExport
+    ? `ZIPを展開すると「${folderTitle}」フォルダにPDFがまとまります。`
+    : `ZIPを展開すると「${folderTitle}」の中に送付方法別のフォルダが作成されます。`;
   const masterSetupActions = `<div class="result-save-row has-master-setup"><div class="result-save-actions has-master-setup">
     <div class="master-action-column"><button class="primary master-jump-button" data-action="go-master">事業所マスタへ移動</button>${!singleFolderExport ? `<span class="output-status master-setup-note">${escapeHtml(reason)}</span>` : ''}</div>
-    <div class="download-action-column">${downloadButton}<label class="single-folder-option"><span class="single-folder-choice"><input type="checkbox" data-action="single-folder-export" ${singleFolderExport ? 'checked' : ''}><span>送付方法を使用しない方は一括して一つのフォルダに作成</span></span><small>チェックすると、送付方法未設定でも保存できます。</small></label></div>
+    <div class="download-action-column">${downloadButton}<label class="single-folder-option"><span class="single-folder-choice"><input type="checkbox" data-action="single-folder-export" ${singleFolderExport ? 'checked' : ''}><span>送付方法を使用しない方は一括して一つのフォルダに作成</span></span><small>チェックすると、送付方法未設定でも保存できます。</small></label><span class="save-instruction">${escapeHtml(archiveInstruction)}</span></div>
   </div></div>`;
-  const regularActions = `<div class="result-save-row">${canExport && !singleFolderExport ? `<span class="save-instruction">${pickerAvailable ? 'ボタンを押すと保存先フォルダを選べます。' : '振り分けたPDFが事業所ごとのフォルダにまとまります。'}</span>` : `<span class="output-status ${canExport ? 'ready' : ''}">${escapeHtml(reason || '内容を確認してから保存できます。')}</span>`}<div class="result-save-actions"><div class="download-action-column">${downloadButton}</div></div></div>`;
+  const regularActions = `<div class="result-save-row">${canExport ? `<span class="save-instruction">${escapeHtml(archiveInstruction)}</span>` : `<span class="output-status">${escapeHtml(reason || '内容を確認してから保存できます。')}</span>`}<div class="result-save-actions"><div class="download-action-column">${downloadButton}</div></div></div>`;
   return `<section class="result-actions">
-    <div class="result-actions-heading"><div><span class="eyebrow">振り分け完了</span><h2>${groupCount}件を振り分けました</h2></div>${outputDirectoryHandle && pickerAvailable ? `<small>前回の保存先：${escapeHtml(outputDirectoryHandle.name)}</small>` : ''}</div>
+    <div class="result-actions-heading"><div><span class="eyebrow">振り分け完了</span><h2>${groupCount}件を振り分けました</h2></div></div>
     <div class="result-counts"><div><span>要確認</span><strong>${reviewCount}<small>件</small></strong></div><div><span>ページ</span><strong>${assigned}<small> / ${totalPages}</small></strong></div><div><span>状態</span><strong class="${canExport ? 'ready' : 'needs-review'}">${statusLabel}</strong></div></div>
     ${masterSetupCount ? masterSetupActions : regularActions}
   </section>`;
@@ -296,7 +292,7 @@ function reviewArea(groups: SlipGroup[], reviewCount: number, assigned: number, 
         }).join('')}
       </tbody></table></div>
     `, false)}
-    ${downloaded ? foldSection('complete', outputKind === 'folder' ? '振り分けフォルダを作成しました' : 'ZIPをダウンロードしました', `${downloaded}事業所分 · ${escapeHtml(outputName)}`, `<div class="complete-content"><p>元PDF：${result!.sources.length}ファイル　総ページ数：${result!.totalPages}ページ　利用者：${new Set(groups.map((g) => g.clientName)).size}名　事業所：${providers.size}事業所　作成PDF：${downloaded}件　要確認：${reviewCount}件${outputKind === 'folder' && outputDirectoryHandle ? `　保存先：${escapeHtml(outputDirectoryHandle.name)} / ${escapeHtml(outputName)}` : ''}</p><button class="primary" data-action="create">もう一度作成して保存</button></div>`, true) : ''}
+    ${downloaded ? foldSection('complete', 'ZIPをダウンロードしました', `${downloaded}事業所分 · ${escapeHtml(outputName)}`, `<div class="complete-content"><p>元PDF：${result!.sources.length}ファイル　総ページ数：${result!.totalPages}ページ　利用者：${new Set(groups.map((g) => g.clientName)).size}名　事業所：${providers.size}事業所　作成PDF：${downloaded}件　要確認：${reviewCount}件</p><button class="primary" data-action="create">もう一度作成して保存</button></div>`, true) : ''}
     `;
 }
 
@@ -398,7 +394,7 @@ function bindEvents() {
   document.querySelector('[data-action="folder"]')?.addEventListener('click', (event) => { event.stopPropagation(); document.querySelector<HTMLInputElement>('#folderInput')?.click(); });
   document.querySelector('[data-action="reset"]')?.addEventListener('click', () => {
     if (busy || !confirm('振り分け結果と選択中PDFの一覧をリセットします。元のPDFファイルは削除されません。よろしいですか？')) return;
-    queuedFiles = []; result = undefined; downloaded = 0; outputKind = undefined; outputName = ''; singleFolderExportChecked = false; render();
+    queuedFiles = []; result = undefined; downloaded = 0; outputName = ''; singleFolderExportChecked = false; render();
   });
   document.querySelector<HTMLInputElement>('#fileInput')?.addEventListener('change', (event) => queueFiles([...(event.target.files ?? [])]));
   document.querySelector<HTMLInputElement>('#folderInput')?.addEventListener('change', (event) => queueFiles([...(event.target.files ?? [])]));
@@ -553,7 +549,7 @@ async function startRouting() {
   showIntakeProgress();
   busy = true; setProgress('PDFを読み込み中');
   try {
-    const loaded = await loadPdfFiles(pdfs, setProgress); const analysis = await analysePdfs(loaded.sources, loaded.duplicateFiles, setProgress); result = analysis; queuedFiles = []; downloaded = 0; outputKind = undefined; outputName = ''; sectionOpen.verification = false;
+    const loaded = await loadPdfFiles(pdfs, setProgress); const analysis = await analysePdfs(loaded.sources, loaded.duplicateFiles, setProgress); result = analysis; queuedFiles = []; downloaded = 0; outputName = ''; sectionOpen.verification = false;
     let added = 0;
     let filledNames = 0;
     for (const group of result.groups) {
@@ -701,103 +697,32 @@ function providerGroups() {
   });
   return values;
 }
-function directoryPicker() { return (window as DirectoryPickerWindow).showDirectoryPicker; }
-
-function isMissingEntry(error: unknown) {
-  return error instanceof DOMException && error.name === 'NotFoundError';
-}
-
-function isEntryConflict(error: unknown) {
-  return error instanceof DOMException && (error.name === 'NotFoundError' || error.name === 'TypeMismatchError');
-}
-
-async function createUniqueDirectory(parent: FileSystemDirectoryHandle, baseName: string) {
-  for (let suffix = 1; suffix < 1000; suffix++) {
-    const name = suffix === 1 ? baseName : `${baseName} (${suffix})`;
-    try { await parent.getDirectoryHandle(name); }
-    catch (error) {
-      if (!isEntryConflict(error)) throw error;
-      if (isMissingEntry(error)) return { name, handle: await parent.getDirectoryHandle(name, { create: true }) };
-    }
-  }
-  throw new Error('同名フォルダが多いため、新しい保存フォルダを作成できません。');
-}
-
-async function writeUniquePdf(directory: FileSystemDirectoryHandle, filename: string, bytes: Uint8Array) {
-  const stem = filename.toLowerCase().endsWith('.pdf') ? filename.slice(0, -4) : filename;
-  for (let suffix = 1; suffix < 1000; suffix++) {
-    const name = suffix === 1 ? `${stem}.pdf` : `${stem} (${suffix}).pdf`;
-    try { await directory.getFileHandle(name); }
-    catch (error) {
-      if (!isEntryConflict(error)) throw error;
-      if (!isMissingEntry(error)) continue;
-      const file = await directory.getFileHandle(name, { create: true });
-      const writable = await file.createWritable();
-      await writable.write(bytes);
-      await writable.close();
-      return;
-    }
-  }
-  throw new Error('同名PDFが多いため、上書きせずに保存できません。');
-}
-
 async function createAllOutputs() {
   if (!result) return;
   const singleFolderExport = singleFolderExportChecked && result.groups.some((group) => group.providerNumber && !masterFor(group)?.deliveryMethod);
-  const pickerAvailable = window.isSecureContext && Boolean(directoryPicker());
-  let selectedDirectory: FileSystemDirectoryHandle | undefined;
-  if (pickerAvailable) {
-    try {
-      selectedDirectory = await directoryPicker()!.call(window, {
-        id: 'service-slip-sorter-output',
-        mode: 'readwrite',
-        startIn: outputDirectoryHandle ?? 'desktop',
-      });
-      outputDirectoryHandle = selectedDirectory;
-      try { await saveOutputDirectoryHandle(selectedDirectory); }
-      catch { alert('選んだフォルダには今回保存できますが、次回用の保存先を記憶できませんでした。'); }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      alert(error instanceof Error ? `保存先フォルダを選べませんでした：${error.message}` : '保存先フォルダを選べませんでした。');
-      return;
-    }
-  }
-
-  showIntakeProgress(); busy = true; downloaded = 0; outputKind = undefined; outputName = '';
-  setProgress(pickerAvailable ? '保存用フォルダを作成中' : 'ZIPを作成中');
+  showIntakeProgress(); busy = true; downloaded = 0; outputName = '';
+  setProgress('ZIPを作成中');
   try {
     const entries = [...providerGroups().values()];
     const month = result.uniqueMonths[0] || '提供年月未確定';
     const singleFolderTitle = monthlyFolderTitle(month);
-    if (selectedDirectory) {
-      const outputFolder = await createUniqueDirectory(selectedDirectory, singleFolderTitle);
-      outputName = outputFolder.name;
-      for (const [index, groups] of entries.entries()) {
-        setProgress(`${index + 1} / ${entries.length}件の事業所別PDFを作成中`);
-        const output = await createProviderPdf(providerNameFor(groups[0]), groups[0].serviceMonth, groups, result.sources);
-        const destination = singleFolderExport ? outputFolder.handle : await outputFolder.handle.getDirectoryHandle(safeFilename(deliveryFolderNameFor(destinationFor(groups[0]))), { create: true });
-        await writeUniquePdf(destination, output.name, output.bytes);
-      }
-      outputKind = 'folder';
-    } else {
-      const outputs = [];
-      for (const [index, groups] of entries.entries()) {
-        setProgress(`${index + 1} / ${entries.length} ZIP用PDFを作成中`);
-        const output = await createProviderPdf(providerNameFor(groups[0]), groups[0].serviceMonth, groups, result.sources);
-        outputs.push({ ...output, folder: singleFolderExport ? singleFolderTitle : deliveryFolderNameFor(destinationFor(groups[0])) });
-      }
-      const zip = await createZip(outputs, month, singleFolderExport ? singleFolderTitle : undefined);
-      download(zip.blob, zip.name);
-      outputKind = 'zip';
-      outputName = zip.name;
+    const outputs = [];
+    for (const [index, groups] of entries.entries()) {
+      setProgress(`${index + 1} / ${entries.length}件のPDFを準備中`);
+      const output = await createProviderPdf(providerNameFor(groups[0]), groups[0].serviceMonth, groups, result.sources);
+      const categoryFolder = singleFolderExport ? '' : safeFilename(deliveryFolderNameFor(destinationFor(groups[0])));
+      outputs.push({ ...output, folder: categoryFolder });
     }
+    setProgress('ZIPファイルをまとめています');
+    const zip = await createZip(outputs, month, singleFolderTitle);
+    download(zip.blob, zip.name);
+    outputName = zip.name;
     downloaded = entries.length;
   } catch (error) {
     const detail = error instanceof Error ? error.message : '不明なエラー';
-    alert(outputName ? `保存中にエラーが発生しました。一部のPDFが保存されている可能性があります。作成途中のフォルダ「${outputName}」を確認してください。\n${detail}` : `PDFの作成に失敗しました：${detail}`);
+    alert(`ZIPの作成に失敗しました：${detail}`);
   } finally { busy = false; render(); }
 }
 
 void loadSavedData().then((data) => { savedData = data; render(); });
-void loadOutputDirectoryHandle().then((handle) => { outputDirectoryHandle = handle; render(); }).catch(() => { /* 保存先の記憶が利用できない場合もフォルダ選択は可能 */ });
 render();

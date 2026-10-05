@@ -3221,6 +3221,17 @@ function renderVisitCalendar() {
     };
     grid.appendChild(btn);
   }
+  padCalendarGridToSixWeeks(grid);
+}
+
+function padCalendarGridToSixWeeks(grid) {
+  while (grid.children.length < 42) {
+    const blank = document.createElement('button');
+    blank.className = 'calendar-day blank';
+    blank.disabled = true;
+    blank.textContent = '';
+    grid.appendChild(blank);
+  }
 }
 
 function renderCalendarSelects(yearSelect, monthSelect, year, month) {
@@ -3560,6 +3571,7 @@ function renderAddClientCalendar() {
     };
     grid.appendChild(btn);
   }
+  padCalendarGridToSixWeeks(grid);
 }
 
 function clearAddClientDateField(field) {

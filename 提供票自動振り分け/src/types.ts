@@ -6,7 +6,7 @@ export type SlipGroup = {
   providerName: string;
   /** PDFに記載された10桁の事業所番号。名称ではなく、これを主キーにします。 */
   providerNumber: string;
-  /** 帳票から分かる場合だけ設定。居宅療養は送付方法より優先して分けます。 */
+  /** 帳票から分かる場合だけ設定するサービス区分。送付先フォルダの判定には使いません。 */
   serviceCategory: '居宅療養' | '';
   /** Gemini補助判定へ送る場合だけ使う、事業所関連行のローカル断片。保存はしない。 */
   geminiExcerpt: string;

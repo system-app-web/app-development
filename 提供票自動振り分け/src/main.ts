@@ -33,7 +33,7 @@ const groupStatus = (group: SlipGroup, singleFolderExport = false) => {
 const download = (bytes: BlobPart, name: string) => { const url = URL.createObjectURL(new Blob([bytes])); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
 const masterFor = (group: SlipGroup) => savedData.providerMaster.find((entry) => entry.providerNumber === group.providerNumber);
 const providerNameFor = (group: SlipGroup) => masterFor(group)?.providerName.trim() || group.providerName.trim();
-const destinationFor = (group: SlipGroup) => group.serviceCategory === '居宅療養' || masterFor(group)?.deliveryMethod === '居宅療養' ? '居宅療養' : (masterFor(group)?.deliveryMethod || '要確認');
+const destinationFor = (group: SlipGroup) => masterFor(group)?.deliveryMethod || '要確認';
 const deliveryMethodOptions = () => savedData.deliveryMethods?.length ? savedData.deliveryMethods : DEFAULT_DELIVERY_METHODS;
 const deliveryMethodNameFor = (value: string) => deliveryMethodOptions().find((method) => method.value === value)?.name || value;
 const deliveryFolderNameFor = (value: string) => deliveryMethodOptions().find((method) => method.value === value)?.folderName || value;
@@ -77,6 +77,79 @@ function showRenderFailure(error: unknown) {
 function render() {
   try { renderView(); }
   catch (error) { showRenderFailure(error); }
+}
+
+function progressState(message: string) {
+  const parts = message.match(/^(\d+)\s*\/\s*(\d+)\s*(.*)$/u);
+  const current = parts ? Number(parts[1]) : undefined;
+  const total = parts ? Number(parts[2]) : undefined;
+  const stage = parts?.[3] || message;
+  return {
+    stage,
+    current,
+    total,
+    percent: total ? Math.min(100, Math.round(((current ?? 0) / total) * 100)) : 0,
+    unit: stage.includes('ページ') ? 'ページ' : stage.includes('ファイル') ? 'ファイル' : '件',
+  };
+}
+
+function progressPanelMarkup(message: string) {
+  const state = progressState(message);
+  const hasCounter = state.current !== undefined && state.total !== undefined;
+  return `<section class="progress-panel" role="status" aria-live="polite">
+    <div class="progress-panel-heading"><div class="progress-panel-copy"><span>振り分け中</span><strong>${escapeHtml(state.stage)}</strong></div>
+      ${hasCounter ? `<div class="progress-counter"><strong>${state.current}<small> / ${state.total}</small></strong><span>${state.unit}</span></div>` : '<i class="progress-spinner" aria-hidden="true"></i>'}
+    </div>
+    <div class="progress-track" ${hasCounter ? `role="progressbar" aria-label="${escapeHtml(state.stage)}" aria-valuemin="0" aria-valuemax="${state.total}" aria-valuenow="${state.current}"` : 'aria-hidden="true"'}><span style="width:${hasCounter ? `${state.percent}%` : '32%'}" class="${hasCounter ? '' : 'indeterminate'}"></span></div>
+    <p class="progress-hint">処理が終わるまで、この画面を閉じずにお待ちください。</p>
+  </section>`;
+}
+
+function updateProgressPanel(message: string) {
+  const panel = app.querySelector<HTMLElement>('.progress-panel');
+  if (!panel) return false;
+  const state = progressState(message);
+  const hasCounter = state.current !== undefined && state.total !== undefined;
+  const stage = panel.querySelector<HTMLElement>('.progress-panel-copy strong');
+  if (stage) stage.textContent = state.stage;
+
+  let counter = panel.querySelector<HTMLElement>('.progress-counter');
+  const spinner = panel.querySelector<HTMLElement>('.progress-spinner');
+  if (hasCounter) {
+    if (!counter && spinner) {
+      spinner.outerHTML = '<div class="progress-counter"><strong></strong><span></span></div>';
+      counter = panel.querySelector<HTMLElement>('.progress-counter');
+    }
+    const count = counter?.querySelector<HTMLElement>('strong');
+    if (count) count.innerHTML = `${state.current}<small> / ${state.total}</small>`;
+    const unit = counter?.querySelector<HTMLElement>('span');
+    if (unit) unit.textContent = state.unit;
+  } else if (counter) {
+    counter.outerHTML = '<i class="progress-spinner" aria-hidden="true"></i>';
+  }
+
+  const track = panel.querySelector<HTMLElement>('.progress-track');
+  const fill = track?.querySelector<HTMLElement>('span');
+  if (track && fill) {
+    if (hasCounter) {
+      track.removeAttribute('aria-hidden');
+      track.setAttribute('role', 'progressbar');
+      track.setAttribute('aria-label', state.stage);
+      track.setAttribute('aria-valuemin', '0');
+      track.setAttribute('aria-valuemax', String(state.total));
+      track.setAttribute('aria-valuenow', String(state.current));
+    } else {
+      track.removeAttribute('role');
+      track.removeAttribute('aria-label');
+      track.removeAttribute('aria-valuemin');
+      track.removeAttribute('aria-valuemax');
+      track.removeAttribute('aria-valuenow');
+      track.setAttribute('aria-hidden', 'true');
+    }
+    fill.style.width = hasCounter ? `${state.percent}%` : '32%';
+    fill.classList.toggle('indeterminate', !hasCounter);
+  }
+  return true;
 }
 
 function renderView() {
@@ -127,12 +200,6 @@ function renderView() {
   const mixedMonths = Boolean(result && result.uniqueMonths.length !== 1);
   const canExport = Boolean(result && !busy && !queuedFiles.length && reviewCount === 0 && blockedCount === 0 && !mixedMonths && assigned === result.totalPages && groups.length);
   const progressMessage = app.dataset.progress || '処理を準備中';
-  const progressParts = progressMessage.match(/^(\d+)\s*\/\s*(\d+)\s*(.*)$/u);
-  const progressCurrent = progressParts ? Number(progressParts[1]) : 0;
-  const progressTotal = progressParts ? Number(progressParts[2]) : 0;
-  const progressPercent = progressTotal ? Math.min(100, Math.round((progressCurrent / progressTotal) * 100)) : 0;
-  const progressStage = progressParts?.[3] || progressMessage;
-  const progressUnit = progressStage.includes('ページ') ? 'ページ' : progressStage.includes('ファイル') ? 'ファイル' : '件';
   app.innerHTML = `
     <main class="shell">
       <header class="header">
@@ -144,13 +211,7 @@ function renderView() {
       </nav>
       ${result && !busy ? summaryArea(groups, reviewCount) : ''}
       ${fixedSection('intake', busy ? '振り分け中' : result && !queuedFiles.length ? '振り分け結果と保存' : 'サービス提供票PDFを入れる', result ? `<button class="primary reset-button header-reset-button" data-action="reset" ${busy ? 'disabled' : ''}>リセット</button>` : queuedFiles.length || busy ? `<span class="fold-meta">${queuedFiles.length ? `選択中 ${queuedFiles.length}件 · 開始前` : '処理中'}</span>` : '', `
-        ${busy ? `<section class="progress-panel" role="status" aria-live="polite">
-          <div class="progress-panel-heading"><div class="progress-panel-copy"><span>振り分け中</span><strong>${escapeHtml(progressStage)}</strong></div>
-            ${progressParts ? `<div class="progress-counter"><strong>${progressCurrent}<small> / ${progressTotal}</small></strong><span>${progressUnit}</span></div>` : `<i class="progress-spinner" aria-hidden="true"></i>`}
-          </div>
-          <div class="progress-track" ${progressParts ? `role="progressbar" aria-label="${escapeHtml(progressStage)}" aria-valuemin="0" aria-valuemax="${progressTotal}" aria-valuenow="${progressCurrent}"` : 'aria-hidden="true"'}><span style="width:${progressParts ? `${progressPercent}%` : '32%'}" class="${progressParts ? '' : 'indeterminate'}"></span></div>
-          <p class="progress-hint">処理が終わるまで、この画面を閉じずにお待ちください。</p>
-        </section>` : queuedFiles.length || !result ? `
+        ${busy ? progressPanelMarkup(progressMessage) : queuedFiles.length || !result ? `
           <div class="dropzone ${queuedFiles.length ? 'with-previews' : ''}" id="dropzone" role="region" aria-label="PDFのドラッグ・ドロップ欄">
             ${queuedFiles.length ? queuePanel() : `
             <div class="drop-icon">↓</div><strong>サービス提供票PDFをここにドラッグ＆ドロップ</strong>
@@ -296,7 +357,10 @@ function reviewArea(groups: SlipGroup[], reviewCount: number, assigned: number, 
     `;
 }
 
-function setProgress(message: string) { app.dataset.progress = message; render(); }
+function setProgress(message: string) {
+  app.dataset.progress = message;
+  if (!updateProgressPanel(message)) render();
+}
 
 function showIntakeProgress() {
   scrollToTopOnNextRender = true;

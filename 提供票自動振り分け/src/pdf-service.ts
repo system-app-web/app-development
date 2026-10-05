@@ -165,6 +165,7 @@ export async function renderPage(source: SourcePdf, pageIndex: number, canvas: H
 }
 
 export const safeFilename = (name: string) => name.replace(/[\\/:*?"<>|]/g, '＿').replace(/\s+/g, ' ').trim() || '名称未設定';
+const safeFolderName = (name: string) => name.replace(/[\\/:*?"<>|]/g, '＿').trim() || '名称未設定';
 
 export async function createProviderPdf(provider: string, month: string, groups: SlipGroup[], sources: SourcePdf[]) {
   const output = await PDFDocument.create();
@@ -181,7 +182,20 @@ export async function createProviderPdf(provider: string, month: string, groups:
   return { name: `${safeFilename(month)}　${safeFilename(provider)}提供票（${safeFilename(familyNames || '利用者名未判定')}）.pdf`, bytes };
 }
 
-export async function createZip(files: { name: string; bytes: Uint8Array; folder?: string }[], month: string) {
-  const zip = new JSZip(); files.forEach((file) => zip.file(file.folder ? `${safeFilename(file.folder)}/${file.name}` : file.name, file.bytes));
-  return { name: `${safeFilename(month)}_提供票_事業所別.zip`, blob: await zip.generateAsync({ type: 'blob' }) };
+export async function createZip(files: { name: string; bytes: Uint8Array; folder?: string }[], month: string, archiveBaseName?: string) {
+  const zip = new JSZip();
+  const usedPaths = new Set<string>();
+  files.forEach((file) => {
+    const folderName = file.folder ? (archiveBaseName ? safeFolderName(file.folder) : safeFilename(file.folder)) : '';
+    const folder = folderName ? `${folderName}/` : '';
+    const extension = file.name.toLowerCase().endsWith('.pdf') ? '.pdf' : '';
+    const stem = extension ? file.name.slice(0, -extension.length) : file.name;
+    let name = file.name;
+    if (archiveBaseName) for (let suffix = 2; usedPaths.has(`${folder}${name}`); suffix++) name = `${stem} (${suffix})${extension}`;
+    const path = `${folder}${name}`;
+    if (archiveBaseName) usedPaths.add(path);
+    zip.file(path, file.bytes);
+  });
+  const name = archiveBaseName ? `${safeFolderName(archiveBaseName)}.zip` : `${safeFilename(month)}_提供票_事業所別.zip`;
+  return { name, blob: await zip.generateAsync({ type: 'blob' }) };
 }

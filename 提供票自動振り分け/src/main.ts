@@ -19,7 +19,6 @@ const stoppedGroupIds = new Set<string>();
 let clientStopDialogOpen = false;
 let clientSearchTerm = '';
 let scrollToTopOnNextRender = false;
-let focusSaveButtonOnNextRender = false;
 type QueuedPdf = { id: string; file: File; thumbnail?: string; pageCount?: number; previewAspectRatio?: number; previewError: boolean };
 let queuedFiles: QueuedPdf[] = [];
 let savedData: AppSavedData = emptySavedData();
@@ -52,7 +51,7 @@ function initializeProviderMasterOrder(data: AppSavedData) {
 }
 const deliveryMethodOptions = () => {
   const configured = savedData.deliveryMethods?.length ? savedData.deliveryMethods : DEFAULT_DELIVERY_METHODS;
-  const mergeOption = configured.find((method) => method.value === 'PDF結合') ?? { value: 'PDF結合', name: 'PDF結合', folderName: 'PDF結合' };
+  const mergeOption = { ...(configured.find((method) => method.value === 'PDF結合') ?? { value: 'PDF結合', name: 'PDF結合', folderName: 'PDF結合' }), name: 'PDF結合（自動FAX用）' };
   const methods = configured.filter((method) => method.value !== 'PDF結合');
   const otherIndex = methods.findIndex((method) => method.value === 'その他');
   methods.splice(otherIndex < 0 ? methods.length : otherIndex, 0, mergeOption);
@@ -225,9 +224,7 @@ function renderView() {
     if (key) sectionOpen[key] = section.open;
   });
   const scrollPosition = scrollToTopOnNextRender ? 0 : window.scrollY;
-  const focusSaveButton = focusSaveButtonOnNextRender;
   scrollToTopOnNextRender = false;
-  focusSaveButtonOnNextRender = false;
   const innerScrollPositions = Array.from(app.querySelectorAll<HTMLElement>('[data-scroll-area]'))
     .map((area) => ({ key: area.dataset.scrollArea!, top: area.scrollTop, left: area.scrollLeft }));
   const active = document.activeElement;
@@ -319,9 +316,8 @@ function renderView() {
         nextFocus = Array.from(document.querySelectorAll<HTMLInputElement>('[data-field]'))
           .find((field) => field.closest<HTMLTableRowElement>('tr[data-id]')?.dataset.id === focusTarget.groupId && field.dataset.field === focusTarget.groupField);
       }
-      if (!focusSaveButton) nextFocus?.focus({ preventScroll: true });
+      nextFocus?.focus({ preventScroll: true });
       window.scrollTo(0, scrollPosition);
-      if (focusSaveButton && canExport) app.querySelector<HTMLButtonElement>('[data-action="create"]:not(:disabled)')?.focus({ preventScroll: true });
     } catch (error) { showRenderFailure(error); }
   });
 }
@@ -341,7 +337,8 @@ function outputPanel(canExport: boolean, reviewCount: number, blockedCount: numb
   const downloadButton = `<button class="primary output-button output-button-large" data-action="create" ${canExport && !busy ? '' : 'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H10l2 2h7.5A1.5 1.5 0 0 1 21 9.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M3.5 11h17"/></svg>${busy ? 'ZIPを作成中…' : '振り分け完了フォルダをダウンロード'}</button>`;
   const saveReason = !canExport && !masterSetupCount ? `<div class="output-status">${escapeHtml(reason || '内容を確認してから保存できます。')}</div>` : '';
   const saveActions = `<div class="result-save-row has-master-setup"><div class="result-save-actions has-master-setup">
-    <div class="master-action-column"><button class="primary master-jump-button" data-action="go-master" ${canExport ? 'disabled' : ''}>事業所マスタへ移動</button>${clientStopControl()}</div>
+    <div class="master-action-column"><button class="primary master-jump-button" data-action="go-master" ${canExport ? 'disabled' : ''}>事業所マスタへ移動</button></div>
+    <div class="stop-action-column">${clientStopControl()}</div>
     <div class="download-action-column">${downloadButton}<label class="single-folder-option ${canExport ? 'is-locked' : ''}"><span class="single-folder-choice"><input type="checkbox" data-action="single-folder-export" ${singleFolderExport ? 'checked' : ''} ${canExport ? 'disabled' : ''}><span>送付方法を使用しない方は一括して一つのフォルダに作成</span></span><small>チェックすると、送付方法が未設定でも保存できます。</small></label></div>
   </div></div>`;
   return `<section class="result-actions">
@@ -680,13 +677,7 @@ function bindEvents() {
   });
   document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-master-field]').forEach((input) => input.addEventListener('change', () => {
     const number = input.closest('tr')?.dataset.master; const entry = savedData.providerMaster.find((item) => item.providerNumber === number); if (!entry) return;
-    const hadMissingRoutes = Boolean(result?.groups.some((group) => group.providerNumber && !masterFor(group)?.deliveryMethod));
     entry[input.dataset.masterField as 'providerName' | 'deliveryMethod'] = input.value as never; entry.updatedAt = new Date().toISOString(); persist(); refreshRoutingSafety();
-    const hasMissingRoutes = Boolean(result?.groups.some((group) => group.providerNumber && !masterFor(group)?.deliveryMethod));
-    if (input.dataset.masterField === 'deliveryMethod' && hadMissingRoutes && !hasMissingRoutes) {
-      scrollToTopOnNextRender = true;
-      focusSaveButtonOnNextRender = true;
-    }
     render();
   }));
   document.querySelectorAll<HTMLElement>('[data-action="delete-master"]').forEach((button) => button.addEventListener('click', async () => {

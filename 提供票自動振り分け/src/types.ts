@@ -33,6 +33,7 @@ export const DEFAULT_DELIVERY_METHODS: DeliveryMethodOption[] = [
   { value: 'メール', name: 'メール', folderName: 'メール' },
   { value: '手渡し', name: '手渡し', folderName: '手渡し' },
   { value: '居宅療養', name: '居宅療養', folderName: '居宅療養' },
+  { value: 'PDF結合', name: 'PDF結合', folderName: 'PDF結合' },
   { value: 'その他', name: 'その他', folderName: 'その他' },
 ];
 
@@ -47,6 +48,8 @@ export type ProviderMasterEntry = {
 export type AppSavedData = {
   version: 1;
   providerMaster: ProviderMasterEntry[];
+  /** 未設定を先頭へ移す初回整理を完了したか。以降は配列順を維持します。 */
+  providerMasterOrderInitialized?: boolean;
   geminiEnabled: boolean;
   deliveryMethods?: DeliveryMethodOption[];
 };

@@ -26,7 +26,7 @@
 .delivery-method-dialog::backdrop { background: #1d263b88; }
 .delivery-method-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .delivery-method-dialog-head h2 { margin: 0; font-size: 21px; }
-.delivery-method-close { width: 34px; height: 34px; border: 0; border-radius: 50%; background: #f0f1f4; color: #51535b; font-size: 23px; line-height: 1; cursor: pointer; }
+.delivery-method-close { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; padding: 0; border: 0; border-radius: 50%; background: #f0f1f4; color: #51535b; line-height: 0; cursor: pointer; }
 .delivery-method-help { margin: 10px 0 18px; color: #667085; font-size: 13px; line-height: 1.6; }
 .delivery-method-list { display: grid; max-height: 48vh; overflow: auto; gap: 10px; padding: 2px; }
 .delivery-method-edit-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 12px; padding: 12px; border: 1px solid #e1e6f1; border-radius: 10px; background: #fafbfe; }

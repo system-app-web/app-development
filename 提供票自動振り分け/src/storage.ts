@@ -5,13 +5,14 @@ const DATABASE = 'service-slip-sorter-backups';
 const STORE = 'daily_snapshots';
 const OUTPUT_DIRECTORY_STORE = 'output_directory';
 
-export const emptySavedData = (): AppSavedData => ({ version: 1, providerMaster: [], geminiEnabled: false, deliveryMethods: DEFAULT_DELIVERY_METHODS.map((method) => ({ ...method })) });
+export const emptySavedData = (): AppSavedData => ({ version: 1, providerMaster: [], providerMasterOrderInitialized: true, geminiEnabled: false, deliveryMethods: DEFAULT_DELIVERY_METHODS.map((method) => ({ ...method })) });
 
 function valid(value: unknown): value is AppSavedData {
   if (!value || typeof value !== 'object') return false;
   const data = value as Partial<AppSavedData>;
   const methodsValid = data.deliveryMethods === undefined || (Array.isArray(data.deliveryMethods) && data.deliveryMethods.every((method) => Boolean(method && typeof method.value === 'string' && typeof method.name === 'string' && typeof method.folderName === 'string')));
-  return data.version === 1 && Array.isArray(data.providerMaster) && typeof data.geminiEnabled === 'boolean' && methodsValid;
+  const orderFlagValid = data.providerMasterOrderInitialized === undefined || typeof data.providerMasterOrderInitialized === 'boolean';
+  return data.version === 1 && Array.isArray(data.providerMaster) && typeof data.geminiEnabled === 'boolean' && methodsValid && orderFlagValid;
 }
 
 function dayKey(date = new Date()) { return date.toISOString().slice(0, 10); }

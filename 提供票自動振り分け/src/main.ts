@@ -1,7 +1,7 @@
 import './style.css';
 import './master.css';
 import './folds.css';
-import { analysePdfs, createFilePreview, createProviderPdf, createZip, loadPdfFiles, renderPage, safeFilename } from './pdf-service';
+import { analysePdfs, createFilePreview, createMergedProviderPdf, createProviderPdf, createZip, loadPdfFiles, renderPage, safeFilename } from './pdf-service';
 import { DEFAULT_DELIVERY_METHODS, type AnalysisResult, type AppSavedData, type DeliveryMethodOption, type ProviderMasterEntry, type SlipGroup } from './types';
 import { emptySavedData, exportSavedData, importSavedData, loadSavedData, saveSavedData } from './storage';
 import { requestGeminiSuggestion } from './gemini-service';
@@ -15,9 +15,12 @@ let deliveryMethodEditorOpen = false;
 let deliveryMethodDraft: DeliveryMethodOption[] = [];
 let downloaded = 0;
 let outputName = '';
+const stoppedGroupIds = new Set<string>();
+let clientStopDialogOpen = false;
+let clientSearchTerm = '';
 let scrollToTopOnNextRender = false;
 let focusSaveButtonOnNextRender = false;
-type QueuedPdf = { id: string; file: File; thumbnail?: string; pageCount?: number; previewError: boolean };
+type QueuedPdf = { id: string; file: File; thumbnail?: string; pageCount?: number; previewAspectRatio?: number; previewError: boolean };
 let queuedFiles: QueuedPdf[] = [];
 let savedData: AppSavedData = emptySavedData();
 const sectionOpen: Record<string, boolean | undefined> = {};
@@ -26,6 +29,10 @@ const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => (
 const range = (group: SlipGroup) => group.pages.length === 1 ? `P${group.pages[0].serial}` : `P${group.pages[0].serial}〜${group.pages.at(-1)!.serial}`;
 const deliveryMethodIssue = '送付方法が未設定です';
 const groupStatus = (group: SlipGroup, singleFolderExport = false) => {
+  if (stoppedGroupIds.has(group.id)) {
+    const hasOtherIssue = group.issues.some((issue) => issue !== deliveryMethodIssue);
+    return hasOtherIssue && group.needsReview && !group.reviewed ? '送付停止・要確認' : '送付停止';
+  }
   const onlyDeliveryMethodMissing = group.issues.length > 0 && group.issues.every((issue) => issue === deliveryMethodIssue);
   if (singleFolderExport && group.needsReview && !group.reviewed && onlyDeliveryMethodMissing) return '一括保存対象';
   return group.needsReview && !group.reviewed ? '要確認' : '確認済み';
@@ -34,7 +41,23 @@ const download = (bytes: BlobPart, name: string) => { const url = URL.createObje
 const masterFor = (group: SlipGroup) => savedData.providerMaster.find((entry) => entry.providerNumber === group.providerNumber);
 const providerNameFor = (group: SlipGroup) => masterFor(group)?.providerName.trim() || group.providerName.trim();
 const destinationFor = (group: SlipGroup) => masterFor(group)?.deliveryMethod || '要確認';
-const deliveryMethodOptions = () => savedData.deliveryMethods?.length ? savedData.deliveryMethods : DEFAULT_DELIVERY_METHODS;
+function initializeProviderMasterOrder(data: AppSavedData) {
+  if (data.providerMasterOrderInitialized) return false;
+  data.providerMaster = [
+    ...data.providerMaster.filter((entry) => !entry.deliveryMethod),
+    ...data.providerMaster.filter((entry) => Boolean(entry.deliveryMethod)),
+  ];
+  data.providerMasterOrderInitialized = true;
+  return true;
+}
+const deliveryMethodOptions = () => {
+  const configured = savedData.deliveryMethods?.length ? savedData.deliveryMethods : DEFAULT_DELIVERY_METHODS;
+  const mergeOption = configured.find((method) => method.value === 'PDF結合') ?? { value: 'PDF結合', name: 'PDF結合', folderName: 'PDF結合' };
+  const methods = configured.filter((method) => method.value !== 'PDF結合');
+  const otherIndex = methods.findIndex((method) => method.value === 'その他');
+  methods.splice(otherIndex < 0 ? methods.length : otherIndex, 0, mergeOption);
+  return methods;
+};
 const deliveryMethodNameFor = (value: string) => deliveryMethodOptions().find((method) => method.value === value)?.name || value;
 const deliveryFolderNameFor = (value: string) => deliveryMethodOptions().find((method) => method.value === value)?.folderName || value;
 const outputBlocked = (group: SlipGroup, allowMissingDeliveryMethod = false) => !group.providerNumber || !providerNameFor(group) || !group.clientName.trim() || !group.serviceMonth.trim() || (!allowMissingDeliveryMethod && !masterFor(group)?.deliveryMethod);
@@ -44,6 +67,41 @@ const monthlyFolderTitle = (month: string) => {
   const monthNumber = month.match(/([0-9]{1,2})月/u)?.[1];
   return monthNumber ? `${Number(monthNumber)}月　提供表` : '提供年月未確定　提供表';
 };
+const normalizeClientName = (name: string) => name.normalize('NFKC').replace(/\s+/gu, ' ').trim().toLocaleLowerCase('ja');
+
+function clientEntries(groups: SlipGroup[] = result?.groups ?? []) {
+  const entries = new Map<string, { name: string; groups: SlipGroup[] }>();
+  groups.forEach((group) => {
+    const name = group.clientName.trim();
+    const key = normalizeClientName(name);
+    if (!key) return;
+    const entry = entries.get(key) ?? { name, groups: [] };
+    entry.groups.push(group);
+    if (name.localeCompare(entry.name, 'ja') < 0) entry.name = name;
+    entries.set(key, entry);
+  });
+  return [...entries.entries()].map(([key, entry]) => ({ key, ...entry }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+}
+
+function clientOfficeEntries(entry: ReturnType<typeof clientEntries>[number]) {
+  const offices = new Map<string, { key: string; name: string; groups: SlipGroup[] }>();
+  entry.groups.forEach((group) => {
+    const name = providerNameFor(group) || '事業所名未判定';
+    const providerNumber = group.providerNumber.trim();
+    const normalizedName = normalizedProviderName(name);
+    const key = providerNumber ? `number:${providerNumber}` : normalizedName ? `name:${normalizedName}` : `group:${group.id}`;
+    const office = offices.get(key) ?? { key, name, groups: [] };
+    office.groups.push(group);
+    if (name.localeCompare(office.name, 'ja') < 0) office.name = name;
+    offices.set(key, office);
+  });
+  return [...offices.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+}
+
+const isStoppedGroup = (group: SlipGroup) => stoppedGroupIds.has(group.id);
+const stoppedClientCount = (groups: SlipGroup[] = result?.groups ?? []) => clientEntries(groups).filter((entry) => entry.groups.some(isStoppedGroup)).length;
+const stoppedOfficeCount = (groups: SlipGroup[] = result?.groups ?? []) => clientEntries(groups).reduce((total, entry) => total + clientOfficeEntries(entry).filter((office) => office.groups.every(isStoppedGroup)).length, 0);
 function refreshRoutingSafety() {
   result?.groups.forEach((group) => {
     group.issues = group.issues.filter((issue) => issue !== '送付方法が未設定です');
@@ -84,11 +142,20 @@ function progressState(message: string) {
   const current = parts ? Number(parts[1]) : undefined;
   const total = parts ? Number(parts[2]) : undefined;
   const stage = parts?.[3] || message;
+  const ratio = total ? Math.min(1, (current ?? 0) / total) : 0;
+  let percent = Math.round(ratio * 100);
+  // Routing is made up of sequential phases. Reserve part of the bar for each
+  // phase so the meter never jumps back to zero when the counter changes.
+  if (current !== undefined && total !== undefined) {
+    if (stage.includes('ファイルを確認中')) percent = Math.round(ratio * 15);
+    else if (stage.includes('ページ解析中')) percent = 15 + Math.round(ratio * 70);
+    else if (stage.includes('事業所情報を補助確認中')) percent = 85 + Math.round(ratio * 14);
+  }
   return {
     stage,
     current,
     total,
-    percent: total ? Math.min(100, Math.round(((current ?? 0) / total) * 100)) : 0,
+    percent,
     unit: stage.includes('ページ') ? 'ページ' : stage.includes('ファイル') ? 'ファイル' : '件',
   };
 }
@@ -174,29 +241,35 @@ function renderView() {
     : undefined;
   const groups = result?.groups ?? [];
   const assigned = new Set(groups.flatMap((group) => group.pages.map((page) => `${page.sourceId}:${page.pageIndex}`))).size;
-  const masterSetupProviderNumbers = new Set(groups.filter((group) => group.providerNumber && !masterFor(group)?.deliveryMethod).map((group) => group.providerNumber));
+  const activeGroups = groups.filter((group) => !isStoppedGroup(group));
+  const masterSetupProviderNumbers = new Set(activeGroups.filter((group) => group.providerNumber && !masterFor(group)?.deliveryMethod).map((group) => group.providerNumber));
   const masterSetupCount = masterSetupProviderNumbers.size;
   if (!masterSetupCount) singleFolderExportChecked = false;
   const singleFolderExport = singleFolderExportChecked && masterSetupCount > 0;
   const reviewKeys = new Set<string>();
   groups.forEach((group) => {
+    const stopped = isStoppedGroup(group);
     const masterRouteMissing = Boolean(group.providerNumber && masterSetupProviderNumbers.has(group.providerNumber));
     if (group.needsReview && !group.reviewed) {
-      if (masterRouteMissing) {
+      if (stopped) {
+        const hasOtherReview = group.issues.some((issue) => issue !== deliveryMethodIssue)
+          || !group.clientName.trim() || !providerNameFor(group) || !group.serviceMonth.trim();
+        if (hasOtherReview) reviewKeys.add(`group:${group.id}`);
+      } else if (masterRouteMissing) {
         if (!singleFolderExport) reviewKeys.add(`master:${group.providerNumber}`);
         if (group.issues.some((issue) => issue !== '送付方法が未設定です') || !group.clientName.trim() || !providerNameFor(group) || !group.serviceMonth.trim()) reviewKeys.add(`group:${group.id}`);
       } else reviewKeys.add(`group:${group.id}`);
     }
   });
   if (!singleFolderExport) masterSetupProviderNumbers.forEach((number) => reviewKeys.add(`master:${number}`));
-  else groups.forEach((group) => {
+  else activeGroups.forEach((group) => {
     if (!group.providerNumber || !masterSetupProviderNumbers.has(group.providerNumber)) return;
     const hasOtherReview = group.issues.some((issue) => issue !== deliveryMethodIssue)
       || !group.clientName.trim() || !providerNameFor(group) || !group.serviceMonth.trim();
     if (!hasOtherReview) reviewKeys.delete(`group:${group.id}`);
   });
   const reviewCount = reviewKeys.size + (result?.duplicateFiles.length ?? 0);
-  const blockedCount = groups.filter((group) => outputBlocked(group, singleFolderExport)).length;
+  const blockedCount = groups.filter((group) => outputBlocked(group, singleFolderExport || isStoppedGroup(group))).length;
   const mixedMonths = Boolean(result && result.uniqueMonths.length !== 1);
   const canExport = Boolean(result && !busy && !queuedFiles.length && reviewCount === 0 && blockedCount === 0 && !mixedMonths && assigned === result.totalPages && groups.length);
   const progressMessage = app.dataset.progress || '処理を準備中';
@@ -226,10 +299,12 @@ function renderView() {
       ${masterArea(singleFolderExport)}
       ${result && !busy ? reviewArea(groups, reviewCount, assigned, singleFolderExport) : ''}
     </main>
-    <dialog id="previewDialog" class="preview-dialog" aria-labelledby="previewTitle"><form method="dialog"><button class="close" aria-label="閉じる">×</button></form><h3 id="previewTitle" tabindex="-1" autofocus>元PDFページ</h3><div id="previewPages" class="preview-pages"></div></dialog>
+    <dialog id="previewDialog" class="preview-dialog" aria-labelledby="previewTitle"><form method="dialog"><button class="close" aria-label="閉じる"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></form><h3 id="previewTitle" tabindex="-1" autofocus>元PDFページ</h3><div id="previewPages" class="preview-pages"></div></dialog>
+    ${clientStopDialogOpen && result && !busy ? clientStopDialog(groups) : ''}
     ${deliveryMethodEditor()}`;
   bindEvents();
   if (deliveryMethodEditorOpen) app.querySelector<HTMLDialogElement>('#deliveryMethodDialog')?.showModal();
+  if (clientStopDialogOpen && result && !busy) app.querySelector<HTMLDialogElement>('#clientStopDialog')?.showModal();
   requestAnimationFrame(() => {
     try {
       innerScrollPositions.forEach(({ key, top, left }) => {
@@ -261,22 +336,18 @@ function fixedSection(key: string, title: string, meta: string, content: string)
 }
 
 function outputPanel(canExport: boolean, reviewCount: number, blockedCount: number, masterSetupCount: number, mixedMonths: boolean, groupCount: number, assigned: number, totalPages: number, singleFolderExport: boolean) {
-  const folderTitle = monthlyFolderTitle(result?.uniqueMonths[0] || '');
-  const reason = masterSetupCount && !singleFolderExport ? '事業所マスタで振り分け先を設定すると、保存できるようになります。' : reviewCount ? `要確認 ${reviewCount}件を確認してから保存できます。` : blockedCount ? `必須情報または振り分け先が未設定の ${blockedCount}件を先に確認してください。` : mixedMonths ? '対象年月が1か月に揃ってから保存できます。' : '';
+  const reason = reviewCount ? `要確認 ${reviewCount}件を確認してから保存できます。` : blockedCount ? `必須情報または振り分け先が未設定の ${blockedCount}件を先に確認してください。` : mixedMonths ? '対象年月が1か月に揃ってから保存できます。' : '';
   const statusLabel = canExport ? '保存可能' : masterSetupCount && !singleFolderExport ? '事業所マスタ未設定' : '確認が必要';
   const downloadButton = `<button class="primary output-button output-button-large" data-action="create" ${canExport && !busy ? '' : 'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H10l2 2h7.5A1.5 1.5 0 0 1 21 9.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M3.5 11h17"/></svg>${busy ? 'ZIPを作成中…' : '振り分け完了フォルダをダウンロード'}</button>`;
-  const archiveInstruction = singleFolderExport
-    ? `ZIPを展開すると「${folderTitle}」フォルダにPDFがまとまります。`
-    : `ZIPを展開すると「${folderTitle}」の中に送付方法別のフォルダが作成されます。`;
-  const masterSetupActions = `<div class="result-save-row has-master-setup"><div class="result-save-actions has-master-setup">
-    <div class="master-action-column"><button class="primary master-jump-button" data-action="go-master">事業所マスタへ移動</button>${!singleFolderExport ? `<span class="output-status master-setup-note">${escapeHtml(reason)}</span>` : ''}</div>
-    <div class="download-action-column">${downloadButton}<label class="single-folder-option"><span class="single-folder-choice"><input type="checkbox" data-action="single-folder-export" ${singleFolderExport ? 'checked' : ''}><span>送付方法を使用しない方は一括して一つのフォルダに作成</span></span><small>チェックすると、送付方法未設定でも保存できます。</small></label><span class="save-instruction">${escapeHtml(archiveInstruction)}</span></div>
+  const saveReason = !canExport && !masterSetupCount ? `<div class="output-status">${escapeHtml(reason || '内容を確認してから保存できます。')}</div>` : '';
+  const saveActions = `<div class="result-save-row has-master-setup"><div class="result-save-actions has-master-setup">
+    <div class="master-action-column"><button class="primary master-jump-button" data-action="go-master" ${canExport ? 'disabled' : ''}>事業所マスタへ移動</button>${clientStopControl()}</div>
+    <div class="download-action-column">${downloadButton}<label class="single-folder-option ${canExport ? 'is-locked' : ''}"><span class="single-folder-choice"><input type="checkbox" data-action="single-folder-export" ${singleFolderExport ? 'checked' : ''} ${canExport ? 'disabled' : ''}><span>送付方法を使用しない方は一括して一つのフォルダに作成</span></span><small>チェックすると、送付方法が未設定でも保存できます。</small></label></div>
   </div></div>`;
-  const regularActions = `<div class="result-save-row">${canExport ? `<span class="save-instruction">${escapeHtml(archiveInstruction)}</span>` : `<span class="output-status">${escapeHtml(reason || '内容を確認してから保存できます。')}</span>`}<div class="result-save-actions"><div class="download-action-column">${downloadButton}</div></div></div>`;
   return `<section class="result-actions">
     <div class="result-actions-heading"><div><span class="eyebrow">振り分け完了</span><h2>${groupCount}件を振り分けました</h2></div></div>
     <div class="result-counts"><div><span>要確認</span><strong>${reviewCount}<small>件</small></strong></div><div><span>ページ</span><strong>${assigned}<small> / ${totalPages}</small></strong></div><div><span>状態</span><strong class="${canExport ? 'ready' : 'needs-review'}">${statusLabel}</strong></div></div>
-    ${masterSetupCount ? masterSetupActions : regularActions}
+    ${saveReason}${saveActions}
   </section>`;
 }
 
@@ -286,7 +357,7 @@ function queuePanel() {
   return `<div class="pdf-queue-content" aria-label="振り分けるPDF">
     <div class="pdf-queue-heading"><div><strong>振り分けるPDF（${queuedFiles.length}件）</strong><span>続けてドラッグするか、追加ボタンでPDFを増やせます。</span></div><div class="pdf-queue-tools"><button class="quiet" data-action="choose" ${busy ? 'disabled' : ''}>PDFを追加</button><button class="quiet" data-action="folder" ${busy ? 'disabled' : ''}>フォルダを追加</button></div></div>
     <div class="pdf-queue-grid">${queuedFiles.map((item) => `<article class="pdf-queue-item">
-      <div class="pdf-thumb">${item.thumbnail ? `<img src="${escapeHtml(item.thumbnail)}" alt="${escapeHtml(item.file.name)}の1ページ目">` : item.previewError ? `<span class="pdf-thumb-message">プレビューを表示できません<br>振り分けは可能です</span>` : `<span class="pdf-thumb-loading">プレビュー作成中…</span>`}</div>
+      <div class="pdf-thumb" ${item.previewAspectRatio ? `style="aspect-ratio:${item.previewAspectRatio}"` : ''}>${item.thumbnail ? `<img src="${escapeHtml(item.thumbnail)}" alt="${escapeHtml(item.file.name)}の1ページ目">` : item.previewError ? `<span class="pdf-thumb-message">プレビューを表示できません<br>振り分けは可能です</span>` : `<span class="pdf-thumb-loading">プレビュー作成中…</span>`}</div>
       <strong class="pdf-queue-name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</strong>
       <span class="pdf-queue-pages">${item.pageCount ? `${item.pageCount}ページ` : item.previewError ? 'PDFを確認してください' : '読み込み中'}</span>
       <button class="pdf-queue-delete" data-action="remove-queued" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.file.name)}を一覧から削除" title="一覧から削除" ${busy ? 'disabled' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
@@ -296,10 +367,8 @@ function queuePanel() {
 }
 
 function masterArea(singleFolderExport: boolean) {
-  const entries = [...savedData.providerMaster].sort((a, b) => {
-    const priority = (entry: ProviderMasterEntry) => !entry.deliveryMethod ? 0 : !entry.providerName.trim() ? 1 : 2;
-    return priority(a) - priority(b);
-  });
+  // 設定状況の変化で一覧内の位置が動かないよう、保存されている順序をそのまま使う。
+  const entries = [...savedData.providerMaster];
   const needsSetup = entries.filter((entry) => !entry.providerName.trim() || !entry.deliveryMethod).length;
   const needsRoute = entries.filter((entry) => !entry.deliveryMethod).length;
   return foldSection('master', '事業所マスタ', `${needsSetup ? `要設定 ${needsSetup}件 · ` : ''}登録 ${entries.length}件`, `<div class="section-head master-head"><div><h2>事業所番号と振り分け先・送付方法</h2></div><div class="backup-buttons"><button class="quiet" data-action="edit-delivery-methods">送付方法項目編集</button><button class="quiet" data-action="backup">バックアップ</button><button class="quiet" data-action="import">データ挿入</button><input id="backupInput" type="file" accept="application/json,.json" hidden></div></div>
@@ -311,12 +380,12 @@ function masterArea(singleFolderExport: boolean) {
 
 function deliveryMethodEditor() {
   return `<dialog id="deliveryMethodDialog" class="delivery-method-dialog" aria-labelledby="deliveryMethodTitle">
-    <div class="delivery-method-dialog-head"><div><span class="eyebrow">事業所マスタ</span><h2 id="deliveryMethodTitle">送付方法項目編集</h2></div><button type="button" class="delivery-method-close" data-action="cancel-delivery-methods" aria-label="閉じる">×</button></div>
+    <div class="delivery-method-dialog-head"><div><span class="eyebrow">事業所マスタ</span><h2 id="deliveryMethodTitle">送付方法項目編集</h2></div><button type="button" class="delivery-method-close" data-action="cancel-delivery-methods" aria-label="閉じる"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <p class="delivery-method-help">表示名は事業所マスタの選択肢に、保存フォルダ名はダウンロード時のフォルダ名に使われます。</p>
     <div class="delivery-method-list">${deliveryMethodDraft.map((method, index) => `<div class="delivery-method-edit-row">
       <label><span>送付方法の表示名</span><input data-delivery-method-field="name" data-index="${index}" value="${escapeHtml(method.name)}" maxlength="60"></label>
       <label><span>ダウンロード時のフォルダ名</span><input data-delivery-method-field="folderName" data-index="${index}" value="${escapeHtml(method.folderName)}" maxlength="80"></label>
-      ${method.value === '居宅療養' ? '<span class="delivery-method-fixed">自動振り分け項目</span>' : `<button type="button" class="quiet delivery-method-remove" data-action="remove-delivery-method" data-index="${index}">削除</button>`}
+      ${method.value === '居宅療養' ? '<span class="delivery-method-fixed">自動振り分け項目</span>' : method.value === 'PDF結合' ? '<span class="delivery-method-fixed">結合処理項目</span>' : `<button type="button" class="quiet delivery-method-remove" data-action="remove-delivery-method" data-index="${index}">削除</button>`}
     </div>`).join('')}</div>
     <button type="button" class="quiet delivery-method-add" data-action="add-delivery-method">＋ 送付方法を追加</button>
     <div class="delivery-method-actions"><button type="button" class="quiet" data-action="cancel-delivery-methods">キャンセル</button><button type="button" class="primary" data-action="save-delivery-methods">保存</button></div>
@@ -324,7 +393,7 @@ function deliveryMethodEditor() {
 }
 
 function summaryArea(groups: SlipGroup[], reviewCount: number) {
-  const userCount = new Set(groups.map((group) => group.clientName.trim()).filter(Boolean)).size;
+  const userCount = clientEntries(groups).length;
   const officeCount = new Set(groups.map((group) => {
     if (group.providerNumber.trim()) return `number:${group.providerNumber.trim()}`;
     const providerName = normalizedProviderName(group.providerName);
@@ -333,6 +402,48 @@ function summaryArea(groups: SlipGroup[], reviewCount: number) {
   return `<section class="summary-grid">
     <article><span>総ページ数</span><b>${result!.totalPages}ページ</b></article><article><span>利用者数</span><b>${userCount}名</b></article><article><span>事業所数</span><b>${officeCount}件</b></article><article><span>要確認</span><b class="${reviewCount ? 'danger' : 'good'}">${reviewCount}件</b></article>
   </section>`;
+}
+
+function clientStopControl() {
+  const stoppedUsers = stoppedClientCount();
+  const stoppedOffices = stoppedOfficeCount();
+  return `<button type="button" class="primary client-stop-open" data-action="open-client-stops">利用者一覧・停止設定</button>${stoppedOffices ? `<small class="client-stop-current">今回停止対象：${stoppedUsers}名・${stoppedOffices}事業所分</small>` : ''}`;
+}
+
+function clientStopDialog(groups: SlipGroup[]) {
+  const entries = clientEntries(groups);
+  const unnamedGroups = groups.filter((group) => !normalizeClientName(group.clientName)).length;
+  const stoppedCount = stoppedClientCount(groups);
+  const stoppedOffices = stoppedOfficeCount(groups);
+  const searchQuery = normalizeClientName(clientSearchTerm);
+  const visibleCount = entries.filter((entry) => {
+    const officeNames = clientOfficeEntries(entry).map((office) => office.name);
+    return !searchQuery || normalizeClientName([entry.name, ...officeNames].join(' ')).includes(searchQuery);
+  }).length;
+  const rows = entries.map((entry, index) => {
+    const allStopped = entry.groups.every(isStoppedGroup);
+    const offices = clientOfficeEntries(entry);
+    const stoppedForClient = offices.filter((office) => office.groups.every(isStoppedGroup)).length;
+    const search = normalizeClientName([entry.name, ...offices.map((office) => office.name)].join(' '));
+    const pageCount = entry.groups.reduce((total, group) => total + group.pages.length, 0);
+    return `<article class="client-stop-row" data-client-row data-search="${escapeHtml(search)}" ${searchQuery && !search.includes(searchQuery) ? 'hidden' : ''} role="listitem">
+      <div class="client-stop-main"><div class="client-stop-name-line"><strong>${escapeHtml(entry.name)}</strong><span class="client-stop-inline-help">今回停止する事業所をクリックしてください</span></div><div class="client-stop-offices">${offices.map((office, officeIndex) => {
+        const stopped = office.groups.every(isStoppedGroup);
+        return `<button type="button" class="client-stop-office-chip ${stopped ? 'is-stopped' : ''}" data-action="toggle-office-stop" data-client-index="${index}" data-office-index="${officeIndex}" aria-pressed="${stopped}" aria-label="${escapeHtml(office.name)}、${stopped ? '停止中。クリックすると再開します' : '通常振り分け。クリックすると今回停止します'}" title="${stopped ? '停止中（クリックすると再開）' : 'クリックすると今回停止します'}"><span>${escapeHtml(office.name)}</span></button>`;
+      }).join('')}</div><small>${offices.length}事業所・${pageCount}ページ${stoppedForClient ? `・${stoppedForClient}事業所停止中` : ''}</small></div>
+      <div class="client-stop-actions"><button type="button" class="client-stop-all ${allStopped ? 'is-resume' : ''}" data-action="toggle-client-stop" data-client-index="${index}">${allStopped ? '全て再開する' : '全て停止する'}</button></div>
+    </article>`;
+  }).join('');
+  const listMarkup = `<p class="client-stop-help">利用がない方は「全て停止する」を選ぶか、利用者名の下にある事業所名をクリックして事業所ごとに停止してください。停止したPDFは通常の送付先フォルダには入れず、ZIP内の「送付停止・確認用」フォルダに残します。PDF自体は削除されません。設定を変えた場合はZIPを再作成してください。</p>
+      <p class="client-stop-caution">利用者名をもとにまとめています。同じ名前の方を個別には区別できないため、停止する前に事業所名とページ数を確認してください。停止設定は今回の振り分け限りで、次回はリセットされます。</p>
+      <div class="client-stop-toolbar"><span>判定できた利用者 <b>${entries.length}名</b> · 停止対象 <b>${stoppedCount}名・${stoppedOffices}事業所分</b>${unnamedGroups ? ` · 名前未判定 ${unnamedGroups}件` : ''}</span><label><span class="sr-only">利用者を検索</span><input type="search" data-action="search-clients" value="${escapeHtml(clientSearchTerm)}" placeholder="利用者名・事業所名で検索"></label></div>
+      ${unnamedGroups ? `<p class="client-stop-unnamed">利用者名を判定できなかった${unnamedGroups}件は、一覧から停止できません。振り分け内容で名前を確認してください。</p>` : ''}
+      <div class="client-stop-list" data-scroll-area="client-stop-list" role="list">${rows || '<p class="client-stop-empty">利用者名を判定できたPDFがありません。</p>'}<p class="client-stop-no-match" ${entries.length && searchQuery && !visibleCount ? '' : 'hidden'}>検索に一致する利用者はいません。</p></div>`;
+  return `<dialog id="clientStopDialog" class="client-stop-dialog" aria-labelledby="clientStopTitle">
+    <div class="client-stop-dialog-head"><div><span class="eyebrow">今回の振り分けだけに適用</span><h2 id="clientStopTitle">利用者一覧・停止設定</h2></div><button type="button" class="client-stop-close" data-action="close-client-stops" aria-label="閉じる"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    ${listMarkup}
+    <div class="client-stop-dialog-actions"><button type="button" class="primary" data-action="close-client-stops">閉じる</button></div>
+  </dialog>`;
 }
 
 function reviewArea(groups: SlipGroup[], reviewCount: number, assigned: number, singleFolderExport: boolean) {
@@ -345,15 +456,16 @@ function reviewArea(groups: SlipGroup[], reviewCount: number, assigned: number, 
       <div class="section-head"><div><p>名前や事業所名を修正できます。${singleFolderExport ? '送付方法未設定は今回の一括保存では使いません。ほかの要確認は解消してください。' : '要確認が残る間は出力できません。'}</p></div><div class="check-total ${assigned === result!.totalPages ? 'good' : 'danger'}">ページ整合性：${assigned} / ${result!.totalPages}</div></div>
       <div class="table-wrap" data-scroll-area="verification"><table><thead><tr><th>状態</th><th>振り分け先</th><th>事業所名・番号</th><th>利用者名</th><th>ページ</th><th>提供年月</th><th>確認</th></tr></thead><tbody>
         ${groups.map((group) => {
+          const stopped = isStoppedGroup(group);
           const onlyDeliveryMethodMissing = group.issues.length > 0 && group.issues.every((issue) => issue === deliveryMethodIssue);
-          const bypassedMissingMethod = singleFolderExport && group.needsReview && !group.reviewed && onlyDeliveryMethodMissing;
+          const bypassedMissingMethod = (stopped || singleFolderExport) && group.needsReview && !group.reviewed && onlyDeliveryMethodMissing;
           const needsReview = group.needsReview && !group.reviewed && !bypassedMissingMethod;
-          const issues = group.issues.map((issue) => issue === deliveryMethodIssue && singleFolderExport ? '送付方法は今回使用しません' : issue);
-          return `<tr data-id="${group.id}" class="${needsReview ? 'needs-review' : ''}"><td><span class="status ${needsReview ? 'warn' : 'ok'}">${groupStatus(group, singleFolderExport)}</span>${issues.length ? `<small>${issues.map(escapeHtml).join(' / ')}</small>` : ''}</td><td><b>${escapeHtml(deliveryMethodNameFor(destinationFor(group)))}</b></td><td><input data-field="providerName" value="${escapeHtml(group.providerName)}" aria-label="事業所名"></td><td><input class="inline-input" data-field="clientName" value="${escapeHtml(group.clientName)}" aria-label="利用者名"></td><td><div class="verification-page-cell"><span>${range(group)}</span><button class="quiet page-preview-link" data-action="preview" data-id="${group.id}">PDFを見る</button></div></td><td><input data-field="serviceMonth" value="${escapeHtml(group.serviceMonth)}" aria-label="提供年月"></td><td>${needsReview ? `<button class="confirm" data-action="confirm" data-id="${group.id}">確認済みにする</button>` : '<span class="muted">確認済み</span>'}</td></tr>`;
+          const issues = group.issues.filter((issue) => !(stopped && issue === deliveryMethodIssue)).map((issue) => issue === deliveryMethodIssue && singleFolderExport ? '送付方法は今回使用しません' : issue);
+          return `<tr data-id="${group.id}" class="${needsReview ? 'needs-review' : ''}"><td><span class="status ${stopped ? 'stopped' : needsReview ? 'warn' : 'ok'}">${groupStatus(group, singleFolderExport)}</span>${issues.length ? `<small>${issues.map(escapeHtml).join(' / ')}</small>` : ''}</td><td><b>${stopped ? '送付停止' : escapeHtml(deliveryMethodNameFor(destinationFor(group)))}</b></td><td><input data-field="providerName" value="${escapeHtml(group.providerName)}" aria-label="事業所名"></td><td><input class="inline-input" data-field="clientName" value="${escapeHtml(group.clientName)}" aria-label="利用者名"></td><td><div class="verification-page-cell"><span>${range(group)}</span><button class="quiet page-preview-link" data-action="preview" data-id="${group.id}">PDFを見る</button></div></td><td><input data-field="serviceMonth" value="${escapeHtml(group.serviceMonth)}" aria-label="提供年月"></td><td>${needsReview ? `<button class="confirm" data-action="confirm" data-id="${group.id}">確認済みにする</button>` : '<span class="muted">確認済み</span>'}</td></tr>`;
         }).join('')}
       </tbody></table></div>
     `, false)}
-    ${downloaded ? foldSection('complete', 'ZIPをダウンロードしました', `${downloaded}事業所分 · ${escapeHtml(outputName)}`, `<div class="complete-content"><p>元PDF：${result!.sources.length}ファイル　総ページ数：${result!.totalPages}ページ　利用者：${new Set(groups.map((g) => g.clientName)).size}名　事業所：${providers.size}事業所　作成PDF：${downloaded}件　要確認：${reviewCount}件</p><button class="primary" data-action="create">もう一度作成して保存</button></div>`, true) : ''}
+    ${downloaded ? foldSection('complete', 'ZIPをダウンロードしました', `${downloaded}件のPDF · ${escapeHtml(outputName)}`, `<div class="complete-content"><p>元PDF：${result!.sources.length}ファイル　総ページ数：${result!.totalPages}ページ　利用者：${clientEntries(groups).length}名　事業所：${providers.size}事業所　作成PDF：${downloaded}件　停止対象：${stoppedClientCount(groups)}名・${stoppedOfficeCount(groups)}事業所分${stoppedOfficeCount(groups) ? '（ZIP内の「送付停止・確認用」フォルダ）' : ''}　要確認：${reviewCount}件</p><button class="primary" data-action="create">もう一度作成して保存</button></div>`, true) : ''}
     `;
 }
 
@@ -449,6 +561,61 @@ function bindEvents() {
     deliveryMethodDraft = [];
     render();
   });
+  app.querySelector('[data-action="open-client-stops"]')?.addEventListener('click', () => {
+    clientSearchTerm = '';
+    clientStopDialogOpen = true;
+    render();
+    requestAnimationFrame(() => app.querySelector<HTMLInputElement>('[data-action="search-clients"]')?.focus({ preventScroll: true }));
+  });
+  app.querySelectorAll<HTMLElement>('[data-action="close-client-stops"]').forEach((button) => button.addEventListener('click', () => {
+    clientStopDialogOpen = false;
+    render();
+  }));
+  app.querySelector<HTMLDialogElement>('#clientStopDialog')?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    clientStopDialogOpen = false;
+    render();
+  });
+  app.querySelector<HTMLInputElement>('[data-action="search-clients"]')?.addEventListener('input', (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    clientSearchTerm = input.value;
+    const query = normalizeClientName(clientSearchTerm);
+    let visibleCount = 0;
+    app.querySelectorAll<HTMLElement>('[data-client-row]').forEach((row) => {
+      row.hidden = Boolean(query && !normalizeClientName(row.dataset.search ?? '').includes(query));
+      if (!row.hidden) visibleCount++;
+    });
+    const noMatch = app.querySelector<HTMLElement>('.client-stop-no-match');
+    if (noMatch) noMatch.hidden = visibleCount > 0;
+  });
+  app.querySelectorAll<HTMLButtonElement>('[data-action="toggle-client-stop"]').forEach((button) => button.addEventListener('click', () => {
+    const entry = clientEntries()[Number(button.dataset.clientIndex)];
+    if (!entry) return;
+    const wasStopped = entry.groups.every(isStoppedGroup);
+    entry.groups.forEach((group) => {
+      if (wasStopped) stoppedGroupIds.delete(group.id);
+      else stoppedGroupIds.add(group.id);
+    });
+    // 既に保存したZIPは自動更新できないため、設定変更後は作成完了表示を取り下げます。
+    downloaded = 0;
+    outputName = '';
+    render();
+    requestAnimationFrame(() => app.querySelector<HTMLButtonElement>(`[data-action="toggle-client-stop"][data-client-index="${button.dataset.clientIndex}"]`)?.focus({ preventScroll: true }));
+  }));
+  app.querySelectorAll<HTMLButtonElement>('[data-action="toggle-office-stop"]').forEach((button) => button.addEventListener('click', () => {
+    const entry = clientEntries()[Number(button.dataset.clientIndex)];
+    const office = entry ? clientOfficeEntries(entry)[Number(button.dataset.officeIndex)] : undefined;
+    if (!office) return;
+    const wasStopped = office.groups.every(isStoppedGroup);
+    office.groups.forEach((group) => {
+      if (wasStopped) stoppedGroupIds.delete(group.id);
+      else stoppedGroupIds.add(group.id);
+    });
+    downloaded = 0;
+    outputName = '';
+    render();
+    requestAnimationFrame(() => app.querySelector<HTMLButtonElement>(`[data-action="toggle-office-stop"][data-client-index="${button.dataset.clientIndex}"][data-office-index="${button.dataset.officeIndex}"]`)?.focus({ preventScroll: true }));
+  }));
   document.querySelector<HTMLInputElement>('[data-action="single-folder-export"]')?.addEventListener('change', (event) => {
     singleFolderExportChecked = (event.currentTarget as HTMLInputElement).checked;
     render();
@@ -458,7 +625,7 @@ function bindEvents() {
   document.querySelector('[data-action="folder"]')?.addEventListener('click', (event) => { event.stopPropagation(); document.querySelector<HTMLInputElement>('#folderInput')?.click(); });
   document.querySelector('[data-action="reset"]')?.addEventListener('click', () => {
     if (busy || !confirm('振り分け結果と選択中PDFの一覧をリセットします。元のPDFファイルは削除されません。よろしいですか？')) return;
-    queuedFiles = []; result = undefined; downloaded = 0; outputName = ''; singleFolderExportChecked = false; render();
+    queuedFiles = []; result = undefined; downloaded = 0; outputName = ''; singleFolderExportChecked = false; stoppedGroupIds.clear(); clientStopDialogOpen = false; clientSearchTerm = ''; render();
   });
   document.querySelector<HTMLInputElement>('#fileInput')?.addEventListener('change', (event) => queueFiles([...(event.target.files ?? [])]));
   document.querySelector<HTMLInputElement>('#folderInput')?.addEventListener('change', (event) => queueFiles([...(event.target.files ?? [])]));
@@ -483,13 +650,13 @@ function bindEvents() {
   document.querySelector('[data-action="ack-duplicates"]')?.addEventListener('click', () => { if (result) { result.duplicateFiles = []; render(); } });
   document.querySelector('[data-action="go-master"]')?.addEventListener('click', () => {
     const missingEntries = new Map<string, ProviderMasterEntry>();
-    result?.groups.forEach((group) => {
+    result?.groups.filter((group) => !isStoppedGroup(group)).forEach((group) => {
       if (group.providerNumber && !savedData.providerMaster.some((entry) => entry.providerNumber === group.providerNumber) && !missingEntries.has(group.providerNumber)) {
         missingEntries.set(group.providerNumber, { providerNumber: group.providerNumber, providerName: group.providerName, deliveryMethod: '', updatedAt: new Date().toISOString() });
       }
     });
     if (missingEntries.size) {
-      savedData.providerMaster.push(...missingEntries.values());
+      savedData.providerMaster.unshift(...missingEntries.values());
       persist();
       render();
     }
@@ -508,7 +675,7 @@ function bindEvents() {
   document.querySelector('[data-action="import"]')?.addEventListener('click', () => document.querySelector<HTMLInputElement>('#backupInput')?.click());
   document.querySelector<HTMLInputElement>('#backupInput')?.addEventListener('change', async (event) => {
     const file = event.target.files?.[0]; if (!file) return;
-    try { savedData = await importSavedData(file); persist(); render(); alert('バックアップを読み込みました。'); }
+    try { savedData = await importSavedData(file); initializeProviderMasterOrder(savedData); persist(); render(); alert('バックアップを読み込みました。'); }
     catch (error) { alert(error instanceof Error ? error.message : 'バックアップを読み込めませんでした。'); }
   });
   document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-master-field]').forEach((input) => input.addEventListener('change', () => {
@@ -527,7 +694,7 @@ function bindEvents() {
     const providerNumber = button.dataset.number!;
     const isInCurrentResult = Boolean(result?.groups.some((group) => group.providerNumber === providerNumber));
     const confirmation = isInCurrentResult
-      ? 'この事業所のマスタ設定を解除しますか？現在の振り分け結果に含まれているため、未設定の事業所として一覧の先頭に残り、設定するまで保存できなくなります。過去のPDFは削除されません。'
+      ? 'この事業所のマスタ設定を解除しますか？現在の振り分け結果に含まれているため、未設定の事業所として一覧に残り、設定するまで保存できなくなります。過去のPDFは削除されません。'
       : 'この事業所をマスタから削除しますか？過去のPDFは削除されません。';
     if (!confirm(confirmation)) return;
     const activeGroup = result?.groups.find((group) => group.providerNumber === providerNumber);
@@ -547,7 +714,7 @@ function bindEvents() {
       } else {
         savedData.providerMaster = savedData.providerMaster.filter((entry) => entry.providerNumber !== providerNumber);
         if (activeGroup) {
-          savedData.providerMaster.push({
+          savedData.providerMaster.unshift({
             providerNumber,
             providerName: activeGroup.providerName,
             deliveryMethod: '',
@@ -593,6 +760,7 @@ async function queueFiles(files: File[]) {
       if (!queuedFiles.some((queued) => queued.id === item.id)) continue;
       item.thumbnail = preview.thumbnail;
       item.pageCount = preview.pageCount;
+      item.previewAspectRatio = preview.aspectRatio;
     } catch {
       if (!queuedFiles.some((queued) => queued.id === item.id)) continue;
       item.previewError = true;
@@ -610,12 +778,16 @@ async function startRouting() {
   if (!queuedFiles.length || queuedFiles.some((item) => !item.thumbnail && !item.previewError) || busy) return;
   const pdfs = queuedFiles.map((item) => item.file);
   singleFolderExportChecked = false;
+  stoppedGroupIds.clear();
+  clientStopDialogOpen = false;
+  clientSearchTerm = '';
   showIntakeProgress();
   busy = true; setProgress('PDFを読み込み中');
   try {
     const loaded = await loadPdfFiles(pdfs, setProgress); const analysis = await analysePdfs(loaded.sources, loaded.duplicateFiles, setProgress); result = analysis; queuedFiles = []; downloaded = 0; outputName = ''; sectionOpen.verification = false;
     let added = 0;
     let filledNames = 0;
+    const newEntries: ProviderMasterEntry[] = [];
     for (const group of result.groups) {
       if (!group.providerNumber) continue;
       const existing = masterFor(group);
@@ -628,8 +800,9 @@ async function startRouting() {
         }
         continue;
       }
-      savedData.providerMaster.push({ providerNumber: group.providerNumber, providerName: group.providerName, deliveryMethod: '', updatedAt: new Date().toISOString() }); added++;
+      newEntries.push({ providerNumber: group.providerNumber, providerName: group.providerName, deliveryMethod: '', updatedAt: new Date().toISOString() }); added++;
     }
+    if (newEntries.length) savedData.providerMaster.unshift(...newEntries);
     if (added || filledNames) persist();
     refreshRoutingSafety();
     if (added) sectionOpen.master = true;
@@ -697,7 +870,7 @@ function applyAutomaticGeminiSuggestion(group: SlipGroup, suggestion: Awaited<Re
     const suggestedName = suggestion.providerName?.trim() || group.providerName.trim();
     if (!suggestedName || !providerNamesCompatible(group.providerName, suggestedName)) return false;
     master = { providerNumber: suggestion.providerNumber, providerName: suggestedName, deliveryMethod: '', updatedAt: new Date().toISOString() };
-    savedData.providerMaster.push(master);
+    savedData.providerMaster.unshift(master);
     sectionOpen.master = true;
   }
 
@@ -752,41 +925,59 @@ async function automaticallyAssistUnresolvedOffices() {
   persist();
 }
 
-function providerGroups() {
+function providerGroups(groups: SlipGroup[] = result!.groups, includeDestination = true) {
   const values = new Map<string, SlipGroup[]>();
   // 似た名称でも番号が違えば、絶対に同じPDFへ結合しない。
-  result!.groups.forEach((group) => {
-    const key = `${destinationFor(group)}|${group.providerNumber || `未判定-${group.id}`}`;
+  groups.forEach((group) => {
+    const key = `${includeDestination ? `${destinationFor(group)}|` : ''}${group.providerNumber || `未判定-${group.id}`}`;
     values.set(key, [...(values.get(key) ?? []), group]);
   });
   return values;
 }
 async function createAllOutputs() {
   if (!result) return;
-  const singleFolderExport = singleFolderExportChecked && result.groups.some((group) => group.providerNumber && !masterFor(group)?.deliveryMethod);
+  const activeGroups = result.groups.filter((group) => !isStoppedGroup(group));
+  const stoppedGroups = result.groups.filter(isStoppedGroup);
+  const singleFolderExport = singleFolderExportChecked && activeGroups.some((group) => group.providerNumber && !masterFor(group)?.deliveryMethod);
+  const month = result.uniqueMonths[0] || '提供年月未確定';
+  const singleFolderTitle = monthlyFolderTitle(month);
+  const mergedGroups = activeGroups.filter((group) => destinationFor(group) === 'PDF結合');
+  const regularGroups = activeGroups.filter((group) => destinationFor(group) !== 'PDF結合');
   showIntakeProgress(); busy = true; downloaded = 0; outputName = '';
   setProgress('ZIPを作成中');
   try {
-    const entries = [...providerGroups().values()];
-    const month = result.uniqueMonths[0] || '提供年月未確定';
-    const singleFolderTitle = monthlyFolderTitle(month);
+    const entries: { groups: SlipGroup[]; folder: string; mergeIntoOne: boolean }[] = [
+      ...[...providerGroups(regularGroups).values()].map((groups) => ({ groups, folder: singleFolderExport ? '' : safeFilename(deliveryFolderNameFor(destinationFor(groups[0]))), mergeIntoOne: false })),
+      ...(mergedGroups.length ? [{ groups: mergedGroups, folder: safeFilename(deliveryFolderNameFor('PDF結合')), mergeIntoOne: true }] : []),
+      ...[...providerGroups(stoppedGroups, false).values()].map((groups) => ({ groups, folder: '送付停止・確認用', mergeIntoOne: false })),
+    ];
     const outputs = [];
-    for (const [index, groups] of entries.entries()) {
+    for (const [index, entry] of entries.entries()) {
       setProgress(`${index + 1} / ${entries.length}件のPDFを準備中`);
-      const output = await createProviderPdf(providerNameFor(groups[0]), groups[0].serviceMonth, groups, result.sources);
-      const categoryFolder = singleFolderExport ? '' : safeFilename(deliveryFolderNameFor(destinationFor(groups[0])));
-      outputs.push({ ...output, folder: categoryFolder });
+      let output: { name: string; bytes: Uint8Array };
+      if (entry.mergeIntoOne) {
+        setProgress('PDFの余白を整えて結合中');
+        output = await createMergedProviderPdf(month, entry.groups, result.sources);
+      } else {
+        output = await createProviderPdf(providerNameFor(entry.groups[0]), entry.groups[0].serviceMonth, entry.groups, result.sources);
+      }
+      outputs.push({ ...output, folder: entry.folder });
     }
     setProgress('ZIPファイルをまとめています');
     const zip = await createZip(outputs, month, singleFolderTitle);
     download(zip.blob, zip.name);
     outputName = zip.name;
-    downloaded = entries.length;
+    downloaded = outputs.length;
   } catch (error) {
     const detail = error instanceof Error ? error.message : '不明なエラー';
     alert(`ZIPの作成に失敗しました：${detail}`);
   } finally { busy = false; render(); }
 }
 
-void loadSavedData().then((data) => { savedData = data; render(); });
+void loadSavedData().then((data) => {
+  // 起動時だけ未設定を先頭に集める。以降は配列順を維持し、設定後も位置を変えない。
+  savedData = data;
+  if (initializeProviderMasterOrder(savedData)) persist();
+  render();
+});
 render();

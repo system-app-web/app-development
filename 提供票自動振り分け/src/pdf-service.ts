@@ -47,13 +47,62 @@ export async function loadPdfFiles(files: File[], onProgress: (text: string) => 
   return { sources, duplicateFiles };
 }
 
-export async function createFilePreview(file: File): Promise<{ thumbnail: string; pageCount: number }> {
+function cropPreviewCanvas(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D) {
+  const { width, height } = canvas;
+  let pixels: Uint8ClampedArray;
+  try { pixels = context.getImageData(0, 0, width, height).data; }
+  catch { return { canvas, aspectRatio: width / height }; }
+  const rowHits = new Uint32Array(height);
+  const columnHits = new Uint32Array(width);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const pixel = (y * width + x) * 4;
+      if (pixels[pixel + 3] && (pixels[pixel] < 248 || pixels[pixel + 1] < 248 || pixels[pixel + 2] < 248)) {
+        rowHits[y]++;
+        columnHits[x]++;
+      }
+    }
+  }
+
+  const minRowHits = Math.max(2, Math.ceil(width * 0.001));
+  const minColumnHits = Math.max(2, Math.ceil(height * 0.001));
+  let top = -1;
+  let bottom = -1;
+  let left = -1;
+  let right = -1;
+  for (let y = 0; y < height; y++) {
+    if (rowHits[y] < minRowHits) continue;
+    if (top < 0) top = y;
+    bottom = y;
+  }
+  for (let x = 0; x < width; x++) {
+    if (columnHits[x] < minColumnHits) continue;
+    if (left < 0) left = x;
+    right = x;
+  }
+  if (top < 0 || bottom < top || left < 0 || right < left) return { canvas, aspectRatio: width / height };
+
+  const padding = 4;
+  left = Math.max(0, left - padding);
+  right = Math.min(width - 1, right + padding);
+  top = Math.max(0, top - padding);
+  bottom = Math.min(height - 1, bottom + padding);
+  const cropped = document.createElement('canvas');
+  cropped.width = right - left + 1;
+  cropped.height = bottom - top + 1;
+  const croppedContext = cropped.getContext('2d');
+  if (!croppedContext) return { canvas, aspectRatio: width / height };
+  croppedContext.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
+  return { canvas: cropped, aspectRatio: cropped.width / cropped.height };
+}
+
+export async function createFilePreview(file: File): Promise<{ thumbnail: string; pageCount: number; aspectRatio: number }> {
   const bytes = await file.arrayBuffer();
   const pdfDocument = await pdfjsLib.getDocument({ data: copyPdfData(bytes) }).promise;
   try {
     const page = await pdfDocument.getPage(1);
     const initialViewport = page.getViewport({ scale: 1 });
-    const scale = Math.min(180 / initialViewport.width, 220 / initialViewport.height);
+    const scale = Math.min(360 / initialViewport.width, 440 / initialViewport.height);
     const viewport = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
@@ -61,7 +110,8 @@ export async function createFilePreview(file: File): Promise<{ thumbnail: string
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
     await page.render({ canvas, canvasContext: context, viewport }).promise;
-    return { thumbnail: canvas.toDataURL('image/jpeg', 0.78), pageCount: pdfDocument.numPages };
+    const preview = cropPreviewCanvas(canvas, context);
+    return { thumbnail: preview.canvas.toDataURL('image/jpeg', 0.82), pageCount: pdfDocument.numPages, aspectRatio: preview.aspectRatio };
   } finally {
     await pdfDocument.destroy();
   }
@@ -168,7 +218,7 @@ export const safeFilename = (name: string) => name.replace(/[\\/:*?"<>|]/g, '＿
 const safeFolderName = (name: string) => name.replace(/[\\/:*?"<>|]/g, '＿').trim() || '名称未設定';
 const safeZipFolderPath = (path: string) => path.split('/').filter(Boolean).map(safeFolderName).join('/');
 
-export async function createProviderPdf(provider: string, month: string, groups: SlipGroup[], sources: SourcePdf[]) {
+async function combineProviderGroups(groups: SlipGroup[], sources: SourcePdf[]) {
   const output = await PDFDocument.create();
   const byId = new Map(sources.map((source) => [source.id, source]));
   const cache = new Map<string, PDFDocument>();
@@ -178,9 +228,22 @@ export async function createProviderPdf(provider: string, month: string, groups:
     if (!input) { input = await PDFDocument.load(source.bytes.slice(0)); cache.set(source.id, input); }
     const [page] = await output.copyPages(input, [ref.pageIndex]); output.addPage(page);
   }
+  return output;
+}
+
+export async function createProviderPdf(provider: string, month: string, groups: SlipGroup[], sources: SourcePdf[]) {
+  const output = await combineProviderGroups(groups, sources);
   const bytes = await output.save();
   const familyNames = [...new Set(groups.map((group) => group.clientName.trim().split(/[ 　]/)[0]).filter(Boolean))].map((name) => `${name}様`).join('、');
   return { name: `${safeFilename(month)}　${safeFilename(provider)}提供票（${safeFilename(familyNames || '利用者名未判定')}）.pdf`, bytes };
+}
+
+export async function createMergedProviderPdf(month: string, groups: SlipGroup[], sources: SourcePdf[]) {
+  const output = await combineProviderGroups(groups, sources);
+  const monthNumber = month.match(/([0-9]{1,2})月/u)?.[1];
+  const title = `${monthNumber ? `${Number(monthNumber)}月` : '提供年月未確定'}分提供票　一括FAX送信用`;
+  output.setTitle(title);
+  return { name: `${title}.pdf`, bytes: await output.save() };
 }
 
 export async function createZip(files: { name: string; bytes: Uint8Array; folder?: string }[], month: string, archiveBaseName?: string) {

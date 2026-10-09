@@ -1438,6 +1438,60 @@ select.modal-input {
 }
 .confirm-btn.ok { background: #3a9e20; color: white; }
 .confirm-btn.cancel { background: #f1f5f9; color: #64748b; }
+
+/* Increase readability only on full-sized desktop viewports. */
+@media (min-width: 1280px) and (min-height: 700px) and (hover: hover) and (pointer: fine) {
+  .app-name { font-size: 19px; }
+  .mlabel { font-size: 16px; }
+  .stat-num { font-size: 15px; }
+  .stat-label { font-size: 13px; }
+  .top-add-btn,
+  .top-add-btn.primary .top-add-btn-label,
+  .top-toggle-btn { font-size: 13px; }
+  .date-toggle-btn { font-size: 10px; }
+  .date-toggle-btn.order-custom { font-size: 9px; }
+  .header-pdf-btn { font-size: 13px; }
+  .utility-btn { height: 20px; font-size: 9px; }
+
+  th.h-no { font-size: 11px; }
+  th.h-name,
+  th.h-kosin,
+  th.h-biko,
+  th .inner,
+  th.h-visit .inner { font-size: 9px; }
+  th .inner.long,
+  th .inner.split { font-size: 8px; }
+  th .inner.split .sub-label { font-size: 0.9em; }
+  th.h-name,
+  td.td-name { width: 88px; }
+  th.h-kosin,
+  td.td-kosin { width: 50px; }
+  th[data-col-key="yuko"],
+  th[data-col-key="planL"],
+  th[data-col-key="planS"] { width: 88px; }
+  th[data-col-key="level"],
+  td.td-lv { width: 38px; }
+  td { height: 50px; font-size: 14px; }
+  .name-main { font-size: 13px; }
+  .name-kana { font-size: 9px; }
+  td.td-no { font-size: 11px; }
+  td.td-kosin { font-size: 11px; }
+  td.td-date { font-size: 14px; }
+  td.td-date[data-col-key="yuko"],
+  td.td-date[data-col-key="planL"],
+  td.td-date[data-col-key="planS"] {
+    width: 88px;
+    padding: 0 3px;
+    font-size: 14px;
+  }
+  td.td-lv { font-size: 13px; }
+  td.td-biko { font-size: 13px; }
+  .visit-date-text { font-size: 11px; }
+  .visit-cell.date-only .visit-date-text { font-size: 12px; }
+  .visit-tag,
+  .chip-warn { font-size: 9px; }
+  .seho-label { font-size: 9px; }
+}
 </style>
 </head>
 <body>

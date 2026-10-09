@@ -10,20 +10,21 @@
 <meta name="apple-mobile-web-app-title" content="利用者チェック表">
 <script>
 (() => {
-  const desktopPointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+  const desktopPointer = window.matchMedia('(pointer: fine)');
   const touchDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const updateDesktopLayout = () => {
-    const screenWidth = window.screen.availWidth || window.innerWidth;
-    const screenHeight = window.screen.availHeight || window.innerHeight;
-    const fillsScreen = window.innerWidth >= screenWidth * 0.9 && window.innerHeight >= screenHeight * 0.78;
+    const screenWidth = window.screen.availWidth || window.screen.width || window.outerWidth;
+    const screenHeight = window.screen.availHeight || window.screen.height || window.outerHeight;
+    const fillsScreen = window.outerWidth >= screenWidth * 0.88 && window.outerHeight >= screenHeight * 0.82;
     document.documentElement.classList.toggle(
       'desktop-wide-view',
-      desktopPointer.matches && !touchDevice && window.innerWidth >= 1000 && fillsScreen
+      desktopPointer.matches && !touchDevice && window.innerWidth >= 960 && fillsScreen
     );
   };
   updateDesktopLayout();
   window.addEventListener('resize', updateDesktopLayout);
+  document.addEventListener('fullscreenchange', updateDesktopLayout);
   desktopPointer.addEventListener?.('change', updateDesktopLayout);
 })();
 </script>
@@ -1459,65 +1460,70 @@ select.modal-input {
 .confirm-btn.cancel { background: #f1f5f9; color: #64748b; }
 
 /* Increase readability only when a desktop window occupies most of the screen. */
-html.desktop-wide-view .app-name { font-size: 19px; }
-html.desktop-wide-view .mlabel { font-size: 16px; }
-html.desktop-wide-view .stat-num { font-size: 15px; }
-html.desktop-wide-view .stat-label { font-size: 13px; }
+html.desktop-wide-view .app-name { font-size: 22px; }
+html.desktop-wide-view .mlabel { font-size: 19px; }
+html.desktop-wide-view .stat-num { font-size: 18px; }
+html.desktop-wide-view .stat-label { font-size: 15px; }
 html.desktop-wide-view .top-add-btn,
 html.desktop-wide-view .top-add-btn.primary .top-add-btn-label,
-html.desktop-wide-view .top-toggle-btn { font-size: 13px; }
-html.desktop-wide-view .date-toggle-btn { font-size: 10px; }
-html.desktop-wide-view .date-toggle-btn.order-custom { font-size: 9px; }
-html.desktop-wide-view .header-pdf-btn { font-size: 13px; }
-html.desktop-wide-view .utility-btn { height: 20px; font-size: 9px; }
+html.desktop-wide-view .top-toggle-btn { font-size: 15px; }
+html.desktop-wide-view .date-toggle-btn { font-size: 12px; }
+html.desktop-wide-view .date-toggle-btn.order-custom { font-size: 11px; }
+html.desktop-wide-view .header-pdf-btn { font-size: 15px; }
+html.desktop-wide-view .utility-btn { height: 22px; font-size: 11px; }
 
-html.desktop-wide-view th.h-no { font-size: 11px; }
+html.desktop-wide-view th.h-no { font-size: 14px; }
 html.desktop-wide-view th.h-name,
 html.desktop-wide-view th.h-kosin,
 html.desktop-wide-view th.h-biko,
 html.desktop-wide-view th .inner,
-html.desktop-wide-view th.h-visit .inner { font-size: 12px; }
+html.desktop-wide-view th.h-visit .inner { font-size: 15px; }
 html.desktop-wide-view th .inner.long,
-html.desktop-wide-view th .inner.split { font-size: 10px; }
-html.desktop-wide-view th .inner { min-height: 46px; line-height: 1.15; }
-html.desktop-wide-view th .inner.split { min-height: 46px; }
+html.desktop-wide-view th .inner.split { font-size: 13px; }
+html.desktop-wide-view th .inner { min-height: 58px; line-height: 1.2; }
+html.desktop-wide-view th .inner.split { min-height: 58px; }
+html.desktop-wide-view th.h-rot { width: 52px; }
+html.desktop-wide-view th.h-rot-date { width: 104px; }
 html.desktop-wide-view th.h-name,
-html.desktop-wide-view td.td-name { width: 96px; }
+html.desktop-wide-view td.td-name { width: 112px; }
 html.desktop-wide-view th.h-kosin,
-html.desktop-wide-view td.td-kosin { width: 56px; }
+html.desktop-wide-view td.td-kosin { width: 68px; }
 html.desktop-wide-view th[data-col-key="yuko"],
 html.desktop-wide-view th[data-col-key="planL"],
-html.desktop-wide-view th[data-col-key="planS"] { width: 92px; }
+html.desktop-wide-view th[data-col-key="planS"] { width: 104px; }
 html.desktop-wide-view th[data-col-key="level"],
-html.desktop-wide-view td.td-lv { width: 44px; }
+html.desktop-wide-view td.td-lv { width: 68px; }
 html.desktop-wide-view th[data-col-key="monita"],
 html.desktop-wide-view th[data-col-key="sikien"],
 html.desktop-wide-view th[data-col-key="drive"],
 html.desktop-wide-view th[data-col-key="hand"],
 html.desktop-wide-view th[data-col-key="fax"],
 html.desktop-wide-view th[data-col-key="meeting"],
-html.desktop-wide-view th[data-custom-col="1"] { width: 56px; }
-html.desktop-wide-view th.h-visit { width: 64px; }
-html.desktop-wide-view td { height: 56px; font-size: 15px; }
-html.desktop-wide-view .name-main { font-size: 15px; }
-html.desktop-wide-view .name-kana { font-size: 11px; }
-html.desktop-wide-view td.td-no { font-size: 11px; }
-html.desktop-wide-view td.td-kosin { font-size: 13px; }
-html.desktop-wide-view td.td-date { font-size: 15px; }
+html.desktop-wide-view th[data-custom-col="1"] { width: 68px; }
+html.desktop-wide-view th.h-visit { width: 74px; }
+html.desktop-wide-view th.h-seho { width: 58px; }
+html.desktop-wide-view th.h-name { width: 112px; }
+html.desktop-wide-view th.h-kosin { width: 68px; }
+html.desktop-wide-view td { height: 64px; font-size: 18px; }
+html.desktop-wide-view .name-main { font-size: 18px; }
+html.desktop-wide-view .name-kana { font-size: 13px; }
+html.desktop-wide-view td.td-no { font-size: 13px; }
+html.desktop-wide-view td.td-kosin { font-size: 15px; }
+html.desktop-wide-view td.td-date { font-size: 18px; }
 html.desktop-wide-view td.td-date[data-col-key="yuko"],
 html.desktop-wide-view td.td-date[data-col-key="planL"],
 html.desktop-wide-view td.td-date[data-col-key="planS"] {
-  width: 92px;
-  padding: 0 4px;
-  font-size: 15px;
+  width: 104px;
+  padding: 0 5px;
+  font-size: 18px;
 }
-html.desktop-wide-view td.td-lv { font-size: 14px; }
-html.desktop-wide-view td.td-biko { font-size: 14px; }
-html.desktop-wide-view .visit-date-text { font-size: 12px; }
-html.desktop-wide-view .visit-cell.date-only .visit-date-text { font-size: 13px; }
+html.desktop-wide-view td.td-lv { font-size: 17px; }
+html.desktop-wide-view td.td-biko { font-size: 16px; }
+html.desktop-wide-view .visit-date-text { font-size: 14px; }
+html.desktop-wide-view .visit-cell.date-only .visit-date-text { font-size: 15px; }
 html.desktop-wide-view .visit-tag,
-html.desktop-wide-view .chip-warn { font-size: 10px; }
-html.desktop-wide-view .seho-label { font-size: 10px; }
+html.desktop-wide-view .chip-warn { font-size: 12px; }
+html.desktop-wide-view .seho-label { font-size: 12px; }
 </style>
 </head>
 <body>

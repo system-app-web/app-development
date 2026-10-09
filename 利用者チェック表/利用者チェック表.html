@@ -8,6 +8,25 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="利用者チェック表">
+<script>
+(() => {
+  const desktopPointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+  const touchDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const updateDesktopLayout = () => {
+    const screenWidth = window.screen.availWidth || window.innerWidth;
+    const screenHeight = window.screen.availHeight || window.innerHeight;
+    const fillsScreen = window.innerWidth >= screenWidth * 0.9 && window.innerHeight >= screenHeight * 0.78;
+    document.documentElement.classList.toggle(
+      'desktop-wide-view',
+      desktopPointer.matches && !touchDevice && window.innerWidth >= 1000 && fillsScreen
+    );
+  };
+  updateDesktopLayout();
+  window.addEventListener('resize', updateDesktopLayout);
+  desktopPointer.addEventListener?.('change', updateDesktopLayout);
+})();
+</script>
 <title>利用者チェック表</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -1439,59 +1458,66 @@ select.modal-input {
 .confirm-btn.ok { background: #3a9e20; color: white; }
 .confirm-btn.cancel { background: #f1f5f9; color: #64748b; }
 
-/* Increase readability only on full-sized desktop viewports. */
-@media (min-width: 1280px) and (min-height: 700px) and (hover: hover) and (pointer: fine) {
-  .app-name { font-size: 19px; }
-  .mlabel { font-size: 16px; }
-  .stat-num { font-size: 15px; }
-  .stat-label { font-size: 13px; }
-  .top-add-btn,
-  .top-add-btn.primary .top-add-btn-label,
-  .top-toggle-btn { font-size: 13px; }
-  .date-toggle-btn { font-size: 10px; }
-  .date-toggle-btn.order-custom { font-size: 9px; }
-  .header-pdf-btn { font-size: 13px; }
-  .utility-btn { height: 20px; font-size: 9px; }
+/* Increase readability only when a desktop window occupies most of the screen. */
+html.desktop-wide-view .app-name { font-size: 19px; }
+html.desktop-wide-view .mlabel { font-size: 16px; }
+html.desktop-wide-view .stat-num { font-size: 15px; }
+html.desktop-wide-view .stat-label { font-size: 13px; }
+html.desktop-wide-view .top-add-btn,
+html.desktop-wide-view .top-add-btn.primary .top-add-btn-label,
+html.desktop-wide-view .top-toggle-btn { font-size: 13px; }
+html.desktop-wide-view .date-toggle-btn { font-size: 10px; }
+html.desktop-wide-view .date-toggle-btn.order-custom { font-size: 9px; }
+html.desktop-wide-view .header-pdf-btn { font-size: 13px; }
+html.desktop-wide-view .utility-btn { height: 20px; font-size: 9px; }
 
-  th.h-no { font-size: 11px; }
-  th.h-name,
-  th.h-kosin,
-  th.h-biko,
-  th .inner,
-  th.h-visit .inner { font-size: 9px; }
-  th .inner.long,
-  th .inner.split { font-size: 8px; }
-  th .inner.split .sub-label { font-size: 0.9em; }
-  th.h-name,
-  td.td-name { width: 88px; }
-  th.h-kosin,
-  td.td-kosin { width: 50px; }
-  th[data-col-key="yuko"],
-  th[data-col-key="planL"],
-  th[data-col-key="planS"] { width: 88px; }
-  th[data-col-key="level"],
-  td.td-lv { width: 38px; }
-  td { height: 50px; font-size: 14px; }
-  .name-main { font-size: 13px; }
-  .name-kana { font-size: 9px; }
-  td.td-no { font-size: 11px; }
-  td.td-kosin { font-size: 11px; }
-  td.td-date { font-size: 14px; }
-  td.td-date[data-col-key="yuko"],
-  td.td-date[data-col-key="planL"],
-  td.td-date[data-col-key="planS"] {
-    width: 88px;
-    padding: 0 3px;
-    font-size: 14px;
-  }
-  td.td-lv { font-size: 13px; }
-  td.td-biko { font-size: 13px; }
-  .visit-date-text { font-size: 11px; }
-  .visit-cell.date-only .visit-date-text { font-size: 12px; }
-  .visit-tag,
-  .chip-warn { font-size: 9px; }
-  .seho-label { font-size: 9px; }
+html.desktop-wide-view th.h-no { font-size: 11px; }
+html.desktop-wide-view th.h-name,
+html.desktop-wide-view th.h-kosin,
+html.desktop-wide-view th.h-biko,
+html.desktop-wide-view th .inner,
+html.desktop-wide-view th.h-visit .inner { font-size: 12px; }
+html.desktop-wide-view th .inner.long,
+html.desktop-wide-view th .inner.split { font-size: 10px; }
+html.desktop-wide-view th .inner { min-height: 46px; line-height: 1.15; }
+html.desktop-wide-view th .inner.split { min-height: 46px; }
+html.desktop-wide-view th.h-name,
+html.desktop-wide-view td.td-name { width: 96px; }
+html.desktop-wide-view th.h-kosin,
+html.desktop-wide-view td.td-kosin { width: 56px; }
+html.desktop-wide-view th[data-col-key="yuko"],
+html.desktop-wide-view th[data-col-key="planL"],
+html.desktop-wide-view th[data-col-key="planS"] { width: 92px; }
+html.desktop-wide-view th[data-col-key="level"],
+html.desktop-wide-view td.td-lv { width: 44px; }
+html.desktop-wide-view th[data-col-key="monita"],
+html.desktop-wide-view th[data-col-key="sikien"],
+html.desktop-wide-view th[data-col-key="drive"],
+html.desktop-wide-view th[data-col-key="hand"],
+html.desktop-wide-view th[data-col-key="fax"],
+html.desktop-wide-view th[data-col-key="meeting"],
+html.desktop-wide-view th[data-custom-col="1"] { width: 56px; }
+html.desktop-wide-view th.h-visit { width: 64px; }
+html.desktop-wide-view td { height: 56px; font-size: 15px; }
+html.desktop-wide-view .name-main { font-size: 15px; }
+html.desktop-wide-view .name-kana { font-size: 11px; }
+html.desktop-wide-view td.td-no { font-size: 11px; }
+html.desktop-wide-view td.td-kosin { font-size: 13px; }
+html.desktop-wide-view td.td-date { font-size: 15px; }
+html.desktop-wide-view td.td-date[data-col-key="yuko"],
+html.desktop-wide-view td.td-date[data-col-key="planL"],
+html.desktop-wide-view td.td-date[data-col-key="planS"] {
+  width: 92px;
+  padding: 0 4px;
+  font-size: 15px;
 }
+html.desktop-wide-view td.td-lv { font-size: 14px; }
+html.desktop-wide-view td.td-biko { font-size: 14px; }
+html.desktop-wide-view .visit-date-text { font-size: 12px; }
+html.desktop-wide-view .visit-cell.date-only .visit-date-text { font-size: 13px; }
+html.desktop-wide-view .visit-tag,
+html.desktop-wide-view .chip-warn { font-size: 10px; }
+html.desktop-wide-view .seho-label { font-size: 10px; }
 </style>
 </head>
 <body>

@@ -1834,7 +1834,7 @@
       if (!file.type.startsWith("image/")) throw new Error("merge mode accepts only PDF or image files");
       const imageCanvas = await renderImage(file);
       const baseName = file.name.replace(/\.[^.]+$/, "") || "スクリーンショット";
-      return new File([buildPdfBlob(imageCanvas)], `${baseName}.pdf`, { type: "application/pdf" });
+      return new File([buildPdfBlob(imageCanvas, DPI, pageSizeForCanvas(imageCanvas))], `${baseName}.pdf`, { type: "application/pdf" });
     }
 
     async function renderPdfPages(file, scale = 3) {
@@ -2732,8 +2732,8 @@
       return sheet;
     }
 
-    function buildPdfBlob(canvas, dpi = DPI) {
-      const pageImages = [buildA4PageMonochrome(canvas, dpi)];
+    function buildPdfBlob(canvas, dpi = DPI, page = selectedPageSize()) {
+      const pageImages = [buildA4PageMonochrome(canvas, dpi, page)];
       return objectsToPdfBlobFromPageImages(pageImages);
     }
 
@@ -2902,8 +2902,8 @@
       return objectsToPdfBlob(objects);
     }
 
-    function buildA4PageMonochrome(canvas, dpi = DPI) {
-      const { canvas: doc, page } = buildA4PageCanvas(canvas, dpi);
+    function buildA4PageMonochrome(canvas, dpi = DPI, page = selectedPageSize()) {
+      const { canvas: doc, page: outputPage } = buildA4PageCanvas(canvas, dpi, page);
       const context = doc.getContext("2d", { willReadFrequently: true });
       const pixels = context.getImageData(0, 0, doc.width, doc.height).data;
       const bytesPerRow = Math.ceil(doc.width / 8);
@@ -2921,7 +2921,7 @@
         data: bytesToBinaryString(packed),
         width: doc.width,
         height: doc.height,
-        page,
+        page: outputPage,
         colorSpace: "/DeviceGray",
         bitsPerComponent: 1
       };
@@ -2936,8 +2936,7 @@
       return result;
     }
 
-    function buildA4PageCanvas(canvas, dpi = DPI) {
-      const page = selectedPageSize();
+    function buildA4PageCanvas(canvas, dpi = DPI, page = selectedPageSize()) {
       const displayCanvas = canvas;
       const pxPerMm = dpi / 25.4;
       const doc = document.createElement("canvas");
@@ -2999,7 +2998,7 @@
         wMm: Math.min(page.wMm - 2, box.wMm * sizeScale),
         hMm: Math.min(page.hMm - 2, box.hMm * sizeScale)
       });
-      if (selectedOrientation() === "portrait") {
+      if (page.wMm < page.hMm) {
         return scaleBox({ wMm: 120, hMm: 170 });
       }
       const margin = 10;

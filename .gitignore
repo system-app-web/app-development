@@ -17,3 +17,7 @@ tmp/
 利用者チェック表/build_urakoshi_json.py
 .vercel
 .env*
+
+# Local-only FAX exports and preview launcher
+FAXアドレス帳/FAXアドレス帳_データ_*.json
+提供票自動振り分け/ローカル確認.app/

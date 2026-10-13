@@ -1,12 +1,11 @@
 # Change and Publishing Policy
 
 - Edit and verify files locally by default.
-- Do not create a Git commit unless the user explicitly asks to commit in the current task.
-- Do not push to GitHub unless the user explicitly asks to push in the current task.
-- Do not start a Vercel deployment, redeployment, promotion, publishing action, or hosting configuration unless the user explicitly asks to deploy in the current task.
-- Treat `commit`, `push`, and `deploy` as separate actions. Editing files does not imply any of them.
+- Do not create a Git commit, push to GitHub, or deploy to Vercel during ordinary editing or verification.
 - Do not start a local web server, open a hosted preview, or check a site on the web unless the user explicitly asks for web-based confirmation.
-- `公開` is an explicit instruction to commit the current task's intended changes, push them to GitHub, and deploy the related release. Vercel dashboard operations remain manual unless an available deployment method is explicitly provided.
+- When the user says `公開`, treat it as an explicit instruction to perform the following actions for the current project's intended changes, in this order and without asking for another confirmation: Git commit, GitHub push, then Vercel production deployment.
+- Do not include API keys, `.env` files, personal information, secrets, generated credentials, or unintended changes from other projects in a commit.
+- When the user says `公開`, do not explain Vercel dashboard steps or settings. Only report briefly if an action cannot be completed.
 
 # New App Data Protection Check
 

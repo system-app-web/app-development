@@ -18,8 +18,24 @@ function getAppOrder(employeeName: string) {
     const orderedApps = savedOrder
       .filter((id): id is string => typeof id === 'string' && appsById.has(id) && !seenIds.has(id) && (seenIds.add(id), true))
       .map((id) => appsById.get(id) as PortalApp);
-    const remainingApps = appData.filter((app) => !orderedApps.some((orderedApp) => orderedApp.id === app.id));
-    return [...orderedApps, ...remainingApps];
+    const nextApps = [...orderedApps];
+    const missingApps = appData.filter((app) => !seenIds.has(app.id));
+
+    for (const app of missingApps) {
+      const appDefaultIndex = appData.findIndex((defaultApp) => defaultApp.id === app.id);
+      const previousDefaultApp = [...appData.slice(0, appDefaultIndex)]
+        .reverse()
+        .find((defaultApp) => nextApps.some((orderedApp) => orderedApp.id === defaultApp.id));
+
+      if (previousDefaultApp) {
+        const previousIndex = nextApps.findIndex((orderedApp) => orderedApp.id === previousDefaultApp.id);
+        nextApps.splice(previousIndex + 1, 0, app);
+      } else {
+        nextApps.push(app);
+      }
+    }
+
+    return nextApps;
   } catch {
     return appData;
   }

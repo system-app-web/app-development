@@ -40,9 +40,9 @@ export function AppCard({ app, isReordering = false, isSelectedForSwap = false, 
       <p className="app-description">{app.description}</p>
       {isTrial ? <p className="app-availability trial">試作公開中</p> : null}
 
-      {isAdjusting && !app.adjustmentLinkAvailable ? (
-        <button className="button disabled" type="button" aria-label={`${app.name}は調整中`} disabled>
-          調整中
+      {(isAdjusting && !app.adjustmentLinkAvailable) || !app.url ? (
+        <button className="button disabled" type="button" aria-label={`${app.name}は${isAdjusting ? '調整中' : '準備中'}`} disabled>
+          {isAdjusting ? '調整中' : '準備中'}
         </button>
       ) : (
         <div className="app-card-actions">

@@ -64,9 +64,11 @@ function writeSessionCookie(session: DeviceSession) {
 }
 
 export function createAppAccessUrl(appUrl: string) {
+  const url = new URL(appUrl, window.location.origin);
+  if (url.origin === window.location.origin) return url.toString();
+
   const session = getStoredSession();
   if (!session) return appUrl;
-  const url = new URL(appUrl);
   url.searchParams.set('ktmDeviceId', getDeviceId());
   url.searchParams.set('ktmAccessToken', session.accessToken);
   return url.toString();

@@ -114,6 +114,18 @@ export const appData: PortalApp[] = [
     status: 'stable',
   },
   {
+    id: 'desktop-memo',
+    name: '付箋紙アプリ',
+    url: '/apps/desktop-memo/',
+    installUrl: '/apps/desktop-memo/?install=1',
+    icon: 'memo',
+    iconImage: 'app-icons/desktop-memo.svg',
+    description: '色付きの小さな付箋でメモを整理',
+    version: 'v0.1.0',
+    status: 'preview',
+    availability: 'trial',
+  },
+  {
     id: 'shortcut-memo',
     name: 'ショートカットメモ',
     url: 'https://shortcut-list.vercel.app',

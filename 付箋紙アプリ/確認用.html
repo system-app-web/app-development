@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f3ed" />
+    <title>デスクトップメモ｜操作確認</title>
+    <style>
+      :root {
+        font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+        color: #353a35;
+        background: #f5f3ed;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        color-scheme: light;
+      }
+      * { box-sizing: border-box; }
+      body { min-width: 320px; min-height: 100vh; margin: 0; }
+      button, textarea, input { font: inherit; }
+      .page { display: grid; min-height: 100vh; place-items: center; padding: 18px; }
+      .preview { width: min(700px, 100%); }
+      .memo-window {
+        display: flex;
+        width: 100%;
+        height: min(440px, calc(100vh - 64px));
+        min-height: 300px;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid #d9d8d0;
+        border-radius: 8px;
+        background: #fbfaf7;
+      }
+      .window-chrome { display: flex; height: 27px; min-height: 27px; align-items: center; padding: 0 8px; border-bottom: 1px solid #e5e3dc; background: #f0eee8; }
+      .window-name { color: #4a4e48; font-size: 10px; font-weight: 600; }
+      .workspace { display: flex; min-height: 0; flex: 1; }
+      .sidebar { display: flex; width: 32px; min-width: 32px; flex: none; flex-direction: column; border-right: 1px solid #e7e5df; background: #f7f6f1; }
+      .sidebar-heading { display: flex; min-height: 35px; align-items: center; justify-content: center; padding: 4px 0 3px; }
+      .sidebar-label { display: none; }
+      .add-note { display: grid; width: 22px; height: 22px; place-items: center; padding: 0; border: 1px solid #deded5; border-radius: 5px; background: #fbfaf7; color: #5c685a; cursor: pointer; font-size: 16px; line-height: 1; }
+      .add-note:hover { background: #efeee8; }
+      .note-list { display: flex; min-height: 0; flex: 1; flex-direction: column; align-items: flex-end; gap: 4px; overflow: auto; padding: 5px 0 7px; }
+      .note-tab { display: flex; width: 25px; min-width: 0; min-height: 36px; flex: none; align-items: center; justify-content: center; padding: 0; overflow: hidden; border: 0; border-radius: 10px 0 0 10px; background: var(--note-surface); color: #50554e; cursor: grab; text-align: center; font-size: 0; user-select: none; }
+      .note-tab.active { position: relative; z-index: 1; width: 28px; margin-right: -1px; color: #343a34; font-weight: 600; }
+      .note-tab:active { cursor: grabbing; }
+      .note-tab.is-dragging { opacity: .42; }
+      .note-tab.is-drop-target { filter: brightness(.9); }
+      .note-tab:focus-visible, button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid #839181; outline-offset: 1px; }
+      .empty-list { padding: 8px 3px; color: #898b83; font-size: 10px; }
+      .editor-panel { position: relative; display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; background: var(--note-surface, #fbfaf7); }
+      .editor-heading { position: relative; z-index: 2; display: flex; min-height: 36px; align-items: center; gap: 7px; padding: 0 8px 0 10px; border-bottom: 1px solid #efede7; }
+      h1 { min-width: 0; overflow: hidden; margin: 0; color: #41463f; cursor: text; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .rename-input { width: min(130px, 48vw); min-width: 48px; height: 24px; padding: 2px 4px; border: 1px solid #d8d9d1; border-radius: 3px; background: #fffefa; color: #41463f; font-size: 12px; font-weight: 700; }
+      .editor-actions { position: relative; display: flex; min-width: 0; align-items: center; gap: 3px; margin-left: auto; }
+      .save-status { max-width: 80px; overflow: hidden; color: #92948b; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+      .more-button { display: grid; width: 21px; height: 23px; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #71766e; cursor: pointer; font-size: 17px; line-height: 1; }
+      .more-button:hover, .more-button[aria-expanded="true"] { background: #efeee8; }
+      .editor-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 4; display: flex; width: 154px; flex-direction: column; gap: 4px; padding: 7px; border: 1px solid #deded6; border-radius: 6px; background: #fffefa; box-shadow: 0 4px 12px rgb(43 48 41 / 8%); }
+      .editor-menu[hidden] { display: none; }
+      .menu-action, .menu-utility button { min-height: 23px; padding: 3px 4px; border: 0; border-radius: 3px; background: transparent; color: #555950; cursor: pointer; font-size: 10px; text-align: left; }
+      .menu-action:hover, .menu-utility button:hover { background: #f2f1eb; }
+      .menu-action:disabled { color: #b6b7b0; cursor: default; }
+      .colors { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 4px 2px; }
+      .color { width: 15px; height: 15px; flex: none; padding: 0; border: 1px solid #fffefa; border-radius: 50%; box-shadow: 0 0 0 1px #d9d9d1; cursor: pointer; }
+      .color[aria-pressed="true"] { box-shadow: 0 0 0 2px #666c63; }
+      .divider { height: 1px; margin: 2px 0; background: #eeece6; }
+      .menu-utility { display: flex; justify-content: space-between; gap: 5px; }
+      .menu-utility button { min-height: 20px; padding: 2px 3px; color: #777a72; font-size: 9px; white-space: nowrap; }
+      .note-body { width: 100%; min-height: 0; flex: 1; margin: 0; padding: 9px 10px; resize: none; border: 0; outline: 0; background: transparent; color: #41463f; font-size: 12px; line-height: 1.7; }
+      .note-body:focus-visible { outline: none; }
+      .note-body:disabled { color: #92948b; }
+      .empty-editor { display: grid; flex: 1; place-items: center; padding: 12px; color: #898b83; font-size: 11px; text-align: center; }
+      .empty-editor[hidden] { display: none; }
+      .note-body[hidden] { display: none; }
+      @media (max-width: 420px) {
+        .page { padding: 10px; }
+        .memo-window { height: calc(100vh - 48px); min-height: 280px; }
+        .sidebar { width: 32px; min-width: 32px; }
+        .editor-heading { padding-left: 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="preview" aria-label="付箋紙アプリ">
+        <div class="memo-window">
+          <header class="window-chrome"><span class="window-name">付箋紙アプリ</span></header>
+          <div class="workspace">
+            <aside class="sidebar" aria-label="付箋一覧">
+              <div class="sidebar-heading"><span class="sidebar-label">付箋</span><button class="add-note" id="add-note" type="button" aria-label="付箋を追加">＋</button></div>
+              <div class="note-list" id="note-list"></div>
+            </aside>
+            <section class="editor-panel" aria-label="メモ本文">
+              <div class="editor-heading">
+                <h1 id="active-title" role="button" tabindex="0" title="クリックしてタイトルを編集">タイトル</h1>
+                <div class="editor-actions">
+                  <span class="save-status" id="save-status" aria-live="polite"></span>
+                  <button class="more-button" id="more-button" type="button" aria-expanded="false" aria-label="その他の操作">⋯</button>
+                  <div class="editor-menu" id="editor-menu" hidden>
+                    <div class="colors" id="color-options" aria-label="メモの色"></div>
+                    <button class="menu-action" id="delete-action" type="button">削除</button>
+                    <div class="divider"></div>
+                    <div class="menu-utility"><button id="backup-action" type="button">バックアップ</button><button id="import-action" type="button">データ挿入</button></div>
+                  </div>
+                </div>
+              </div>
+              <textarea class="note-body" id="note-body" aria-label="メモ本文" placeholder="ここにメモを書けます"></textarea>
+              <div class="empty-editor" id="empty-editor" hidden>付箋がありません<br />＋から追加できます</div>
+            </section>
+          </div>
+        </div>
+        <input id="import-input" type="file" accept=".json,application/json" hidden />
+      </section>
+    </main>
+    <script>
+      (() => {
+        const APP_NAME = 'デスクトップメモ';
+        const colors = [
+          { id: 'sand', label: '砂色', dot: '#bd966b', surface: '#f3eadb' },
+          { id: 'sage', label: 'セージ', dot: '#829581', surface: '#eaf0e8' },
+          { id: 'blue', label: '青灰', dot: '#8095a7', surface: '#e9eef2' },
+          { id: 'rose', label: 'くすみ赤', dot: '#b17f78', surface: '#f3e9e7' },
+          { id: 'olive', label: 'オリーブ', dot: '#99966c', surface: '#f0efe2' },
+          { id: 'slate', label: '灰緑', dot: '#7f918c', surface: '#e9eeec' },
+        ];
+        const initialNotes = [
+          { id: 'today', title: 'タイトル', color: 'sand', body: '・書類を確認する\n・買い物リストを整理\n・来週の予定を確認\n\n思いついたことを、ここに書き留めます。', updatedAt: new Date().toISOString() },
+          { id: 'shopping', title: '買い物', color: 'sage', body: '・牛乳\n・パン\n・電池', updatedAt: new Date().toISOString() },
+          { id: 'work', title: '仕事', color: 'blue', body: '・会議資料を確認\n・連絡を返す', updatedAt: new Date().toISOString() },
+          { id: 'later', title: 'あとで', color: 'rose', body: 'あとで確認すること', updatedAt: new Date().toISOString() },
+        ];
+        let notes = initialNotes.map((note) => ({ ...note }));
+        let selectedId = notes[0].id;
+        let renaming = false;
+        let draggedId = null;
+        let dragTargetId = null;
+
+        const list = document.getElementById('note-list');
+        const titleHeading = document.getElementById('active-title');
+        const body = document.getElementById('note-body');
+        const emptyEditor = document.getElementById('empty-editor');
+        const status = document.getElementById('save-status');
+        const more = document.getElementById('more-button');
+        const menu = document.getElementById('editor-menu');
+        const importInput = document.getElementById('import-input');
+        const colorOptions = document.getElementById('color-options');
+        const getSelectedIndex = () => notes.findIndex((note) => note.id === selectedId);
+        const getSelected = () => notes.find((note) => note.id === selectedId) || null;
+        const closeMenu = () => {
+          menu.hidden = true;
+          more.setAttribute('aria-expanded', 'false');
+        };
+
+        function render() {
+          document.getElementById('rename-input')?.remove();
+          list.replaceChildren();
+          if (notes.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-list';
+            empty.textContent = '付箋はありません';
+            list.append(empty);
+          }
+          notes.forEach((note) => {
+            const color = colors.find((item) => item.id === note.color) || colors[0];
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = `note-tab${note.id === selectedId ? ' active' : ''}`;
+            tab.textContent = note.title;
+            tab.draggable = true;
+            tab.title = `${note.title} · ドラッグして順番変更`;
+            tab.setAttribute('aria-label', note.title);
+            tab.setAttribute('aria-pressed', String(note.id === selectedId));
+            tab.style.setProperty('--note-color', color.dot);
+            tab.style.setProperty('--note-surface', color.surface);
+            tab.addEventListener('click', () => {
+              if (draggedId) return;
+              commitRename();
+              selectedId = note.id;
+              closeMenu();
+              render();
+            });
+            tab.addEventListener('dragstart', (event) => {
+              draggedId = note.id;
+              tab.classList.add('is-dragging');
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', note.id);
+            });
+            tab.addEventListener('dragover', (event) => {
+              if (!draggedId) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+              if (dragTargetId === note.id) return;
+              list.querySelector('.is-drop-target')?.classList.remove('is-drop-target');
+              dragTargetId = note.id;
+              tab.classList.add('is-drop-target');
+            });
+            tab.addEventListener('drop', (event) => {
+              event.preventDefault();
+              const sourceId = draggedId || event.dataTransfer.getData('text/plain');
+              const from = notes.findIndex((item) => item.id === sourceId);
+              const to = notes.findIndex((item) => item.id === note.id);
+              if (from >= 0 && to >= 0 && from !== to) {
+                const [moved] = notes.splice(from, 1);
+                notes.splice(to, 0, moved);
+              }
+              draggedId = null;
+              dragTargetId = null;
+              render();
+            });
+            tab.addEventListener('dragend', () => {
+              draggedId = null;
+              dragTargetId = null;
+              list.querySelectorAll('.is-dragging, .is-drop-target').forEach((item) => {
+                item.classList.remove('is-dragging', 'is-drop-target');
+              });
+            });
+            list.append(tab);
+          });
+
+          const selected = getSelected();
+          const hasNote = Boolean(selected);
+          const selectedColor = colors.find((item) => item.id === selected?.color) || colors[0];
+          document.querySelector('.editor-panel').style.setProperty('--note-surface', hasNote ? selectedColor.surface : '#fbfaf7');
+          body.hidden = !hasNote;
+          body.disabled = !hasNote;
+          emptyEditor.hidden = hasNote;
+          titleHeading.hidden = !hasNote || renaming;
+          titleHeading.textContent = selected?.title || '';
+          if (!renaming) body.value = selected?.body || '';
+          status.textContent = '';
+          document.getElementById('delete-action').disabled = !hasNote;
+          colorOptions.replaceChildren();
+          colors.forEach((color) => {
+            const swatch = document.createElement('button');
+            swatch.type = 'button';
+            swatch.className = 'color';
+            swatch.style.background = color.dot;
+            swatch.setAttribute('aria-label', `${color.label}に色を変更`);
+            swatch.setAttribute('aria-pressed', String(selected?.color === color.id));
+            swatch.disabled = !hasNote;
+            swatch.addEventListener('click', () => {
+              if (!selected) return;
+              selected.color = color.id;
+              selected.updatedAt = new Date().toISOString();
+              render();
+            });
+            colorOptions.append(swatch);
+          });
+        }
+
+        function commitRename() {
+          const input = document.getElementById('rename-input');
+          if (!renaming || !input) return;
+          const selected = getSelected();
+          if (selected) {
+            selected.title = input.value.trim().slice(0, 4) || 'タイトル';
+            selected.updatedAt = new Date().toISOString();
+          }
+          renaming = false;
+          render();
+        }
+
+        function startRename() {
+          const selected = getSelected();
+          if (!selected) return;
+          renaming = true;
+          const input = document.createElement('input');
+          input.id = 'rename-input';
+          input.className = 'rename-input';
+          input.maxLength = 4;
+          input.value = selected.title;
+          input.setAttribute('aria-label', 'タイトル（4文字まで）');
+          titleHeading.hidden = true;
+          titleHeading.after(input);
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') { event.preventDefault(); commitRename(); }
+            if (event.key === 'Escape') { input.value = selected.title; commitRename(); }
+          });
+          input.addEventListener('blur', commitRename, { once: true });
+          input.focus();
+          input.select();
+        }
+
+        titleHeading.addEventListener('click', startRename);
+        titleHeading.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            startRename();
+          }
+        });
+
+        document.getElementById('add-note').addEventListener('click', () => {
+          const note = { id: `note-${Date.now()}-${Math.random().toString(16).slice(2)}`, title: 'タイトル', color: 'sand', body: '', updatedAt: new Date().toISOString() };
+          notes.push(note);
+          selectedId = note.id;
+          renaming = false;
+          closeMenu();
+          render();
+          startRename();
+        });
+
+        body.addEventListener('input', () => {
+          const selected = getSelected();
+          if (!selected) return;
+          selected.body = body.value;
+          selected.updatedAt = new Date().toISOString();
+          status.textContent = '';
+        });
+        more.addEventListener('click', () => {
+          const open = more.getAttribute('aria-expanded') !== 'true';
+          more.setAttribute('aria-expanded', String(open));
+          menu.hidden = !open;
+        });
+        document.addEventListener('click', (event) => {
+          if (!menu.hidden && !menu.contains(event.target) && !more.contains(event.target)) closeMenu();
+        });
+        document.getElementById('delete-action').addEventListener('click', () => {
+          const index = getSelectedIndex();
+          if (index < 0) return;
+          if (!window.confirm(`「${notes[index].title}」を削除しますか？`)) return;
+          notes.splice(index, 1);
+          selectedId = notes[Math.min(index, notes.length - 1)]?.id || null;
+          closeMenu();
+          render();
+        });
+        document.getElementById('backup-action').addEventListener('click', () => {
+          const data = {
+            appName: APP_NAME,
+            schemaVersion: 1,
+            exportedAt: new Date().toISOString(),
+            data: { version: 1, notes: notes.map((note) => ({ ...note })), selectedId },
+          };
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `デスクトップメモ_backup_${new Date().toISOString().slice(0, 10)}.json`;
+          link.click();
+          URL.revokeObjectURL(url);
+          status.textContent = '書き出しました';
+        });
+        document.getElementById('import-action').addEventListener('click', () => importInput.click());
+        importInput.addEventListener('change', async () => {
+          const file = importInput.files?.[0];
+          importInput.value = '';
+          if (!file) return;
+          try {
+            if (file.size > 10 * 1024 * 1024) throw new Error('ファイルが大きすぎます。');
+            const imported = JSON.parse(await file.text());
+            const incoming = imported?.data;
+            if (imported?.appName !== APP_NAME || imported?.schemaVersion !== 1 || incoming?.version !== 1 || !Array.isArray(incoming.notes)) {
+              throw new Error('デスクトップメモのバックアップファイルではありません。');
+            }
+            const validNotes = incoming.notes.every((note) => note && typeof note.id === 'string' && typeof note.title === 'string' && typeof note.body === 'string' && colors.some((color) => color.id === note.color));
+            if (!validNotes) throw new Error('付箋の内容を読み取れませんでした。');
+            if (!window.confirm('現在のデータを、選んだバックアップの内容に置き換えますか？')) return;
+            notes = incoming.notes.map((note) => ({ ...note, title: note.title.slice(0, 4), updatedAt: typeof note.updatedAt === 'string' ? note.updatedAt : new Date().toISOString() }));
+            selectedId = notes.some((note) => note.id === incoming.selectedId) ? incoming.selectedId : notes[0]?.id || null;
+            renaming = false;
+            closeMenu();
+            render();
+            status.textContent = '読み込みました';
+          } catch (error) {
+            window.alert(error instanceof Error ? error.message : 'ファイルを読み込めませんでした。');
+          }
+        });
+        render();
+      })();
+    </script>
+  </body>
+</html>

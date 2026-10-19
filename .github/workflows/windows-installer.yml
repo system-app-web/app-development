@@ -1,0 +1,51 @@
+name: Windows installer
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-installer:
+    name: Build Windows installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: 付箋紙アプリ/pnpm-lock.yaml
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install app dependencies
+        working-directory: ./付箋紙アプリ
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows installer
+        working-directory: ./付箋紙アプリ
+        run: pnpm tauri build
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-memo-windows-installer
+          path: 付箋紙アプリ/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 30

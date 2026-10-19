@@ -444,8 +444,7 @@
       flex-wrap: wrap;
     }
 
-    .contrast-btn,
-    .size-btn {
+    .contrast-btn {
       width: auto;
       min-height: 32px;
       min-width: 70px;
@@ -464,10 +463,78 @@
       color: #fff;
     }
 
-    .size-btn.active {
-      background: #2563eb;
-      border-color: #2563eb;
-      color: #fff;
+    .size-control {
+      display: grid;
+      grid-template-columns: auto minmax(180px, 1fr) auto auto;
+      width: auto;
+      margin: 16px 30px 0;
+    }
+
+    .size-label {
+      min-width: 48px;
+    }
+
+    .size-adjuster {
+      display: grid;
+      grid-template-columns: 44px minmax(80px, 1fr) 44px;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .size-step-btn,
+    .size-reset-btn {
+      width: auto;
+      min-height: 44px;
+      border: 1px solid #c6d2d7;
+      border-radius: 5px;
+      background: #fff;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .size-step-btn {
+      width: 44px;
+      padding: 0;
+      font-size: 22px;
+      touch-action: none;
+    }
+
+    .size-step-btn:disabled,
+    .size-reset-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .size-range {
+      width: 100%;
+      min-width: 80px;
+      height: 44px;
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+      touch-action: pan-y;
+    }
+
+    .size-percent {
+      min-width: 56px;
+      text-align: center;
+      color: #334155;
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+    }
+
+    .size-reset-btn {
+      padding: 0 12px;
+      white-space: nowrap;
+    }
+
+    .size-step-btn:hover:not(:disabled),
+    .size-reset-btn:hover:not(:disabled) {
+      border-color: #75bcb4;
+      background: #eff9f7;
     }
 
     .drop {
@@ -686,8 +753,6 @@
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      max-width: calc(100% - 24px);
-      max-height: calc(100% - 24px);
     }
 
     .merge-page {
@@ -785,6 +850,11 @@
       .doc-type { margin: 18px 20px 0; gap: 4px; grid-template-columns: 1fr 1fr; }
       .doc-type label { min-height: 46px; font-size: 13px; line-height: 1.3; text-align: center; }
       .notice, .rotation-tools, .control-row, .pencil-palette, .pencil-page-control, .drop, .status, #saveBtn, #printBtn { margin-left: 20px; margin-right: 20px; }
+      .size-control { grid-template-columns: auto minmax(0, 1fr) auto; }
+      .size-label { grid-column: 1; grid-row: 1; }
+      .size-percent { grid-column: 2; grid-row: 1; justify-self: end; }
+      .size-reset-btn { grid-column: 3; grid-row: 1; }
+      .size-adjuster { grid-column: 1 / -1; grid-row: 2; }
       .drop { min-height: 340px; padding: 12px; }
       .drop.pencil-preview { max-height: 620px; }
     }
@@ -826,12 +896,14 @@
     </div>
 
     <div class="control-row size-control">
-      <span>サイズ</span>
-      <div class="contrast-options">
-        <button class="size-btn" type="button" data-scale="0.9">小</button>
-        <button class="size-btn active" type="button" data-scale="1">標準</button>
-        <button class="size-btn" type="button" data-scale="1.12">大</button>
+      <label class="size-label" for="sizeRange">サイズ</label>
+      <div class="size-adjuster">
+        <button id="sizeMinusBtn" class="size-step-btn" type="button" aria-label="5%縮小" title="5%ずつ縮小">−</button>
+        <input id="sizeRange" class="size-range" type="range" min="50" max="150" step="1" value="100" aria-label="サイズ">
+        <button id="sizePlusBtn" class="size-step-btn" type="button" aria-label="5%拡大" title="5%ずつ拡大">＋</button>
       </div>
+      <output id="sizePercent" class="size-percent" for="sizeRange">100%</output>
+      <button id="sizeResetBtn" class="size-reset-btn" type="button">標準に戻す</button>
     </div>
 
     <button id="saveBtn" type="button" disabled>PDF保存</button>
@@ -960,7 +1032,11 @@
     const mergePdfViewer = document.getElementById("mergePdfViewer");
     const mergePdfCloseBtn = document.getElementById("mergePdfCloseBtn");
     const contrastButtons = Array.from(document.querySelectorAll(".contrast-btn"));
-    const sizeButtons = Array.from(document.querySelectorAll(".size-btn"));
+    const sizeRange = document.getElementById("sizeRange");
+    const sizeMinusBtn = document.getElementById("sizeMinusBtn");
+    const sizePlusBtn = document.getElementById("sizePlusBtn");
+    const sizePercent = document.getElementById("sizePercent");
+    const sizeResetBtn = document.getElementById("sizeResetBtn");
     const statusEl = document.getElementById("status");
     let loadedCanvases = [];
     let sourceCanvases = [];
@@ -989,6 +1065,10 @@
     let outputDirectory = null;
     let blackThreshold = 172;
     let sizeScale = 1;
+    const SIZE_SCALE_STORAGE_KEY = "pdf-converter-size-scales-v1";
+    const sizeScalePreferences = readSizeScalePreferences();
+    let sizeScaleSaveTimer = null;
+    let sizePreviewFrame = null;
     let orientationWorkerPromise = null;
     const blackCircleDiameters = { small: 0.018, medium: 0.028, large: 0.04 };
     const manualOrientationDirections = { merge: 0, care: 0, burden: 0, pencil: 0 };
@@ -1045,14 +1125,24 @@
       });
     });
 
-    sizeButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        sizeScale = Number(button.dataset.scale);
-        updateSizeButtons();
-        if (outputCanvases.length) showPreview();
-        saveModeState(currentDocType);
-      });
+    sizeRange.addEventListener("input", () => {
+      setSizeScalePercent(Number(sizeRange.value));
     });
+
+    sizeRange.addEventListener("change", () => {
+      saveModeState(currentDocType);
+      saveSizeScalePreferencesNow();
+    });
+
+    sizeResetBtn.addEventListener("click", () => {
+      setSizeScalePercent(100);
+      saveModeState(currentDocType);
+      saveSizeScalePreferencesNow();
+    });
+
+    bindSizeStepButton(sizeMinusBtn, -5);
+    bindSizeStepButton(sizePlusBtn, 5);
+    window.addEventListener("beforeunload", saveSizeScalePreferencesNow);
 
     pencilToolButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -1309,7 +1399,7 @@
     updateRotationButtons();
     updateControlsVisibility();
     updateContrastButtons();
-    updateSizeButtons();
+    updateSizeControl();
 
     ["dragenter", "dragover"].forEach((name) => {
       drop.addEventListener(name, (event) => {
@@ -1507,9 +1597,132 @@
       });
     }
 
-    function updateSizeButtons() {
-      sizeButtons.forEach((button) => {
-        button.classList.toggle("active", Number(button.dataset.scale) === sizeScale);
+    function readSizeScalePreferences() {
+      const preferences = { care: 100, burden: 100 };
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(SIZE_SCALE_STORAGE_KEY) || "{}");
+        Object.keys(preferences).forEach((type) => {
+          const percent = Number(saved[type]);
+          if (Number.isFinite(percent)) preferences[type] = Math.max(50, Math.min(150, Math.round(percent)));
+        });
+      } catch (error) {
+        console.warn("Failed to load saved document sizes.", error);
+      }
+      return preferences;
+    }
+
+    function saveSizeScalePreferences() {
+      if (sizeScaleSaveTimer !== null) window.clearTimeout(sizeScaleSaveTimer);
+      sizeScaleSaveTimer = window.setTimeout(saveSizeScalePreferencesNow, 220);
+    }
+
+    function saveSizeScalePreferencesNow() {
+      if (sizeScaleSaveTimer !== null) window.clearTimeout(sizeScaleSaveTimer);
+      sizeScaleSaveTimer = null;
+      try {
+        window.localStorage.setItem(SIZE_SCALE_STORAGE_KEY, JSON.stringify(sizeScalePreferences));
+      } catch (error) {
+        console.warn("Failed to save document sizes.", error);
+      }
+    }
+
+    function updateSizeControl() {
+      const maxPercent = maximumSizePercent(selectedPageSize());
+      const percent = Math.max(50, Math.min(maxPercent, Math.round(sizeScale * 100)));
+      sizeScale = percent / 100;
+      sizeRange.min = "50";
+      sizeRange.max = String(maxPercent);
+      sizeRange.value = String(percent);
+      sizePercent.textContent = `${percent}%`;
+      sizeMinusBtn.disabled = percent <= 50;
+      sizePlusBtn.disabled = percent >= maxPercent;
+      sizeResetBtn.disabled = percent === 100;
+    }
+
+    function setSizeScalePercent(percent) {
+      const boundedPercent = Math.max(50, Math.min(maximumSizePercent(selectedPageSize()), Math.round(percent)));
+      sizeScale = boundedPercent / 100;
+      const type = selectedDocType();
+      if (type === "care" || type === "burden") {
+        sizeScalePreferences[type] = boundedPercent;
+        if (modeStates[type]) modeStates[type].sizeScale = sizeScale;
+        saveSizeScalePreferences();
+      }
+      updateSizeControl();
+      scheduleSizePreviewUpdate();
+    }
+
+    function adjustSizeScalePercent(delta) {
+      const currentPercent = Math.round(sizeScale * 100);
+      const nextPercent = Math.max(50, Math.min(maximumSizePercent(selectedPageSize()), currentPercent + delta));
+      if (nextPercent === currentPercent) return false;
+      setSizeScalePercent(nextPercent);
+      return true;
+    }
+
+    function bindSizeStepButton(button, delta) {
+      let holdTimer = null;
+      let repeatTimer = null;
+      let pointerHeld = false;
+      let longPressRepeated = false;
+      let longPressSaved = false;
+
+      const stopHolding = (cancelled = false) => {
+        if (holdTimer !== null) window.clearTimeout(holdTimer);
+        if (repeatTimer !== null) window.clearInterval(repeatTimer);
+        holdTimer = null;
+        repeatTimer = null;
+        pointerHeld = false;
+        if (longPressRepeated && !longPressSaved) {
+          saveModeState(currentDocType);
+          saveSizeScalePreferencesNow();
+          longPressSaved = true;
+        }
+        if (cancelled) {
+          longPressRepeated = false;
+          longPressSaved = false;
+        }
+      };
+
+      button.addEventListener("pointerdown", (event) => {
+        if (event.button !== undefined && event.button !== 0) return;
+        pointerHeld = true;
+        longPressRepeated = false;
+        longPressSaved = false;
+        try {
+          button.setPointerCapture(event.pointerId);
+        } catch {}
+        holdTimer = window.setTimeout(() => {
+          longPressRepeated = true;
+          adjustSizeScalePercent(delta);
+          repeatTimer = window.setInterval(() => {
+            if (!adjustSizeScalePercent(delta)) stopHolding();
+          }, 90);
+        }, 360);
+      });
+
+      button.addEventListener("pointerup", () => stopHolding());
+      button.addEventListener("pointercancel", () => stopHolding(true));
+      button.addEventListener("lostpointercapture", () => stopHolding());
+      button.addEventListener("click", () => {
+        if (longPressRepeated) {
+          longPressRepeated = false;
+          longPressSaved = false;
+          return;
+        }
+        if (pointerHeld) return;
+        if (adjustSizeScalePercent(delta)) {
+          saveModeState(currentDocType);
+          saveSizeScalePreferencesNow();
+        }
+      });
+    }
+
+    function scheduleSizePreviewUpdate() {
+      if (sizePreviewFrame !== null) return;
+      sizePreviewFrame = requestAnimationFrame(() => {
+        sizePreviewFrame = null;
+        updatePreviewSize();
       });
     }
 
@@ -1622,9 +1835,19 @@
       pencilOcrMode = false;
       pencilOcrDraft = null;
       blackThreshold = state.blackThreshold;
-      sizeScale = state.sizeScale;
+      if (type === "care" || type === "burden") {
+        const savedPercent = sizeScalePreferences[type];
+        const boundedPercent = Math.max(50, Math.min(maximumSizePercent(selectedPageSize()), savedPercent));
+        sizeScale = boundedPercent / 100;
+        sizeScalePreferences[type] = boundedPercent;
+        if (boundedPercent !== savedPercent) saveSizeScalePreferencesNow();
+      } else {
+        const savedPercent = Math.round((state.sizeScale || 1) * 100);
+        sizeScale = Math.max(50, Math.min(maximumSizePercent(selectedPageSize()), savedPercent)) / 100;
+      }
+      modeStates[type].sizeScale = sizeScale;
       updateContrastButtons();
-      updateSizeButtons();
+      updateSizeControl();
       updateRotationButtons();
       const hasOutput = isMergeMode() ? mergeFiles.length : outputCanvases.length;
       setActionButtonsDisabled(!hasOutput);
@@ -2009,6 +2232,17 @@
       drop.classList.toggle("merge-preview", isMergeMode());
       drop.classList.remove("pencil-preview");
       drop.appendChild(buildPreviewSheet(canvas));
+    }
+
+    function updatePreviewSize() {
+      if (isMergeMode() || isPencilMode()) return;
+      const preview = drop.querySelector(".sheet canvas");
+      if (!preview) return;
+      const page = selectedPageSize();
+      const box = largePlacementBox(page);
+      const fitted = fitWithin(preview.width, preview.height, box.wMm, box.hMm);
+      preview.style.width = `${(fitted.wMm / page.wMm) * 100}%`;
+      preview.style.height = `${(fitted.hMm / page.hMm) * 100}%`;
     }
 
     function clonePencilAnnotations(annotations) {
@@ -2993,16 +3227,27 @@
       return A4;
     }
 
-    function largePlacementBox(page) {
-      const scaleBox = (box) => ({
-        wMm: Math.min(page.wMm - 2, box.wMm * sizeScale),
-        hMm: Math.min(page.hMm - 2, box.hMm * sizeScale)
-      });
+    function basePlacementBox(page) {
       if (page.wMm < page.hMm) {
-        return scaleBox({ wMm: 120, hMm: 170 });
+        return { wMm: 120, hMm: 170 };
       }
       const margin = 10;
-      return scaleBox({ wMm: page.wMm - margin * 2, hMm: page.hMm - margin * 2 });
+      return { wMm: page.wMm - margin * 2, hMm: page.hMm - margin * 2 };
+    }
+
+    function maximumSizePercent(page) {
+      const base = basePlacementBox(page);
+      const maxWidthScale = (page.wMm - 2) / base.wMm;
+      const maxHeightScale = (page.hMm - 2) / base.hMm;
+      return Math.max(100, Math.min(150, Math.floor(Math.min(maxWidthScale, maxHeightScale) * 100)));
+    }
+
+    function largePlacementBox(page) {
+      const base = basePlacementBox(page);
+      return {
+        wMm: Math.min(page.wMm - 2, base.wMm * sizeScale),
+        hMm: Math.min(page.hMm - 2, base.hMm * sizeScale)
+      };
     }
 
     function objectsToPdfBlob(objects) {

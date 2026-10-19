@@ -46,7 +46,7 @@ export function AppCard({ app, isReordering = false, isSelectedForSwap = false, 
         </button>
       ) : (
         <div className="app-card-actions">
-          <a className={`button ${isAdjusting ? 'disabled adjustment-link' : 'primary'}`} href={createAppAccessUrl(app.url)} aria-label={`${app.name}を開く${isAdjusting ? '（調整中）' : ''}`}>
+          <a className={`button ${isAdjusting ? 'disabled adjustment-link' : 'primary'}`} href={createAppAccessUrl(app.url)} target="_blank" rel="noopener noreferrer" aria-label={`${app.name}を開く${isAdjusting ? '（調整中）' : ''}`}>
             {isAdjusting ? '調整中' : 'このアプリを開く'}
           </a>
           {app.installUrl ? (

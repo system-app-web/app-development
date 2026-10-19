@@ -3234,26 +3234,28 @@ window.addEventListener("pointermove", (event) => {
     let top = resizeState.origY;
     let right = resizeState.origX + resizeState.origW;
     let bottom = resizeState.origY + resizeState.origH;
-    let deltaX = event.clientX - resizeState.startX;
-    let deltaY = event.clientY - resizeState.startY;
-    if (isItem && room.rotation % 360) {
-      const radians = -room.rotation * Math.PI / 180;
-      const rotatedX = deltaX * Math.cos(radians) - deltaY * Math.sin(radians);
-      const rotatedY = deltaX * Math.sin(radians) + deltaY * Math.cos(radians);
-      deltaX = rotatedX;
-      deltaY = rotatedY;
-    }
-    const pointerX = resizeState.origX + deltaX * scaleX;
-    const pointerY = resizeState.origY + deltaY * scaleY;
-
     if (isItem) {
+      let deltaX = (event.clientX - resizeState.startX) * scaleX;
+      let deltaY = (event.clientY - resizeState.startY) * scaleY;
+      if (room.rotation % 360) {
+        const radians = room.rotation * Math.PI / 180;
+        const displayScaleX = svg.clientWidth / 1200;
+        const displayScaleY = svg.clientHeight / 800;
+        const cosine = Math.cos(radians);
+        const sine = Math.sin(radians);
+        const localX = cosine * deltaX + sine * (displayScaleY / displayScaleX) * deltaY;
+        const localY = -sine * (displayScaleX / displayScaleY) * deltaX + cosine * deltaY;
+        deltaX = localX;
+        deltaY = localY;
+      }
       const fixedX = resizeState.corner.includes("w") ? resizeState.origX + resizeState.origW : resizeState.origX;
       const fixedY = resizeState.corner.includes("n") ? resizeState.origY + resizeState.origH : resizeState.origY;
-      const proposedWidth = resizeState.origW + (resizeState.corner.includes("w") ? -1 : 1) * deltaX * scaleX;
-      const proposedHeight = resizeState.origH + (resizeState.corner.includes("n") ? -1 : 1) * deltaY * scaleY;
-      const widthScale = proposedWidth / resizeState.origW;
-      const heightScale = proposedHeight / resizeState.origH;
-      const requestedScale = Math.abs(widthScale - 1) >= Math.abs(heightScale - 1) ? widthScale : heightScale;
+      const directionX = resizeState.corner.includes("w") ? -1 : 1;
+      const directionY = resizeState.corner.includes("n") ? -1 : 1;
+      const originalDiagonalSquared = resizeState.origW ** 2 + resizeState.origH ** 2;
+      const requestedScale = 1 + (
+        directionX * deltaX * resizeState.origW + directionY * deltaY * resizeState.origH
+      ) / originalDiagonalSquared;
       const minScale = Math.max(minW / resizeState.origW, minH / resizeState.origH);
       const maxWidth = resizeState.corner.includes("w") ? fixedX : 1200 - fixedX;
       const maxHeight = resizeState.corner.includes("n") ? fixedY : 800 - fixedY;
@@ -3268,6 +3270,8 @@ window.addEventListener("pointermove", (event) => {
       return;
     }
 
+    const pointerX = resizeState.origX + (event.clientX - resizeState.startX) * scaleX;
+    const pointerY = resizeState.origY + (event.clientY - resizeState.startY) * scaleY;
     const nextX = snapToGrid(pointerX, "x");
     const nextY = snapToGrid(pointerY, "y");
     if (resizeState.corner.includes("w")) left = Math.max(0, Math.min(right - minW, nextX));

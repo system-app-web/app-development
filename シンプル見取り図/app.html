@@ -553,6 +553,9 @@ h1 {
   text-align: center;
   white-space: nowrap;
 }
+.item-preview-label.two-line {
+  white-space: pre-line;
+}
 .floor-plan-icon {
   position: relative;
   display: block;
@@ -777,7 +780,7 @@ const itemCatalog = {
   bedRails: rasterItem("ベッド", "bedRails", "bed-rails.png", 636 / 944, { longestSide: 5.6 }),
   bedSimple: rasterItem("布団", "bedSimple", "bed-simple.png", 515 / 880, { longestSide: 5.6 }),
   toiletModern: rasterItem("トイレ", "toiletModern", "toilet-modern.png", 584 / 873, { longestSide: 2.5 }),
-  portableToilet: rasterItem("ポータブルトイレ", "portableToilet", "portable-toilet.png", 1, { longestSide: 2.5 }),
+  portableToilet: rasterItem("ポータブルトイレ", "portableToilet", "portable-toilet.png", 1, { longestSide: 2.5, paletteViewBox: "12 7 46 55" }),
   urinal: rasterItem("和式トイレ", "urinal", "urinal.png", 206 / 320, { longestSide: 2.5 }),
   washbasinModern: rasterItem("洗面台", "washbasinModern", "washbasin-modern.png", 700 / 511, { longestSide: 2.5 }),
   bathRectangleImage: rasterItem("長方形浴槽", "bathRectangleImage", "bath-rectangle.png", 756 / 430, { longestSide: 3.8 }),
@@ -1426,7 +1429,7 @@ function createPaletteItemButton(mode, item) {
   button.addEventListener("click", () => addCanvasItem(mode));
 
   const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  preview.setAttribute("viewBox", `0 0 ${item.w} ${item.h}`);
+  preview.setAttribute("viewBox", item.paletteViewBox || `0 0 ${item.w} ${item.h}`);
   preview.setAttribute("aria-hidden", "true");
   const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
   group.dataset.palettePreview = "true";
@@ -1438,7 +1441,8 @@ function createPaletteItemButton(mode, item) {
 
   const label = document.createElement("span");
   label.className = "item-preview-label";
-  label.textContent = itemPaletteLabels[mode] || item.name;
+  label.textContent = mode === "portableToilet" ? "ポータブル\nトイレ" : itemPaletteLabels[mode] || item.name;
+  if (mode === "portableToilet") label.classList.add("two-line");
   button.append(preview, label);
   return button;
 }

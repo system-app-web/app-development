@@ -1458,6 +1458,9 @@ select.modal-input {
 }
 .confirm-btn.ok { background: #3a9e20; color: white; }
 .confirm-btn.cancel { background: #f1f5f9; color: #64748b; }
+.confirm-btn.delete-future { background: #fee2e2; color: #b91c1c; }
+.confirm-btns.office-delete-confirm { flex-direction: column; }
+.confirm-btns.office-delete-confirm .confirm-btn { width: 100%; flex: none; }
 
 /* Increase readability only when a desktop window occupies most of the screen. */
 html.desktop-wide-view .app-name { font-size: 22px; }
@@ -1609,9 +1612,10 @@ html.desktop-wide-view .seho-label { font-size: 12px; }
   <div class="confirm-box">
     <div class="confirm-title" id="cf-title"></div>
     <div class="confirm-msg" id="cf-msg"></div>
-    <div class="confirm-btns">
-      <button class="confirm-btn cancel" onclick="closeConfirm()">キャンセル</button>
+    <div class="confirm-btns" id="confirm-btns">
+      <button class="confirm-btn cancel" id="cf-cancel" onclick="closeConfirm()">キャンセル</button>
       <button class="confirm-btn ok" id="cf-ok">OK</button>
+      <button class="confirm-btn delete-future" id="cf-delete-future" hidden>この月以降も削除</button>
     </div>
   </div>
 </div>
@@ -2632,6 +2636,9 @@ function saveMonthData(y, m, data, options = {}) {
   if (options.syncFutureProfileFields) {
     syncFutureProfileFields(all, monthKey(y, m), all[monthKey(y, m)]);
   }
+  if (options.syncFutureFaxOffices) {
+    syncFutureFaxOffices(all, monthKey(y, m), all[monthKey(y, m)]);
+  }
   saveAll(all);
   updateUndoButton();
 }
@@ -2687,6 +2694,35 @@ function syncFutureProfileFields(all, sourceKey, sourceList) {
         });
         return updated;
       });
+    });
+}
+
+// Share office names and additions forward without copying or shifting checks.
+function syncFutureFaxOffices(all, sourceKey, sourceList) {
+  Object.keys(all)
+    .filter(key => key > sourceKey && Array.isArray(all[key]))
+    .sort()
+    .forEach(key => {
+      const futureList = dedupeClients(all[key]);
+      sourceList.forEach(source => {
+        const future = matchingClientInList(futureList, source);
+        if (!future) return;
+        const sourceOffices = normalizeFaxOffices(source.faxOffices);
+        const futureOffices = normalizeFaxOffices(future.faxOffices);
+        const sourceById = new Map(sourceOffices.map(office => [office.id, office]));
+        const futureIds = new Set(futureOffices.map(office => office.id));
+        future.faxOffices = futureOffices.map(office => {
+          const sourceOffice = sourceById.get(office.id);
+          return sourceOffice ? { ...office, name: sourceOffice.name } : office;
+        });
+        sourceOffices.forEach(office => {
+          if (!futureIds.has(office.id)) {
+            future.faxOffices.push({ ...office, checked: false });
+          }
+        });
+        syncFaxDone(future);
+      });
+      all[key] = futureList;
     });
 }
 
@@ -2946,18 +2982,19 @@ function openFaxOfficeChecklist(i) {
     `<div class="office-check-list">${rows}</div>
      <div class="office-modal-actions">
        <button class="mact green" onclick="openFaxOfficeAdd()">事業所追加</button>
+       <button class="mact green" onclick="importPreviousFaxOffices()">前月の事業所を取り込む</button>
        <button class="mact green" onclick="closeModal();render();">OK</button>
      </div>`
   );
   document.getElementById('modal').classList.add('fax-office-picker');
 }
 
-function saveFaxOfficeState() {
+function saveFaxOfficeState(options = {}) {
   const item = currentData[modalIndex];
   if (!item) return;
   item.faxOffices = normalizeFaxOffices(item.faxOffices);
   syncFaxDone(item);
-  saveMonthData(curYear, curMonth, currentData);
+  saveMonthData(curYear, curMonth, currentData, options);
 }
 
 function toggleFaxOffice(id) {
@@ -2989,6 +3026,30 @@ function saveFaxOfficeAdd() {
   }
   const item = currentData[modalIndex];
   item.faxOffices = [...normalizeFaxOffices(item.faxOffices), { id: makeOfficeId(), name, checked: false }];
+  saveFaxOfficeState({ syncFutureFaxOffices: true });
+  openFaxOfficeChecklist(modalIndex);
+}
+
+function importPreviousFaxOffices() {
+  const item = currentData[modalIndex];
+  if (!item) return;
+  const all = loadAll();
+  const previousKey = curMonth === 1 ? monthKey(curYear - 1, 12) : monthKey(curYear, curMonth - 1);
+  const previousList = all[previousKey];
+  const previousItem = Array.isArray(previousList) ? matchingClientInList(previousList, item) : null;
+  if (!previousItem) {
+    alert('前月の事業所データがありません');
+    return;
+  }
+  const existingIds = new Set(normalizeFaxOffices(item.faxOffices).map(office => office.id));
+  const missing = normalizeFaxOffices(previousItem.faxOffices)
+    .filter(office => !existingIds.has(office.id))
+    .map(office => ({ ...office, checked: false }));
+  if (missing.length === 0) {
+    alert('取り込める事業所はありません');
+    return;
+  }
+  item.faxOffices = [...normalizeFaxOffices(item.faxOffices), ...missing];
   saveFaxOfficeState();
   openFaxOfficeChecklist(modalIndex);
 }
@@ -3020,15 +3081,35 @@ function saveFaxOfficeEdit(id) {
   item.faxOffices = normalizeFaxOffices(item.faxOffices).map(office =>
     office.id === id ? { ...office, name } : office
   );
-  saveFaxOfficeState();
+  saveFaxOfficeState({ syncFutureFaxOffices: true });
   openFaxOfficeChecklist(modalIndex);
 }
 
-function deleteFaxOffice(id) {
+function deleteFaxOffice(id, includeFuture = false) {
   const item = currentData[modalIndex];
   if (!item) return;
-  item.faxOffices = normalizeFaxOffices(item.faxOffices).filter(office => office.id !== id);
-  saveFaxOfficeState();
+  if (includeFuture) {
+    const all = loadAll();
+    const currentKey = monthKey(curYear, curMonth);
+    saveUndoSnapshot(all);
+    Object.keys(all)
+      .filter(key => key >= currentKey && Array.isArray(all[key]))
+      .sort()
+      .forEach(key => {
+        const monthList = key === currentKey ? currentData : dedupeClients(all[key]);
+        const target = matchingClientInList(monthList, item);
+        if (!target) return;
+        target.faxOffices = normalizeFaxOffices(target.faxOffices).filter(office => office.id !== id);
+        syncFaxDone(target);
+        all[key] = key === currentKey ? sortClientsByName(dedupeClients(monthList)) : monthList;
+      });
+    currentData = all[currentKey];
+    saveAll(all);
+    updateUndoButton();
+  } else {
+    item.faxOffices = normalizeFaxOffices(item.faxOffices).filter(office => office.id !== id);
+    saveFaxOfficeState();
+  }
   render();
   openFaxOfficeChecklist(modalIndex);
 }
@@ -3038,10 +3119,20 @@ function confirmDeleteFaxOffice(id) {
   const office = normalizeFaxOffices(item?.faxOffices).find(entry => entry.id === id);
   if (!office) return;
   document.getElementById('cf-title').textContent = '事業所を削除';
-  document.getElementById('cf-msg').textContent = `${office.name} を削除しますか？`;
+  document.getElementById('cf-msg').textContent = `${office.name} をどの範囲から削除しますか？`;
+  const buttons = document.getElementById('confirm-btns');
+  const currentButton = document.getElementById('cf-ok');
+  const futureButton = document.getElementById('cf-delete-future');
+  currentButton.textContent = 'この月だけ削除';
+  futureButton.hidden = false;
+  buttons.classList.add('office-delete-confirm');
   document.getElementById('cf-ok').onclick = () => {
     closeConfirm();
     deleteFaxOffice(id);
+  };
+  futureButton.onclick = () => {
+    closeConfirm();
+    deleteFaxOffice(id, true);
   };
   document.getElementById('confirm').classList.add('show');
 }
@@ -4452,6 +4543,9 @@ function confirmDelete(i) {
 
 function closeConfirm() {
   document.getElementById('confirm').classList.remove('show');
+  document.getElementById('cf-ok').textContent = 'OK';
+  document.getElementById('cf-delete-future').hidden = true;
+  document.getElementById('confirm-btns').classList.remove('office-delete-confirm');
 }
 
 function makePdfFileName() {

@@ -9,7 +9,7 @@ import { requestGeminiSuggestion } from './gemini-service';
 const app = document.querySelector<HTMLDivElement>('#app')!;
 let result: AnalysisResult | undefined;
 let busy = false;
-let deletingMasterNumber: string | undefined;
+let deletingMasterId: string | undefined;
 let masterActionError = '';
 let deliveryMethodEditorOpen = false;
 let deliveryMethodDraft: DeliveryMethodOption[] = [];
@@ -37,9 +37,60 @@ const groupStatus = (group: SlipGroup, singleFolderExport = false) => {
   return group.needsReview && !group.reviewed ? '要確認' : '確認済み';
 };
 const download = (bytes: BlobPart, name: string) => { const url = URL.createObjectURL(new Blob([bytes])); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
-const masterFor = (group: SlipGroup) => savedData.providerMaster.find((entry) => entry.providerNumber === group.providerNumber);
+const normalizeProviderNumber = (value: string) => value.normalize('NFKC').trim();
+const providerPairKey = (number: string, name: string) => JSON.stringify([normalizeProviderNumber(number), normalizedProviderName(name)]);
+function findProviderMaster(providerNumber: string, providerName: string) {
+  const numberKey = normalizeProviderNumber(providerNumber);
+  if (!numberKey) return undefined;
+  const candidates = savedData.providerMaster.filter((entry) => normalizeProviderNumber(entry.providerNumber) === numberKey);
+  const nameKey = normalizedProviderName(providerName);
+  const exact = candidates.filter((entry) => normalizedProviderName(entry.providerName) === nameKey);
+  if (exact.length === 1) return exact[0];
+  const unnamed = candidates.filter((entry) => !normalizedProviderName(entry.providerName));
+  if (nameKey && candidates.length === 1 && unnamed.length === 1) return unnamed[0];
+  return undefined;
+}
+const masterFor = (group: SlipGroup) => findProviderMaster(group.providerNumber, group.providerName);
+const providerMatchKeyFor = (group: SlipGroup) => {
+  const master = masterFor(group);
+  if (master?.id) return master.id;
+  if (group.providerNumber) return providerPairKey(group.providerNumber, group.providerName);
+  const name = normalizedProviderName(group.providerName);
+  return name ? `name:${name}` : `group:${group.id}`;
+};
+const createProviderMasterEntry = (providerNumber: string, providerName: string): ProviderMasterEntry => ({ id: crypto.randomUUID(), providerNumber, providerName, deliveryMethod: '', updatedAt: new Date().toISOString() });
 const providerNameFor = (group: SlipGroup) => masterFor(group)?.providerName.trim() || group.providerName.trim();
 const destinationFor = (group: SlipGroup) => masterFor(group)?.deliveryMethod || '要確認';
+function normalizeProviderMaster(data: AppSavedData, preferredId?: string) {
+  const entriesByPair = new Map<string, { entry: ProviderMasterEntry; deliveryMethods: Set<string> }>();
+  let merged = 0;
+  let changed = false;
+  for (const entry of data.providerMaster) {
+    const key = providerPairKey(entry.providerNumber, entry.providerName);
+    const existing = entriesByPair.get(key);
+    if (existing) {
+      if (entry.id === preferredId) existing.entry.id = preferredId;
+      existing.deliveryMethods.add(entry.deliveryMethod);
+      if (!existing.entry.providerName.trim() && entry.providerName.trim()) existing.entry.providerName = entry.providerName;
+      if (entry.updatedAt > existing.entry.updatedAt) existing.entry.updatedAt = entry.updatedAt;
+      merged++;
+      changed = true;
+    } else entriesByPair.set(key, { entry: { ...entry }, deliveryMethods: new Set([entry.deliveryMethod]) });
+  }
+  const usedIds = new Set<string>();
+  data.providerMaster = [...entriesByPair.values()].map(({ entry, deliveryMethods }) => {
+    const configuredMethods = [...deliveryMethods].filter(Boolean);
+    entry.deliveryMethod = configuredMethods.length === 1 ? configuredMethods[0] : '';
+    if (configuredMethods.length > 1) changed = true;
+    if (!entry.id || usedIds.has(entry.id)) {
+      entry.id = crypto.randomUUID();
+      changed = true;
+    }
+    usedIds.add(entry.id);
+    return entry;
+  });
+  return { changed, merged };
+}
 function initializeProviderMasterOrder(data: AppSavedData) {
   if (data.providerMasterOrderInitialized) return false;
   data.providerMaster = [
@@ -89,7 +140,7 @@ function clientOfficeEntries(entry: ReturnType<typeof clientEntries>[number]) {
     const name = providerNameFor(group) || '事業所名未判定';
     const providerNumber = group.providerNumber.trim();
     const normalizedName = normalizedProviderName(name);
-    const key = providerNumber ? `number:${providerNumber}` : normalizedName ? `name:${normalizedName}` : `group:${group.id}`;
+    const key = providerMatchKeyFor(group) || (providerNumber ? `number:${providerNumber}` : normalizedName ? `name:${normalizedName}` : `group:${group.id}`);
     const office = offices.get(key) ?? { key, name, groups: [] };
     office.groups.push(group);
     if (name.localeCompare(office.name, 'ja') < 0) office.name = name;
@@ -230,7 +281,7 @@ function renderView() {
   const active = document.activeElement;
   const focusTarget = active instanceof HTMLInputElement || active instanceof HTMLSelectElement
     ? {
-        masterNumber: active.closest<HTMLTableRowElement>('tr[data-master]')?.dataset.master,
+        masterId: active.closest<HTMLTableRowElement>('tr[data-master]')?.dataset.master,
         masterField: active.dataset.masterField,
         groupId: active.closest<HTMLTableRowElement>('tr[data-id]')?.dataset.id,
         groupField: active.dataset.field,
@@ -239,28 +290,30 @@ function renderView() {
   const groups = result?.groups ?? [];
   const assigned = new Set(groups.flatMap((group) => group.pages.map((page) => `${page.sourceId}:${page.pageIndex}`))).size;
   const activeGroups = groups.filter((group) => !isStoppedGroup(group));
-  const masterSetupProviderNumbers = new Set(activeGroups.filter((group) => group.providerNumber && !masterFor(group)?.deliveryMethod).map((group) => group.providerNumber));
-  const masterSetupCount = masterSetupProviderNumbers.size;
+  const masterSetupKeys = new Set(activeGroups.filter((group) => group.providerNumber && !masterFor(group)?.deliveryMethod).map(providerMatchKeyFor));
+  const masterSetupCount = masterSetupKeys.size;
   if (!masterSetupCount) singleFolderExportChecked = false;
   const singleFolderExport = singleFolderExportChecked && masterSetupCount > 0;
   const reviewKeys = new Set<string>();
   groups.forEach((group) => {
     const stopped = isStoppedGroup(group);
-    const masterRouteMissing = Boolean(group.providerNumber && masterSetupProviderNumbers.has(group.providerNumber));
+    const masterKey = providerMatchKeyFor(group);
+    const masterRouteMissing = Boolean(group.providerNumber && masterSetupKeys.has(masterKey));
     if (group.needsReview && !group.reviewed) {
       if (stopped) {
         const hasOtherReview = group.issues.some((issue) => issue !== deliveryMethodIssue)
           || !group.clientName.trim() || !providerNameFor(group) || !group.serviceMonth.trim();
         if (hasOtherReview) reviewKeys.add(`group:${group.id}`);
       } else if (masterRouteMissing) {
-        if (!singleFolderExport) reviewKeys.add(`master:${group.providerNumber}`);
+        if (!singleFolderExport) reviewKeys.add(`master:${masterKey}`);
         if (group.issues.some((issue) => issue !== '送付方法が未設定です') || !group.clientName.trim() || !providerNameFor(group) || !group.serviceMonth.trim()) reviewKeys.add(`group:${group.id}`);
       } else reviewKeys.add(`group:${group.id}`);
     }
   });
-  if (!singleFolderExport) masterSetupProviderNumbers.forEach((number) => reviewKeys.add(`master:${number}`));
+  if (!singleFolderExport) masterSetupKeys.forEach((key) => reviewKeys.add(`master:${key}`));
   else activeGroups.forEach((group) => {
-    if (!group.providerNumber || !masterSetupProviderNumbers.has(group.providerNumber)) return;
+    const masterKey = providerMatchKeyFor(group);
+    if (!group.providerNumber || !masterSetupKeys.has(masterKey)) return;
     const hasOtherReview = group.issues.some((issue) => issue !== deliveryMethodIssue)
       || !group.clientName.trim() || !providerNameFor(group) || !group.serviceMonth.trim();
     if (!hasOtherReview) reviewKeys.delete(`group:${group.id}`);
@@ -309,9 +362,9 @@ function renderView() {
         if (area) { area.scrollTop = top; area.scrollLeft = left; }
       });
       let nextFocus: HTMLInputElement | HTMLSelectElement | undefined;
-      if (focusTarget?.masterNumber && focusTarget.masterField) {
+      if (focusTarget?.masterId && focusTarget.masterField) {
         nextFocus = Array.from(document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-master-field]'))
-          .find((field) => field.closest<HTMLTableRowElement>('tr[data-master]')?.dataset.master === focusTarget.masterNumber && field.dataset.masterField === focusTarget.masterField);
+          .find((field) => field.closest<HTMLTableRowElement>('tr[data-master]')?.dataset.master === focusTarget.masterId && field.dataset.masterField === focusTarget.masterField);
       } else if (focusTarget?.groupId && focusTarget.groupField) {
         nextFocus = Array.from(document.querySelectorAll<HTMLInputElement>('[data-field]'))
           .find((field) => field.closest<HTMLTableRowElement>('tr[data-id]')?.dataset.id === focusTarget.groupId && field.dataset.field === focusTarget.groupField);
@@ -371,7 +424,7 @@ function masterArea(singleFolderExport: boolean) {
   return foldSection('master', '事業所マスタ', `${needsSetup ? `要設定 ${needsSetup}件 · ` : ''}登録 ${entries.length}件`, `<div class="section-head master-head"><div><h2>事業所番号と振り分け先・送付方法</h2></div><div class="backup-buttons"><button class="quiet" data-action="edit-delivery-methods">送付方法項目編集</button><button class="quiet" data-action="backup">バックアップ</button><button class="quiet" data-action="import">データ挿入</button><input id="backupInput" type="file" accept="application/json,.json" hidden></div></div>
     ${needsSetup ? `<div class="master-alert" role="status"><strong>${needsRoute ? '振り分け先を選択してください' : '事業所名を入力してください'}</strong><span>${singleFolderExport && needsRoute ? '今回の一括保存では送付方法を使いません。事業所名など、ほかの不足情報は通常どおり確認してください。' : needsRoute ? '赤色の欄を設定しないとダウンロードできません。' : '色の付いた欄を確認してください。'}</span></div>` : ''}
     ${masterActionError ? `<div class="master-operation-error" role="alert">${escapeHtml(masterActionError)}</div>` : ''}
-    ${entries.length ? `<div class="table-wrap master-table" data-scroll-area="master"><table><thead><tr><th>10桁の事業所番号</th><th>事業所名（略称可）</th><th>振り分け先・送付方法</th><th></th></tr></thead><tbody>${entries.map((entry) => { const missingName = !entry.providerName.trim(); const missingRoute = !entry.deliveryMethod; const state = missingName ? 'needs-name' : missingRoute ? 'needs-route' : 'registered'; const label = missingName ? (missingRoute ? '名称・振り分け先を入力' : '事業所名を入力') : missingRoute ? '振り分け先を選択' : '登録済み'; const isDeleting = deletingMasterNumber === entry.providerNumber; return `<tr data-master="${escapeHtml(entry.providerNumber)}" class="master-${state}"><td>${escapeHtml(entry.providerNumber)}<small class="master-status ${state}">${label}</small></td><td><input data-master-field="providerName" value="${escapeHtml(entry.providerName)}"></td><td><select data-master-field="deliveryMethod" class="${missingRoute ? 'master-route-unset' : ''}"><option value="" ${entry.deliveryMethod === '' ? 'selected' : ''}>未設定（要確認）</option>${deliveryMethodOptions().map((method) => `<option value="${escapeHtml(method.value)}" ${entry.deliveryMethod === method.value ? 'selected' : ''}>${escapeHtml(method.name)}</option>`).join('')}</select></td><td><button class="quiet master-delete-button" data-action="delete-master" data-number="${escapeHtml(entry.providerNumber)}" ${deletingMasterNumber ? 'disabled' : ''}>${isDeleting ? '<i class="progress-spinner small" aria-hidden="true"></i>削除中…' : '削除'}</button></td></tr>`; }).join('')}</tbody></table></div>` : `<p class="empty-master">PDFを解析すると、新しい事業所番号がここに追加されます。送付方法が未設定の書類は必ず「要確認」になります。</p>`}
+    ${entries.length ? `<div class="table-wrap master-table" data-scroll-area="master"><table><thead><tr><th>10桁の事業所番号</th><th>事業所名（略称可）</th><th>振り分け先・送付方法</th><th></th></tr></thead><tbody>${entries.map((entry) => { const missingName = !entry.providerName.trim(); const missingRoute = !entry.deliveryMethod; const state = missingName ? 'needs-name' : missingRoute ? 'needs-route' : 'registered'; const label = missingName ? (missingRoute ? '名称・振り分け先を入力' : '事業所名を入力') : missingRoute ? '振り分け先を選択' : '登録済み'; const isDeleting = deletingMasterId === entry.id; return `<tr data-master="${escapeHtml(entry.id || '')}" class="master-${state}"><td>${escapeHtml(entry.providerNumber)}<small class="master-status ${state}">${label}</small></td><td><input data-master-field="providerName" value="${escapeHtml(entry.providerName)}"></td><td><select data-master-field="deliveryMethod" class="${missingRoute ? 'master-route-unset' : ''}"><option value="" ${entry.deliveryMethod === '' ? 'selected' : ''}>未設定（要確認）</option>${deliveryMethodOptions().map((method) => `<option value="${escapeHtml(method.value)}" ${entry.deliveryMethod === method.value ? 'selected' : ''}>${escapeHtml(method.name)}</option>`).join('')}</select></td><td><button class="quiet master-delete-button" data-action="delete-master" data-id="${escapeHtml(entry.id || '')}" ${deletingMasterId ? 'disabled' : ''}>${isDeleting ? '<i class="progress-spinner small" aria-hidden="true"></i>削除中…' : '削除'}</button></td></tr>`; }).join('')}</tbody></table></div>` : `<p class="empty-master">PDFを解析すると、新しい事業所番号がここに追加されます。送付方法が未設定の書類は必ず「要確認」になります。</p>`}
   `, true);
 }
 
@@ -392,7 +445,7 @@ function deliveryMethodEditor() {
 function summaryArea(groups: SlipGroup[], reviewCount: number) {
   const userCount = clientEntries(groups).length;
   const officeCount = new Set(groups.map((group) => {
-    if (group.providerNumber.trim()) return `number:${group.providerNumber.trim()}`;
+    if (group.providerNumber.trim()) return providerMatchKeyFor(group);
     const providerName = normalizedProviderName(group.providerName);
     return providerName ? `name:${providerName}` : '';
   }).filter(Boolean)).size;
@@ -648,8 +701,9 @@ function bindEvents() {
   document.querySelector('[data-action="go-master"]')?.addEventListener('click', () => {
     const missingEntries = new Map<string, ProviderMasterEntry>();
     result?.groups.filter((group) => !isStoppedGroup(group)).forEach((group) => {
-      if (group.providerNumber && !savedData.providerMaster.some((entry) => entry.providerNumber === group.providerNumber) && !missingEntries.has(group.providerNumber)) {
-        missingEntries.set(group.providerNumber, { providerNumber: group.providerNumber, providerName: group.providerName, deliveryMethod: '', updatedAt: new Date().toISOString() });
+      const key = providerPairKey(group.providerNumber, group.providerName);
+      if (group.providerNumber && !masterFor(group) && !missingEntries.has(key)) {
+        missingEntries.set(key, createProviderMasterEntry(group.providerNumber, group.providerName));
       }
     });
     if (missingEntries.size) {
@@ -672,46 +726,50 @@ function bindEvents() {
   document.querySelector('[data-action="import"]')?.addEventListener('click', () => document.querySelector<HTMLInputElement>('#backupInput')?.click());
   document.querySelector<HTMLInputElement>('#backupInput')?.addEventListener('change', async (event) => {
     const file = event.target.files?.[0]; if (!file) return;
-    try { savedData = await importSavedData(file); initializeProviderMasterOrder(savedData); persist(); render(); alert('バックアップを読み込みました。'); }
+    try {
+      savedData = await importSavedData(file);
+      const normalized = normalizeProviderMaster(savedData);
+      initializeProviderMasterOrder(savedData);
+      persist(); render();
+      alert(normalized.merged ? `バックアップを読み込みました。事業所番号と名称が一致する重複を${normalized.merged}件まとめました。` : 'バックアップを読み込みました。');
+    }
     catch (error) { alert(error instanceof Error ? error.message : 'バックアップを読み込めませんでした。'); }
   });
   document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-master-field]').forEach((input) => input.addEventListener('change', () => {
-    const number = input.closest('tr')?.dataset.master; const entry = savedData.providerMaster.find((item) => item.providerNumber === number); if (!entry) return;
-    entry[input.dataset.masterField as 'providerName' | 'deliveryMethod'] = input.value as never; entry.updatedAt = new Date().toISOString(); persist(); refreshRoutingSafety();
+    const id = input.closest('tr')?.dataset.master; const entry = savedData.providerMaster.find((item) => item.id === id); if (!entry) return;
+    entry[input.dataset.masterField as 'providerName' | 'deliveryMethod'] = input.value as never;
+    entry.updatedAt = new Date().toISOString();
+    const normalized = normalizeProviderMaster(savedData, id);
+    persist(); refreshRoutingSafety();
     render();
+    if (normalized.merged) alert('事業所番号と事業所名が同じ行をまとめました。送付方法が複数あった場合は、誤振り分けを防ぐため未設定に戻しています。');
   }));
   document.querySelectorAll<HTMLElement>('[data-action="delete-master"]').forEach((button) => button.addEventListener('click', async () => {
-    if (deletingMasterNumber) return;
-    const providerNumber = button.dataset.number!;
-    const isInCurrentResult = Boolean(result?.groups.some((group) => group.providerNumber === providerNumber));
+    if (deletingMasterId) return;
+    const id = button.dataset.id!;
+    const entry = savedData.providerMaster.find((item) => item.id === id);
+    if (!entry) return;
+    const activeGroup = result?.groups.find((group) => masterFor(group)?.id === id);
+    const isInCurrentResult = Boolean(activeGroup);
     const confirmation = isInCurrentResult
       ? 'この事業所のマスタ設定を解除しますか？現在の振り分け結果に含まれているため、未設定の事業所として一覧に残り、設定するまで保存できなくなります。過去のPDFは削除されません。'
       : 'この事業所をマスタから削除しますか？過去のPDFは削除されません。';
     if (!confirm(confirmation)) return;
-    const activeGroup = result?.groups.find((group) => group.providerNumber === providerNumber);
     const savedMasterBefore = savedData.providerMaster.map((entry) => ({ ...entry }));
     const groupsBefore = result?.groups.map((group) => ({ ...group, issues: [...group.issues] }));
-    deletingMasterNumber = providerNumber;
+    deletingMasterId = id;
     masterActionError = '';
     render();
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     let succeeded = false;
     try {
-      const removedEntry = savedData.providerMaster.find((entry) => entry.providerNumber === providerNumber);
+      const removedEntry = savedData.providerMaster.find((entry) => entry.id === id);
       if (activeGroup && removedEntry) {
         // 現在の振り分け結果で使っている行は消さず、未設定に戻して行を保ちます。
         removedEntry.deliveryMethod = '';
         removedEntry.updatedAt = new Date().toISOString();
       } else {
-        savedData.providerMaster = savedData.providerMaster.filter((entry) => entry.providerNumber !== providerNumber);
-        if (activeGroup) {
-          savedData.providerMaster.unshift({
-            providerNumber,
-            providerName: activeGroup.providerName,
-            deliveryMethod: '',
-            updatedAt: new Date().toISOString(),
-          });
-        }
+        savedData.providerMaster = savedData.providerMaster.filter((entry) => entry.id !== id);
       }
       persist();
       refreshRoutingSafety();
@@ -723,12 +781,12 @@ function bindEvents() {
       try { persist(); } catch { /* 元の内容を画面内で保持し、エラーを表示します */ }
       masterActionError = '事業所を削除できませんでした。マスタの内容は元に戻しました。再読み込み後にもう一度お試しください。';
     } finally {
-      deletingMasterNumber = undefined;
+      deletingMasterId = undefined;
       render();
     }
     if (succeeded && activeGroup) requestAnimationFrame(() => {
       const unsetRoute = Array.from(document.querySelectorAll<HTMLSelectElement>('select.master-route-unset'))
-        .find((select) => select.closest<HTMLTableRowElement>('tr[data-master]')?.dataset.master === providerNumber);
+        .find((select) => select.closest<HTMLTableRowElement>('tr[data-master]')?.dataset.master === id);
       unsetRoute?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       unsetRoute?.focus({ preventScroll: true });
     });
@@ -778,7 +836,7 @@ async function startRouting() {
     const loaded = await loadPdfFiles(pdfs, setProgress); const analysis = await analysePdfs(loaded.sources, loaded.duplicateFiles, setProgress); result = analysis; queuedFiles = []; downloaded = 0; outputName = ''; sectionOpen.verification = false;
     let added = 0;
     let filledNames = 0;
-    const newEntries: ProviderMasterEntry[] = [];
+    const newEntries = new Map<string, ProviderMasterEntry>();
     for (const group of result.groups) {
       if (!group.providerNumber) continue;
       const existing = masterFor(group);
@@ -791,10 +849,15 @@ async function startRouting() {
         }
         continue;
       }
-      newEntries.push({ providerNumber: group.providerNumber, providerName: group.providerName, deliveryMethod: '', updatedAt: new Date().toISOString() }); added++;
+      const key = providerPairKey(group.providerNumber, group.providerName);
+      if (!newEntries.has(key)) {
+        newEntries.set(key, createProviderMasterEntry(group.providerNumber, group.providerName));
+        added++;
+      }
     }
-    if (newEntries.length) savedData.providerMaster.unshift(...newEntries);
-    if (added || filledNames) persist();
+    if (newEntries.size) savedData.providerMaster.unshift(...newEntries.values());
+    const normalized = normalizeProviderMaster(savedData);
+    if (added || filledNames || normalized.changed) persist();
     refreshRoutingSafety();
     if (added) sectionOpen.master = true;
     await automaticallyAssistUnresolvedOffices();
@@ -848,19 +911,20 @@ function providerNamesCompatible(left: string, right: string) {
 function applyAutomaticGeminiSuggestion(group: SlipGroup, suggestion: Awaited<ReturnType<typeof requestGeminiSuggestion>>) {
   if (suggestion.confidence < 0.9) return false;
   if (group.providerNumber && suggestion.providerNumber && group.providerNumber !== suggestion.providerNumber) return false;
-  if (!providerNamesCompatible(group.providerName, suggestion.providerName || '')) return false;
+  if (group.providerName.trim() && suggestion.providerName?.trim()
+    && normalizedProviderName(group.providerName) !== normalizedProviderName(suggestion.providerName)) return false;
 
   const candidateNumber = group.providerNumber || suggestion.providerNumber || '';
-  let master = savedData.providerMaster.find((entry) => entry.providerNumber === candidateNumber);
+  let master = findProviderMaster(candidateNumber, suggestion.providerName?.trim() || group.providerName);
   if (master) {
-    if (!providerNamesCompatible(group.providerName, master.providerName)
-      || !providerNamesCompatible(suggestion.providerName || '', master.providerName)) return false;
+    if ((group.providerName.trim() && normalizedProviderName(group.providerName) !== normalizedProviderName(master.providerName))
+      || (suggestion.providerName?.trim() && normalizedProviderName(suggestion.providerName) !== normalizedProviderName(master.providerName))) return false;
     if (!master.providerName.trim() && suggestion.providerName?.trim()) master.providerName = suggestion.providerName.trim();
   } else {
     if (!suggestion.providerNumber || suggestion.confidence < 0.95 || group.providerNumber) return false;
     const suggestedName = suggestion.providerName?.trim() || group.providerName.trim();
     if (!suggestedName || !providerNamesCompatible(group.providerName, suggestedName)) return false;
-    master = { providerNumber: suggestion.providerNumber, providerName: suggestedName, deliveryMethod: '', updatedAt: new Date().toISOString() };
+    master = createProviderMasterEntry(suggestion.providerNumber, suggestedName);
     savedData.providerMaster.unshift(master);
     sectionOpen.master = true;
   }
@@ -918,9 +982,9 @@ async function automaticallyAssistUnresolvedOffices() {
 
 function providerGroups(groups: SlipGroup[] = result!.groups, includeDestination = true) {
   const values = new Map<string, SlipGroup[]>();
-  // 似た名称でも番号が違えば、絶対に同じPDFへ結合しない。
+  // 同じ番号でも名称が異なる事業所は別々にまとめます。
   groups.forEach((group) => {
-    const key = `${includeDestination ? `${destinationFor(group)}|` : ''}${group.providerNumber || `未判定-${group.id}`}`;
+    const key = `${includeDestination ? `${destinationFor(group)}|` : ''}${group.providerNumber ? providerMatchKeyFor(group) : `未判定-${group.id}`}`;
     values.set(key, [...(values.get(key) ?? []), group]);
   });
   return values;
@@ -968,7 +1032,9 @@ async function createAllOutputs() {
 void loadSavedData().then((data) => {
   // 起動時だけ未設定を先頭に集める。以降は配列順を維持し、設定後も位置を変えない。
   savedData = data;
-  if (initializeProviderMasterOrder(savedData)) persist();
+  const normalized = normalizeProviderMaster(savedData);
+  const orderChanged = initializeProviderMasterOrder(savedData);
+  if (normalized.changed || orderChanged) persist();
   render();
 });
 render();

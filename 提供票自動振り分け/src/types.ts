@@ -4,7 +4,7 @@ export type SlipGroup = {
   id: string;
   clientName: string;
   providerName: string;
-  /** PDFに記載された10桁の事業所番号。名称ではなく、これを主キーにします。 */
+  /** PDFに記載された10桁の事業所番号。同じ番号でも事業所名が違えば別の事業所として扱います。 */
   providerNumber: string;
   /** 帳票から分かる場合だけ設定するサービス区分。送付先フォルダの判定には使いません。 */
   serviceCategory: '居宅療養' | '';
@@ -38,6 +38,8 @@ export const DEFAULT_DELIVERY_METHODS: DeliveryMethodOption[] = [
 ];
 
 export type ProviderMasterEntry = {
+  /** マスタ行を番号の重複があっても個別に編集・削除するためのID。 */
+  id?: string;
   providerNumber: string;
   providerName: string;
   deliveryMethod: DeliveryMethod;

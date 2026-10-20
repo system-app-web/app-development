@@ -3228,8 +3228,8 @@ window.addEventListener("pointermove", (event) => {
     const room = rooms.find((item) => item.id === resizeState.id);
     if (!room) return;
     const isItem = isCanvasItem(room);
-    const minW = isItem ? 24 * scaleX : gridStep("x");
-    const minH = isItem ? 24 * scaleY : gridStep("y");
+    const minW = isItem ? 12 * scaleX : gridStep("x");
+    const minH = isItem ? 12 * scaleY : gridStep("y");
     let left = resizeState.origX;
     let top = resizeState.origY;
     let right = resizeState.origX + resizeState.origW;
@@ -3256,7 +3256,7 @@ window.addEventListener("pointermove", (event) => {
       const requestedScale = 1 + (
         directionX * deltaX * resizeState.origW + directionY * deltaY * resizeState.origH
       ) / originalDiagonalSquared;
-      const minScale = Math.max(minW / resizeState.origW, minH / resizeState.origH);
+      const minScale = Math.min(1, Math.max(minW / resizeState.origW, minH / resizeState.origH));
       const maxWidth = resizeState.corner.includes("w") ? fixedX : 1200 - fixedX;
       const maxHeight = resizeState.corner.includes("n") ? fixedY : 800 - fixedY;
       const maxScale = Math.min(maxWidth / resizeState.origW, maxHeight / resizeState.origH);

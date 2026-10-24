@@ -17,6 +17,8 @@
 - タイトルは太字で表示する。
 - 事業所マスタは「事業所番号と事業所名の両方が一致」したときだけ重複扱いにし、番号が同じでも名称が異なる行は別々に残す。
 - Before starting any work in a repository on this computer, always run `git pull` first to get the latest changes (cloud Codex may have changed the code).
+- Webアプリなど公開可能な変更が完了・検証できたら、PR・mainへの反映・デプロイ状況と残る手動操作を確認し、完了報告でこちらから「公開しますか？」と提案する。ユーザーが明確に公開を指示するまでは、コミット・push・デプロイをしない。
+- 依頼された作業以外にも役立つ改善案や次の一手があれば、勝手に実装せず、待たずに簡潔に提案する。
 
 # New App Data Protection Check
 

@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '付箋紙アプリ/**'
+      - '.github/workflows/windows-installer.yml'
   workflow_dispatch:
 
 permissions:

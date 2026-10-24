@@ -188,7 +188,7 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
     if (!group.providerName) group.issues.push('事業所名を判定できません');
     if (!group.providerNumber) group.issues.push('10桁の事業所番号を判定できません');
     if (!group.serviceMonth) group.issues.push('提供年月を判定できません');
-    const key = `${group.clientName}|${group.providerNumber || group.providerName}|${group.serviceMonth}`;
+    const key = `${group.clientName}|${group.providerNumber || group.providerName}|${group.serviceCategory}|${group.serviceMonth}`;
     if (group.clientName && group.providerName && seen.has(key)) {
       group.issues.push('同一利用者・同一事業所の重複の可能性');
       seen.get(key)?.issues.push('同一利用者・同一事業所の重複の可能性');

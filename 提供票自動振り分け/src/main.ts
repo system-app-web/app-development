@@ -5,6 +5,15 @@ import { analysePdfs, createFilePreview, createMergedProviderPdf, createProvider
 import { DEFAULT_DELIVERY_METHODS, type AnalysisResult, type AppSavedData, type DeliveryMethodOption, type ProviderMasterEntry, type SlipGroup } from './types';
 import { emptySavedData, exportSavedData, importSavedData, loadSavedData, saveSavedData } from './storage';
 import { requestGeminiSuggestion } from './gemini-service';
+import {
+  getProviderMasterWarningNumbers,
+  matchProviderMaster,
+  normalizeProviderNumber,
+  normalizeServiceCategory,
+  providerIdentityKey,
+  reconcileProviderMaster,
+  refreshRoutingSafetyForGroups,
+} from './provider-matching';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 let result: AnalysisResult | undefined;
@@ -37,59 +46,101 @@ const groupStatus = (group: SlipGroup, singleFolderExport = false) => {
   return group.needsReview && !group.reviewed ? '要確認' : '確認済み';
 };
 const download = (bytes: BlobPart, name: string) => { const url = URL.createObjectURL(new Blob([bytes])); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
-const normalizeProviderNumber = (value: string) => value.normalize('NFKC').trim();
-const providerPairKey = (number: string, name: string) => JSON.stringify([normalizeProviderNumber(number), normalizedProviderName(name)]);
-function findProviderMaster(providerNumber: string, providerName: string) {
-  const numberKey = normalizeProviderNumber(providerNumber);
-  if (!numberKey) return undefined;
-  const candidates = savedData.providerMaster.filter((entry) => normalizeProviderNumber(entry.providerNumber) === numberKey);
-  const nameKey = normalizedProviderName(providerName);
-  const exact = candidates.filter((entry) => normalizedProviderName(entry.providerName) === nameKey);
-  if (exact.length === 1) return exact[0];
-  const unnamed = candidates.filter((entry) => !normalizedProviderName(entry.providerName));
-  if (nameKey && candidates.length === 1 && unnamed.length === 1) return unnamed[0];
-  return undefined;
-}
-const masterFor = (group: SlipGroup) => findProviderMaster(group.providerNumber, group.providerName);
+const findProviderMaster = (providerNumber: string, serviceCategory?: string) => {
+  const match = matchProviderMaster(savedData.providerMaster, providerNumber, serviceCategory);
+  return match.kind === 'matched' ? match.entry : undefined;
+};
+const masterFor = (group: SlipGroup) => findProviderMaster(group.providerNumber, group.serviceCategory);
 const providerMatchKeyFor = (group: SlipGroup) => {
   const master = masterFor(group);
   if (master?.id) return master.id;
-  if (group.providerNumber) return providerPairKey(group.providerNumber, group.providerName);
+  if (group.providerNumber) return providerIdentityKey(group.providerNumber, group.serviceCategory);
   const name = normalizedProviderName(group.providerName);
   return name ? `name:${name}` : `group:${group.id}`;
 };
-const createProviderMasterEntry = (providerNumber: string, providerName: string): ProviderMasterEntry => ({ id: crypto.randomUUID(), providerNumber, providerName, deliveryMethod: '', updatedAt: new Date().toISOString() });
+const createProviderMasterEntry = (providerNumber: string, providerName: string, serviceCategory = ''): ProviderMasterEntry => ({ id: crypto.randomUUID(), providerNumber, providerName, serviceCategory, deliveryMethod: '', updatedAt: new Date().toISOString() });
 const providerNameFor = (group: SlipGroup) => masterFor(group)?.providerName.trim() || group.providerName.trim();
 const destinationFor = (group: SlipGroup) => masterFor(group)?.deliveryMethod || '要確認';
 function normalizeProviderMaster(data: AppSavedData, preferredId?: string) {
-  const entriesByPair = new Map<string, { entry: ProviderMasterEntry; deliveryMethods: Set<string> }>();
-  let merged = 0;
-  let changed = false;
-  for (const entry of data.providerMaster) {
-    const key = providerPairKey(entry.providerNumber, entry.providerName);
-    const existing = entriesByPair.get(key);
-    if (existing) {
-      if (entry.id === preferredId) existing.entry.id = preferredId;
-      existing.deliveryMethods.add(entry.deliveryMethod);
-      if (!existing.entry.providerName.trim() && entry.providerName.trim()) existing.entry.providerName = entry.providerName;
-      if (entry.updatedAt > existing.entry.updatedAt) existing.entry.updatedAt = entry.updatedAt;
-      merged++;
-      changed = true;
-    } else entriesByPair.set(key, { entry: { ...entry }, deliveryMethods: new Set([entry.deliveryMethod]) });
-  }
+  const before = JSON.stringify(data.providerMaster);
+  const reconciled = reconcileProviderMaster(data.providerMaster, preferredId);
   const usedIds = new Set<string>();
-  data.providerMaster = [...entriesByPair.values()].map(({ entry, deliveryMethods }) => {
-    const configuredMethods = [...deliveryMethods].filter(Boolean);
-    entry.deliveryMethod = configuredMethods.length === 1 ? configuredMethods[0] : '';
-    if (configuredMethods.length > 1) changed = true;
+  data.providerMaster = reconciled.entries.map((source) => {
+    const entry = { ...source };
     if (!entry.id || usedIds.has(entry.id)) {
       entry.id = crypto.randomUUID();
-      changed = true;
     }
     usedIds.add(entry.id);
     return entry;
   });
-  return { changed, merged };
+  return { ...reconciled, merged: reconciled.mergedCount, changed: before !== JSON.stringify(data.providerMaster) };
+}
+
+/** PDF読込時・マスタ移動時に、番号＋サービス種類の不足行だけを補います。 */
+function ensureProviderMasterForGroups(groups: SlipGroup[]) {
+  const before = JSON.stringify(savedData.providerMaster);
+  normalizeProviderMaster(savedData);
+  const categoriesByNumber = new Map<string, Set<string>>();
+  groups.forEach((group) => {
+    const number = normalizeProviderNumber(group.providerNumber);
+    const category = normalizeServiceCategory(group.serviceCategory);
+    if (!number || !category) return;
+    categoriesByNumber.set(number, new Set([...(categoriesByNumber.get(number) ?? []), category]));
+  });
+  let added = 0;
+  const additions = new Map<string, ProviderMasterEntry>();
+
+  for (const group of groups) {
+    const number = normalizeProviderNumber(group.providerNumber);
+    if (!number) continue;
+    const category = normalizeServiceCategory(group.serviceCategory);
+    const candidates = savedData.providerMaster.filter((entry) => normalizeProviderNumber(entry.providerNumber) === number);
+    const exact = category ? candidates.filter((entry) => normalizeServiceCategory(entry.serviceCategory) === category) : [];
+    if (exact.length) {
+      if (exact.length > 1) continue;
+      if (!exact[0].providerName.trim() && group.providerName.trim()) {
+        exact[0].providerName = group.providerName.trim();
+        exact[0].updatedAt = new Date().toISOString();
+      }
+      continue;
+    }
+    if (!category) {
+      if (!candidates.length) {
+        const key = providerIdentityKey(number, '');
+        if (!additions.has(key)) {
+          additions.set(key, createProviderMasterEntry(number, group.providerName.trim()));
+          added++;
+        }
+      } else if (candidates.length === 1 && !candidates[0].providerName.trim() && group.providerName.trim()) {
+        candidates[0].providerName = group.providerName.trim();
+        candidates[0].updatedAt = new Date().toISOString();
+      }
+      continue;
+    }
+
+    const untyped = candidates.filter((entry) => !normalizeServiceCategory(entry.serviceCategory));
+    if (candidates.length === 1 && untyped.length === 1 && categoriesByNumber.get(number)?.size === 1) {
+      // 旧データにサービス種類がない一行だけなら、そのPDFの種類を補って設定を引き継ぎます。
+      untyped[0].serviceCategory = category;
+      if (!untyped[0].providerName.trim() && group.providerName.trim()) untyped[0].providerName = group.providerName.trim();
+      untyped[0].updatedAt = new Date().toISOString();
+      continue;
+    }
+
+    // 同じ番号の別サービス、または複数の旧行から推測せず、種類を明記した行を用意します。
+    const key = providerIdentityKey(number, category);
+    if (!additions.has(key)) {
+      additions.set(key, createProviderMasterEntry(number, group.providerName.trim(), category));
+      added++;
+    }
+  }
+
+  if (additions.size) savedData.providerMaster.unshift(...additions.values());
+  normalizeProviderMaster(savedData);
+  return {
+    added,
+    changed: before !== JSON.stringify(savedData.providerMaster),
+  };
 }
 function initializeProviderMasterOrder(data: AppSavedData) {
   if (data.providerMasterOrderInitialized) return false;
@@ -153,27 +204,9 @@ const isStoppedGroup = (group: SlipGroup) => stoppedGroupIds.has(group.id);
 const stoppedClientCount = (groups: SlipGroup[] = result?.groups ?? []) => clientEntries(groups).filter((entry) => entry.groups.some(isStoppedGroup)).length;
 const stoppedOfficeCount = (groups: SlipGroup[] = result?.groups ?? []) => clientEntries(groups).reduce((total, entry) => total + clientOfficeEntries(entry).filter((office) => office.groups.every(isStoppedGroup)).length, 0);
 function refreshRoutingSafety() {
-  result?.groups.forEach((group) => {
-    group.issues = group.issues.filter((issue) => issue !== '送付方法が未設定です');
-    let master = masterFor(group);
-    if (!master && !group.providerNumber && group.providerName.trim()) {
-      const nameMatches = savedData.providerMaster.filter((entry) => normalizedProviderName(entry.providerName) === normalizedProviderName(group.providerName));
-      if (nameMatches.length === 1) {
-        master = nameMatches[0];
-        group.providerNumber = master.providerNumber;
-        group.issues = group.issues.filter((issue) => issue !== '10桁の事業所番号を判定できません');
-      }
-    }
-    if (master?.providerName.trim()) {
-      group.providerName ||= master.providerName.trim();
-      group.issues = group.issues.filter((issue) => issue !== '事業所名を判定できません');
-    }
-    if (!master?.deliveryMethod) {
-      group.issues.push('送付方法が未設定です');
-      group.reviewed = false;
-    }
-    group.needsReview = group.issues.length > 0;
-  });
+  const masterBefore = JSON.stringify(savedData.providerMaster);
+  refreshRoutingSafetyForGroups(result?.groups ?? [], savedData.providerMaster);
+  if (masterBefore !== JSON.stringify(savedData.providerMaster)) persist();
 }
 
 function showRenderFailure(error: unknown) {
@@ -419,12 +452,14 @@ function queuePanel() {
 function masterArea(singleFolderExport: boolean) {
   // 設定状況の変化で一覧内の位置が動かないよう、保存されている順序をそのまま使う。
   const entries = [...savedData.providerMaster];
+  const warningNumbers = getProviderMasterWarningNumbers(entries);
   const needsSetup = entries.filter((entry) => !entry.providerName.trim() || !entry.deliveryMethod).length;
   const needsRoute = entries.filter((entry) => !entry.deliveryMethod).length;
   return foldSection('master', '事業所マスタ', `${needsSetup ? `要設定 ${needsSetup}件 · ` : ''}登録 ${entries.length}件`, `<div class="section-head master-head"><div><h2>事業所番号と振り分け先・送付方法</h2></div><div class="backup-buttons"><button class="quiet" data-action="edit-delivery-methods">送付方法項目編集</button><button class="quiet" data-action="backup">バックアップ</button><button class="quiet" data-action="import">データ挿入</button><input id="backupInput" type="file" accept="application/json,.json" hidden></div></div>
     ${needsSetup ? `<div class="master-alert" role="status"><strong>${needsRoute ? '振り分け先を選択してください' : '事業所名を入力してください'}</strong><span>${singleFolderExport && needsRoute ? '今回の一括保存では送付方法を使いません。事業所名など、ほかの不足情報は通常どおり確認してください。' : needsRoute ? '赤色の欄を設定しないとダウンロードできません。' : '色の付いた欄を確認してください。'}</span></div>` : ''}
+    ${warningNumbers.length ? `<div class="master-alert" role="status"><strong>同じ番号のサービス種類・送付方法を特定できない行があります</strong><span>${warningNumbers.map(escapeHtml).join('、')}。PDFを読み込んで種類を補うか、送付方法が決められない行を確認してください。</span></div>` : ''}
     ${masterActionError ? `<div class="master-operation-error" role="alert">${escapeHtml(masterActionError)}</div>` : ''}
-    ${entries.length ? `<div class="table-wrap master-table" data-scroll-area="master"><table><thead><tr><th>10桁の事業所番号</th><th>事業所名（略称可）</th><th>振り分け先・送付方法</th><th></th></tr></thead><tbody>${entries.map((entry) => { const missingName = !entry.providerName.trim(); const missingRoute = !entry.deliveryMethod; const state = missingName ? 'needs-name' : missingRoute ? 'needs-route' : 'registered'; const label = missingName ? (missingRoute ? '名称・振り分け先を入力' : '事業所名を入力') : missingRoute ? '振り分け先を選択' : '登録済み'; const isDeleting = deletingMasterId === entry.id; return `<tr data-master="${escapeHtml(entry.id || '')}" class="master-${state}"><td>${escapeHtml(entry.providerNumber)}<small class="master-status ${state}">${label}</small></td><td><input data-master-field="providerName" value="${escapeHtml(entry.providerName)}"></td><td><select data-master-field="deliveryMethod" class="${missingRoute ? 'master-route-unset' : ''}"><option value="" ${entry.deliveryMethod === '' ? 'selected' : ''}>未設定（要確認）</option>${deliveryMethodOptions().map((method) => `<option value="${escapeHtml(method.value)}" ${entry.deliveryMethod === method.value ? 'selected' : ''}>${escapeHtml(method.name)}</option>`).join('')}</select></td><td><button class="quiet master-delete-button" data-action="delete-master" data-id="${escapeHtml(entry.id || '')}" ${deletingMasterId ? 'disabled' : ''}>${isDeleting ? '<i class="progress-spinner small" aria-hidden="true"></i>削除中…' : '削除'}</button></td></tr>`; }).join('')}</tbody></table></div>` : `<p class="empty-master">PDFを解析すると、新しい事業所番号がここに追加されます。送付方法が未設定の書類は必ず「要確認」になります。</p>`}
+    ${entries.length ? `<div class="table-wrap master-table" data-scroll-area="master"><table><thead><tr><th>10桁の事業所番号</th><th>サービス種類</th><th>事業所名（略称可）</th><th>振り分け先・送付方法</th><th></th></tr></thead><tbody>${entries.map((entry) => { const missingName = !entry.providerName.trim(); const missingRoute = !entry.deliveryMethod; const state = missingName ? 'needs-name' : missingRoute || entry.needsServiceReview ? 'needs-route' : 'registered'; const label = entry.needsServiceReview ? '送付方法を確認' : missingName ? (missingRoute ? '名称・振り分け先を入力' : '事業所名を入力') : missingRoute ? '振り分け先を選択' : '登録済み'; const isDeleting = deletingMasterId === entry.id; return `<tr data-master="${escapeHtml(entry.id || '')}" class="master-${state}"><td>${escapeHtml(entry.providerNumber)}<small class="master-status ${state}">${label}</small></td><td><span class="master-service-category">${escapeHtml(normalizeServiceCategory(entry.serviceCategory) || '未判定')}</span></td><td><input data-master-field="providerName" value="${escapeHtml(entry.providerName)}"></td><td><select data-master-field="deliveryMethod" class="${missingRoute ? 'master-route-unset' : ''}"><option value="" ${entry.deliveryMethod === '' ? 'selected' : ''}>未設定（要確認）</option>${deliveryMethodOptions().map((method) => `<option value="${escapeHtml(method.value)}" ${entry.deliveryMethod === method.value ? 'selected' : ''}>${escapeHtml(method.name)}</option>`).join('')}</select></td><td><button class="quiet master-delete-button" data-action="delete-master" data-id="${escapeHtml(entry.id || '')}" ${deletingMasterId ? 'disabled' : ''}>${isDeleting ? '<i class="progress-spinner small" aria-hidden="true"></i>削除中…' : '削除'}</button></td></tr>`; }).join('')}</tbody></table></div>` : `<p class="empty-master">PDFを解析すると、新しい事業所番号がここに追加されます。送付方法が未設定の書類は必ず「要確認」になります。</p>`}
   `, true);
 }
 
@@ -692,22 +727,16 @@ function bindEvents() {
   document.querySelectorAll<HTMLInputElement>('input[data-field]').forEach((input) => input.addEventListener('change', () => {
     const group = result?.groups.find((item) => item.id === input.closest('tr')?.dataset.id); if (!group) return;
     group[input.dataset.field as 'providerName' | 'clientName' | 'serviceMonth'] = input.value.trim();
-    const missing = !group.clientName || !group.providerName || !group.serviceMonth;
-    group.needsReview = missing || group.issues.length > 0;
-    group.reviewed = false; render();
+    group.reviewed = false;
+    refreshRoutingSafety();
+    render();
   }));
   document.querySelectorAll<HTMLElement>('[data-action="confirm"]').forEach((button) => button.addEventListener('click', () => { const group = result?.groups.find((item) => item.id === button.dataset.id); if (group) { group.reviewed = true; render(); } }));
   document.querySelector('[data-action="ack-duplicates"]')?.addEventListener('click', () => { if (result) { result.duplicateFiles = []; render(); } });
   document.querySelector('[data-action="go-master"]')?.addEventListener('click', () => {
-    const missingEntries = new Map<string, ProviderMasterEntry>();
-    result?.groups.filter((group) => !isStoppedGroup(group)).forEach((group) => {
-      const key = providerPairKey(group.providerNumber, group.providerName);
-      if (group.providerNumber && !masterFor(group) && !missingEntries.has(key)) {
-        missingEntries.set(key, createProviderMasterEntry(group.providerNumber, group.providerName));
-      }
-    });
-    if (missingEntries.size) {
-      savedData.providerMaster.unshift(...missingEntries.values());
+    const ensured = ensureProviderMasterForGroups(result?.groups.filter((group) => !isStoppedGroup(group)) ?? []);
+    refreshRoutingSafety();
+    if (ensured.changed) {
       persist();
       render();
     }
@@ -731,7 +760,7 @@ function bindEvents() {
       const normalized = normalizeProviderMaster(savedData);
       initializeProviderMasterOrder(savedData);
       persist(); render();
-      alert(normalized.merged ? `バックアップを読み込みました。事業所番号と名称が一致する重複を${normalized.merged}件まとめました。` : 'バックアップを読み込みました。');
+      alert(normalized.merged ? `バックアップを読み込みました。事業所番号とサービス種類が一致する重複を${normalized.merged}件まとめました。${normalized.warningNumbers.length ? `送付方法を特定できない番号があります：${normalized.warningNumbers.join('、')}` : ''}` : 'バックアップを読み込みました。');
     }
     catch (error) { alert(error instanceof Error ? error.message : 'バックアップを読み込めませんでした。'); }
   });
@@ -742,7 +771,7 @@ function bindEvents() {
     const normalized = normalizeProviderMaster(savedData, id);
     persist(); refreshRoutingSafety();
     render();
-    if (normalized.merged) alert('事業所番号と事業所名が同じ行をまとめました。送付方法が複数あった場合は、誤振り分けを防ぐため未設定に戻しています。');
+    if (normalized.merged) alert('事業所番号とサービス種類が同じ行をまとめました。送付方法が異なる行は誤振り分けを防ぐため残し、確認が必要な状態にしています。');
   }));
   document.querySelectorAll<HTMLElement>('[data-action="delete-master"]').forEach((button) => button.addEventListener('click', async () => {
     if (deletingMasterId) return;
@@ -834,32 +863,10 @@ async function startRouting() {
   busy = true; setProgress('PDFを読み込み中');
   try {
     const loaded = await loadPdfFiles(pdfs, setProgress); const analysis = await analysePdfs(loaded.sources, loaded.duplicateFiles, setProgress); result = analysis; queuedFiles = []; downloaded = 0; outputName = ''; sectionOpen.verification = false;
-    let added = 0;
-    let filledNames = 0;
-    const newEntries = new Map<string, ProviderMasterEntry>();
-    for (const group of result.groups) {
-      if (!group.providerNumber) continue;
-      const existing = masterFor(group);
-      if (existing) {
-        // PDFから名前が取れた場合も、スタッフが登録済みの略称や送付方法は変更しません。
-        if (!existing.providerName.trim() && group.providerName.trim()) {
-          existing.providerName = group.providerName;
-          existing.updatedAt = new Date().toISOString();
-          filledNames++;
-        }
-        continue;
-      }
-      const key = providerPairKey(group.providerNumber, group.providerName);
-      if (!newEntries.has(key)) {
-        newEntries.set(key, createProviderMasterEntry(group.providerNumber, group.providerName));
-        added++;
-      }
-    }
-    if (newEntries.size) savedData.providerMaster.unshift(...newEntries.values());
-    const normalized = normalizeProviderMaster(savedData);
-    if (added || filledNames || normalized.changed) persist();
+    const ensured = ensureProviderMasterForGroups(result.groups);
+    if (ensured.changed) persist();
     refreshRoutingSafety();
-    if (added) sectionOpen.master = true;
+    if (ensured.added) sectionOpen.master = true;
     await automaticallyAssistUnresolvedOffices();
   }
   catch (error) { alert(error instanceof Error ? `PDFを読み込めませんでした：${error.message}` : 'PDFを読み込めませんでした。'); }
@@ -911,27 +918,27 @@ function providerNamesCompatible(left: string, right: string) {
 function applyAutomaticGeminiSuggestion(group: SlipGroup, suggestion: Awaited<ReturnType<typeof requestGeminiSuggestion>>) {
   if (suggestion.confidence < 0.9) return false;
   if (group.providerNumber && suggestion.providerNumber && group.providerNumber !== suggestion.providerNumber) return false;
-  if (group.providerName.trim() && suggestion.providerName?.trim()
-    && normalizedProviderName(group.providerName) !== normalizedProviderName(suggestion.providerName)) return false;
+
+  const suggestedCategory = suggestion.isHomeMedicalCare === true ? '居宅療養管理指導' : '';
+  if (group.serviceCategory && suggestedCategory
+    && normalizeServiceCategory(group.serviceCategory) !== normalizeServiceCategory(suggestedCategory)) return false;
+  if (!group.serviceCategory && suggestedCategory) group.serviceCategory = suggestedCategory;
 
   const candidateNumber = group.providerNumber || suggestion.providerNumber || '';
-  let master = findProviderMaster(candidateNumber, suggestion.providerName?.trim() || group.providerName);
+  let master = findProviderMaster(candidateNumber, group.serviceCategory);
   if (master) {
-    if ((group.providerName.trim() && normalizedProviderName(group.providerName) !== normalizedProviderName(master.providerName))
-      || (suggestion.providerName?.trim() && normalizedProviderName(suggestion.providerName) !== normalizedProviderName(master.providerName))) return false;
     if (!master.providerName.trim() && suggestion.providerName?.trim()) master.providerName = suggestion.providerName.trim();
   } else {
     if (!suggestion.providerNumber || suggestion.confidence < 0.95 || group.providerNumber) return false;
     const suggestedName = suggestion.providerName?.trim() || group.providerName.trim();
     if (!suggestedName || !providerNamesCompatible(group.providerName, suggestedName)) return false;
-    master = createProviderMasterEntry(suggestion.providerNumber, suggestedName);
+    master = createProviderMasterEntry(suggestion.providerNumber, suggestedName, group.serviceCategory);
     savedData.providerMaster.unshift(master);
     sectionOpen.master = true;
   }
 
   group.providerNumber = master.providerNumber;
-  group.providerName = master.providerName.trim() || suggestion.providerName?.trim() || group.providerName;
-  if (suggestion.isHomeMedicalCare === true) group.serviceCategory = '居宅療養';
+  group.providerName ||= master.providerName.trim() || suggestion.providerName?.trim() || '';
   group.issues = group.issues.filter((issue) => !providerIdentityIssues.has(issue));
   group.needsReview = group.issues.length > 0;
   group.geminiUsed = true;

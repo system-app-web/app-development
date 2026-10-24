@@ -1,7 +1,8 @@
 .master { padding: 24px; margin-top: 18px; }
 .backup-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .master-table { margin-top: 14px; }
-.master-table table { min-width: 660px; }
+.master-table table { min-width: 820px; }
+.master-service-category { color: #5d6270; font-size: 12px; }
 .master-table select { width: 100%; border: 1px solid #d8d9df; border-radius: 7px; padding: 7px 8px; font: inherit; background: #fff; }
 .empty-master { margin: 18px 0 0; padding: 13px 14px; background: #f6f8fc; border-radius: 10px; color: #5d6270; font-size: 13px; line-height: 1.6; }
 .master-alert { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 16px; padding: 12px 14px; border: 1px solid #f2b8be; border-radius: 10px; background: #fff3f4; color: #9f2631; font-size: 13px; line-height: 1.5; }

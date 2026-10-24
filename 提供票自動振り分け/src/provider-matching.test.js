@@ -172,6 +172,10 @@ describe('サービス種類を使った事業所マスタ照合', () => {
     assert.equal(extractServiceCategory('サービスコード 13 3111'), '訪問看護');
     assert.equal(extractServiceCategory('サービスコード 14'), '訪問リハビリテーション');
     assert.equal(extractServiceCategory('サービスコード 31'), '居宅療養管理指導');
+    assert.equal(extractServiceCategory('サービスコード 43'), '居宅介護支援');
+    assert.equal(extractServiceCategory('サービスコード 46'), '介護予防支援');
+    assert.equal(extractServiceCategory('サービスコード AF'), '介護予防ケアマネジメント');
+    assert.equal(extractServiceCategory('サービスコード 431111'), '居宅介護支援');
     assert.equal(extractServiceCategory('サービスコード A2 1001'), '訪問型サービス（独自）');
     assert.equal(extractServiceCategory('サービスコード AG 1001'), '訪問型短期集中予防サービス（定率）');
     assert.equal(extractServiceCategory('サービスコード 68 1001'), '小規模多機能型居宅介護（短期利用型）');
@@ -180,6 +184,44 @@ describe('サービス種類を使った事業所マスタ照合', () => {
     assert.equal(extractServiceCategory('サービスコード 13 3111\nサービスコード 14 1001'), '');
     assert.equal(extractServiceCategory('サービスコード 13 3111\n事業所番号 1234567890'), '訪問看護');
     assert.equal(extractServiceCategory('訪問リハビリテーション 居宅療養管理指導'), '');
+  });
+
+  it('提供票の支援事業者見出しを除外し、サービス内容から種類を判定する', () => {
+    const homeCareHeader = '居宅介護支援事業者→サービス事業者';
+    const preventiveHeader = '介護予防支援事業者→サービス事業者';
+    assert.equal(extractServiceCategory(`${homeCareHeader}\n訪問看護 131111`), '訪問看護');
+    assert.equal(extractServiceCategory(`${homeCareHeader}\n居宅療養管理指導`), '居宅療養管理指導');
+    assert.equal(extractServiceCategory(`${homeCareHeader}\n訪問リハビリテーション`), '訪問リハビリテーション');
+    assert.equal(extractServiceCategory(`${preventiveHeader}\n訪問看護 131111`), '訪問看護');
+    assert.equal(extractServiceCategory(`${preventiveHeader}\n居宅療養管理指導`), '居宅療養管理指導');
+    assert.equal(extractServiceCategory(`${preventiveHeader}\n訪問リハビリテーション`), '訪問リハビリテーション');
+    assert.equal(extractServiceCategory(homeCareHeader), '');
+    assert.equal(extractServiceCategory(preventiveHeader), '');
+    assert.equal(extractServiceCategory('居宅介護支援'), '');
+    assert.equal(extractServiceCategory('介護予防支援'), '');
+    assert.equal(extractServiceCategory('介護予防ケアマネジメント'), '');
+    assert.equal(extractServiceCategory('訪問看護事業所'), '');
+    assert.equal(extractServiceCategory('訪問看護事業者'), '');
+  });
+
+  it('サービス名のないカンマなし6桁金額をコードとして読まず、サービス名判定にも混ぜない', () => {
+    assert.equal(extractServiceCategory('167650'), '');
+    assert.equal(extractServiceCategory('サービス内容 167650'), '');
+    assert.equal(extractServiceCategory('訪問リハビリテーション 167650'), '訪問リハビリテーション');
+  });
+
+  it('支援事業者見出しだけのページで、前後の提供票を別種類として分断しない', () => {
+    const nextHeader = {
+      serviceCategory: extractServiceCategory('居宅介護支援事業者→サービス事業者'),
+      isSlipHeading: true,
+      isAppendix: false,
+    };
+    const currentSlip = {
+      serviceCategory: '訪問看護',
+      isSlipHeading: true,
+      isAppendix: false,
+    };
+    assert.equal(shouldStartNewSlip(currentSlip, nextHeader), false);
   });
 
   it('同じ利用者・番号でも明示されたサービス種類が変われば別グループにする', () => {

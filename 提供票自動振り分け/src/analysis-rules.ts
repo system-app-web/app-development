@@ -21,6 +21,7 @@ const usable = (value?: string) => Boolean(value && value.length >= 2 && value.l
 const serviceEvidenceTerms = [...new Set(SERVICE_CATEGORY_OPTIONS.flatMap((option) => [option.value, ...(option.aliases ?? [])]))]
   .filter((value) => value !== 'その他')
   .map((value) => value.normalize('NFKC').replace(/\s+/gu, ''));
+const codeOnlyServiceCategories = new Set(['居宅介護支援', '介護予防支援', '介護予防ケアマネジメント']);
 
 function afterLabel(text: string, labels: string[]): string | undefined {
   for (const label of labels) {
@@ -159,13 +160,18 @@ function providerNumberFromAppendix(text: string): string | undefined {
 function namedServiceCategories(normalizedText: string) {
   const matches: Array<{ start: number; end: number; value: string }> = [];
   for (const option of SERVICE_CATEGORY_OPTIONS) {
-    if (option.value === 'その他') continue;
+    if (option.value === 'その他' || codeOnlyServiceCategories.has(option.value)) continue;
     for (const alias of [option.value, ...(option.aliases ?? [])]) {
       const needle = alias.normalize('NFKC').replace(/[\s　]+/gu, '');
       if (!needle) continue;
       let start = normalizedText.indexOf(needle);
       while (start >= 0) {
-        matches.push({ start, end: start + needle.length, value: option.value });
+        const end = start + needle.length;
+        const suffix = normalizedText.slice(end);
+        // 「訪問看護事業所」等の事業所名・見出しをサービス種類として数えない。
+        if (!suffix.startsWith('事業者') && !suffix.startsWith('事業所')) {
+          matches.push({ start, end, value: option.value });
+        }
         start = normalizedText.indexOf(needle, start + 1);
       }
     }
@@ -184,22 +190,29 @@ function namedServiceCategories(normalizedText: string) {
 function serviceCodeCategories(text: string) {
   const normalizedText = text.normalize('NFKC').toUpperCase();
   const categories = new Set<string>();
-  // サービス種類コード＋項目コード（例: 13 3111 / 133111）。
-  const fullCodePattern = /(?<![0-9A-Z])((?:2[AB]|A[0-9A-Z]|[0-9]{2})[ \t-]*[0-9A-Z]{4})(?![0-9A-Z])/gu;
-  for (const match of normalizedText.matchAll(fullCodePattern)) {
-    const prefix = match[1].replace(/[ \t-]/gu, '').slice(0, 2);
-    const category = serviceCategoryForCodePrefix(prefix);
-    if (category) categories.add(category);
-  }
-
-  // 提供票によっては「サービスコード 13」のように、種類コードだけが印字されます。
-  // 「サービスコード」の同じ行にある種類コードだけを拾い、事業所番号や日付を誤認しません。
+  // 金額や年月の6桁数字をコード扱いしないよう、種類コード欄のラベルに続く値だけを見る。
+  const codeLabel = /(?:サービスコード|サービス種類コード|種類コード|サービス内容コード)\s*[:：]?\s*/u;
+  const codePattern = /^(2[AB]|A[0-9A-Z]|[0-9]{2})(?:([ \t-])([0-9A-Z]{4})|([0-9A-Z]{4}))(?![0-9A-Z])/u;
+  const typeOnlyPattern = /^(2[AB]|A[0-9A-Z]|[0-9]{2})(?![0-9A-Z])/u;
   for (const line of normalizedText.split(/\r?\n/u)) {
-    const labelIndex = line.indexOf('サービスコード');
-    if (labelIndex < 0) continue;
-    const remainder = line.slice(labelIndex + 'サービスコード'.length);
-    for (const match of remainder.matchAll(/(?<![0-9A-Z])(2[AB]|A[0-9A-Z]|[0-9]{2})(?![0-9A-Z])/gu)) {
-      const category = serviceCategoryForCodePrefix(match[1]);
+    const label = codeLabel.exec(line);
+    if (!label) continue;
+    const remainder = line.slice(label.index + label[0].length);
+    const fullCode = codePattern.exec(remainder);
+    if (fullCode) {
+      const prefix = fullCode[1];
+      const category = serviceCategoryForCodePrefix(prefix);
+      // 種類コード欄のラベル直後だけを読むため、欄外の金額・年月をコード扱いしない。
+      if (category) {
+        categories.add(category);
+      }
+      continue;
+    }
+
+    // 「サービスコード 13」のように種類コードだけが印字された形式。
+    const typeOnly = typeOnlyPattern.exec(remainder);
+    if (typeOnly) {
+      const category = serviceCategoryForCodePrefix(typeOnly[1]);
       if (category) categories.add(category);
     }
   }

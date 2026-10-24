@@ -34,10 +34,10 @@
 - Keep answers short. No long explanations unless he asks.
 
 # Design Policy
-- For any work that affects how a screen looks (new screens, layout, colors, buttons, icons), always use Open Design first to plan the design, even if Takuya does not ask for it, then implement it.
+- For any work that affects how a screen looks (new screens, layout, colors, buttons, icons), use the Impeccable skill to guide the design before implementation, even if Takuya does not ask for it.
 - Goal: a natural, simple, stylish design that does not look AI-made. It should feel like a calm, well-made business app that people really use.
 - Do not use: purple or blue-purple gradients, sparkle or glow effects, heavy shadows, lots of emoji, or decoration with no purpose.
 - Limit colors to 2-3 (white or light gray background, dark gray text, one accent color).
 - Keep font sizes and spacing consistent. Make buttons and input fields large enough for older staff to tap easily.
-- After implementing, check the layout at both PC width and phone width and make sure nothing breaks.
+- After implementing, run `/impeccable audit` to check the design. Use `/impeccable polish` or `/impeccable quieter` when needed, and check the layout at both PC width and phone width.
 - When changing an existing app, match that app's current look.

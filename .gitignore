@@ -4,7 +4,16 @@ dist/
 .vercel/
 .pnpm-store/
 .agents/
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/impeccable/
+!.agents/skills/impeccable/**
 .codex/
+!.codex/
+.codex/*
+!.codex/hooks.json
 tmp/
 
 # Local preview/runtime files

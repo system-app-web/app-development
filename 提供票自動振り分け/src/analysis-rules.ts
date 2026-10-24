@@ -1,3 +1,5 @@
+import { SERVICE_CATEGORY_OPTIONS, serviceCategoryForCodePrefix } from './service-categories.ts';
+
 /**
  * 提供票レイアウトごとの調整点をこのファイルに集約しています。
  * 実PDFを確認後、ラベル・正規表現・見出し判定をここで追加してください。
@@ -16,6 +18,10 @@ export type PageFacts = {
 
 const clean = (value: string) => value.replace(/[\u3000\t]/g, ' ').replace(/\s+/g, ' ').trim();
 const usable = (value?: string) => Boolean(value && value.length >= 2 && value.length <= 45);
+const serviceEvidenceTerms = [...new Set(SERVICE_CATEGORY_OPTIONS.flatMap((option) => [option.value, ...(option.aliases ?? [])]))]
+  .filter((value) => value !== 'その他')
+  .map((value) => value.normalize('NFKC').replace(/\s+/gu, ''));
+const codeOnlyServiceCategories = new Set(['居宅介護支援', '介護予防支援', '介護予防ケアマネジメント']);
 
 function afterLabel(text: string, labels: string[]): string | undefined {
   for (const label of labels) {
@@ -55,7 +61,11 @@ function lineText(items: TextItem[]) {
 /** Gemini補助判定に渡す場合も、事業所に関係する行だけを選ぶ。 */
 export function providerEvidence(items: TextItem[]): string {
   return lineText(items)
-    .filter((line) => /事業所番号|事業所名|サービス事業所|サービス種類|サービスコード|居宅療養管理指導|訪問リハビリ/u.test(line))
+    .filter((line) => {
+      const normalizedLine = line.normalize('NFKC').replace(/\s+/gu, '');
+      return /事業所番号|事業所名|サービス事業所|サービス種類|サービスコード/u.test(line)
+        || serviceEvidenceTerms.some((term) => normalizedLine.includes(term));
+    })
     .filter((line) => !/被保険者|利用者氏名|利用者名/u.test(line))
     .slice(0, 12)
     .join('\n')
@@ -147,12 +157,75 @@ function providerNumberFromAppendix(text: string): string | undefined {
   return afterHeading.match(/[0-9]{10}/u)?.[0];
 }
 
-/** テキストPDFに印字されたサービス種類名を使う。複数種類が書かれているページは推測しない。 */
+function namedServiceCategories(normalizedText: string) {
+  const matches: Array<{ start: number; end: number; value: string }> = [];
+  for (const option of SERVICE_CATEGORY_OPTIONS) {
+    if (option.value === 'その他' || codeOnlyServiceCategories.has(option.value)) continue;
+    for (const alias of [option.value, ...(option.aliases ?? [])]) {
+      const needle = alias.normalize('NFKC').replace(/[\s　]+/gu, '');
+      if (!needle) continue;
+      let start = normalizedText.indexOf(needle);
+      while (start >= 0) {
+        const end = start + needle.length;
+        const suffix = normalizedText.slice(end);
+        // 「訪問看護事業所」等の事業所名・見出しをサービス種類として数えない。
+        if (!suffix.startsWith('事業者') && !suffix.startsWith('事業所')) {
+          matches.push({ start, end, value: option.value });
+        }
+        start = normalizedText.indexOf(needle, start + 1);
+      }
+    }
+  }
+
+  return matches
+    .filter((match) => !matches.some((other) => (
+      other.value !== match.value
+      && other.start <= match.start
+      && other.end >= match.end
+      && other.end - other.start > match.end - match.start
+    )))
+    .map((match) => match.value);
+}
+
+function serviceCodeCategories(text: string) {
+  const normalizedText = text.normalize('NFKC').toUpperCase();
+  const categories = new Set<string>();
+  // 金額や年月の6桁数字をコード扱いしないよう、種類コード欄のラベルに続く値だけを見る。
+  const codeLabel = /(?:サービスコード|サービス種類コード|種類コード|サービス内容コード)\s*[:：]?\s*/u;
+  const codePattern = /^(2[AB]|A[0-9A-Z]|[0-9]{2})(?:([ \t-])([0-9A-Z]{4})|([0-9A-Z]{4}))(?![0-9A-Z])/u;
+  const typeOnlyPattern = /^(2[AB]|A[0-9A-Z]|[0-9]{2})(?![0-9A-Z])/u;
+  for (const line of normalizedText.split(/\r?\n/u)) {
+    const label = codeLabel.exec(line);
+    if (!label) continue;
+    const remainder = line.slice(label.index + label[0].length);
+    const fullCode = codePattern.exec(remainder);
+    if (fullCode) {
+      const prefix = fullCode[1];
+      const category = serviceCategoryForCodePrefix(prefix);
+      // 種類コード欄のラベル直後だけを読むため、欄外の金額・年月をコード扱いしない。
+      if (category) {
+        categories.add(category);
+      }
+      continue;
+    }
+
+    // 「サービスコード 13」のように種類コードだけが印字された形式。
+    const typeOnly = typeOnlyPattern.exec(remainder);
+    if (typeOnly) {
+      const category = serviceCategoryForCodePrefix(typeOnly[1]);
+      if (category) categories.add(category);
+    }
+  }
+  return [...categories];
+}
+
+/** テキストPDFの種類名・サービスコードを使う。複数種類が書かれたページは推測しない。 */
 export function extractServiceCategory(text: string): string {
   const normalizedText = text.normalize('NFKC').replace(/\s+/gu, '');
-  const categories = new Set<string>();
-  if (/(?:介護予防)?居宅療養管理指導/u.test(normalizedText)) categories.add('居宅療養管理指導');
-  if (/(?:介護予防)?訪問リハビリテーション|訪問リハビリ/u.test(normalizedText)) categories.add('訪問リハビリテーション');
+  const categories = new Set([
+    ...namedServiceCategories(normalizedText),
+    ...serviceCodeCategories(text),
+  ]);
   return categories.size === 1 ? [...categories][0] : '';
 }
 

@@ -7,7 +7,7 @@ export type PageFacts = {
   clientName?: string;
   providerName?: string;
   providerNumber?: string;
-  serviceCategory: '居宅療養' | '';
+  serviceCategory: string;
   serviceMonth?: string;
   isSlipHeading: boolean;
   isAppendix: boolean;
@@ -55,7 +55,7 @@ function lineText(items: TextItem[]) {
 /** Gemini補助判定に渡す場合も、事業所に関係する行だけを選ぶ。 */
 export function providerEvidence(items: TextItem[]): string {
   return lineText(items)
-    .filter((line) => /事業所番号|事業所名|サービス事業所|居宅療養管理指導/u.test(line))
+    .filter((line) => /事業所番号|事業所名|サービス事業所|サービス種類|サービスコード|居宅療養管理指導|訪問リハビリ/u.test(line))
     .filter((line) => !/被保険者|利用者氏名|利用者名/u.test(line))
     .slice(0, 12)
     .join('\n')
@@ -147,6 +147,15 @@ function providerNumberFromAppendix(text: string): string | undefined {
   return afterHeading.match(/[0-9]{10}/u)?.[0];
 }
 
+/** テキストPDFに印字されたサービス種類名を使う。複数種類が書かれているページは推測しない。 */
+export function extractServiceCategory(text: string): string {
+  const normalizedText = text.normalize('NFKC').replace(/\s+/gu, '');
+  const categories = new Set<string>();
+  if (/(?:介護予防)?居宅療養管理指導/u.test(normalizedText)) categories.add('居宅療養管理指導');
+  if (/(?:介護予防)?訪問リハビリテーション|訪問リハビリ/u.test(normalizedText)) categories.add('訪問リハビリテーション');
+  return categories.size === 1 ? [...categories][0] : '';
+}
+
 export function extractPageFacts(items: TextItem[]): PageFacts {
   const lines = lineText(items);
   const text = lines.join('\n');
@@ -161,7 +170,7 @@ export function extractPageFacts(items: TextItem[]): PageFacts {
     clientName,
     providerName,
     providerNumber,
-    serviceCategory: /居宅療養管理指導/u.test(text) ? '居宅療養' : '',
+    serviceCategory: extractServiceCategory(text),
     serviceMonth: monthFrom(text),
     isSlipHeading: /サービス提供票|提供票別表|居宅サービス計画/u.test(text),
     isAppendix: /サービス提供票別表/u.test(text),
@@ -172,6 +181,7 @@ export function extractPageFacts(items: TextItem[]): PageFacts {
 export function shouldStartNewSlip(current: PageFacts | undefined, next: PageFacts): boolean {
   if (!current) return true;
   const bothNumbersKnown = Boolean(current.providerNumber && next.providerNumber);
+  if (current.serviceCategory && next.serviceCategory && current.serviceCategory !== next.serviceCategory) return true;
 
   // 主票→別表は同じ書類の続きです。主票の右上名称が省略形でも、別表の番号・名称で確定します。
   if (!current.isAppendix && next.isAppendix) {

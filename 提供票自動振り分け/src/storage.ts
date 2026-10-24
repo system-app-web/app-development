@@ -1,4 +1,4 @@
-import { DEFAULT_DELIVERY_METHODS, type AppSavedData } from './types';
+import { DEFAULT_DELIVERY_METHODS, type AppSavedData } from './types.ts';
 
 const STORAGE_KEY = 'service-slip-sorter.settings.v1';
 const DATABASE = 'service-slip-sorter-backups';

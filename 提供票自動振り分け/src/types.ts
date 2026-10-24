@@ -6,8 +6,8 @@ export type SlipGroup = {
   providerName: string;
   /** PDFに記載された10桁の事業所番号。同じ番号でも事業所名が違えば別の事業所として扱います。 */
   providerNumber: string;
-  /** 帳票から分かる場合だけ設定するサービス区分。送付先フォルダの判定には使いません。 */
-  serviceCategory: '居宅療養' | '';
+  /** 帳票から分かるサービス種類。番号が重複した事業所の照合に使います。 */
+  serviceCategory: string;
   /** Gemini補助判定へ送る場合だけ使う、事業所関連行のローカル断片。保存はしない。 */
   geminiExcerpt: string;
   geminiUsed: boolean;
@@ -41,9 +41,13 @@ export type ProviderMasterEntry = {
   /** マスタ行を番号の重複があっても個別に編集・削除するためのID。 */
   id?: string;
   providerNumber: string;
+  /** PDFから判定したサービス種類。古い保存データでは未設定です。 */
+  serviceCategory?: string;
   providerName: string;
   deliveryMethod: DeliveryMethod;
   updatedAt: string;
+  /** 同一番号・サービス種類の重複行で送付方法を決められない場合に表示します。 */
+  needsServiceReview?: boolean;
 };
 
 /** 個人名やPDF本体は保存しない。マスタと利用者が入力した設定だけを日次バックアップする。 */

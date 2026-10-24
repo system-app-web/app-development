@@ -3,7 +3,7 @@
 - Edit and verify files locally by default.
 - Do not create a Git commit, push to GitHub, or deploy to Vercel during ordinary editing or verification.
 - Do not start a local web server, open a hosted preview, or check a site on the web unless the user explicitly asks for web-based confirmation.
-- When the user says `公開`, treat it as an explicit instruction to perform the following actions for the current project's intended changes, in this order and without asking for another confirmation: Git commit, GitHub push, then Vercel production deployment.
+- When the user says `公開`, treat it as an instruction to merge the current work branch's PR into `main`, without asking for another confirmation. Merging to `main` automatically publishes production on Vercel; do not use Vercel CLI or the Vercel dashboard.
 - Do not include API keys, `.env` files, personal information, secrets, generated credentials, or unintended changes from other projects in a commit.
 - When the user says `公開`, do not explain Vercel dashboard steps or settings. Only report briefly if an action cannot be completed.
 
@@ -15,7 +15,7 @@
 - 画面には制作過程の説明文（「確認用」など）を表示しない。
 - タイトル変更はメニューに置かず、タイトルを直接クリックして編集する。
 - タイトルは太字で表示する。
-- 事業所マスタは「事業所番号と事業所名の両方が一致」したときだけ重複扱いにし、番号が同じでも名称が異なる行は別々に残す。
+- 提供票振り分けの事業所マスタは、事業所番号＋サービス種類で見分ける。事業所名はPDFタイトル用の略称として自由に変えてよく、照合には使わない。
 - Before starting any work in a repository on this computer, always run `git pull` first to get the latest changes (cloud Codex may have changed the code).
 - Webアプリなど公開可能な変更が完了・検証できたら、PR・mainへの反映・デプロイ状況と残る手動操作を確認し、完了報告でこちらから「公開しますか？」と提案する。ユーザーが明確に公開を指示するまでは、コミット・push・デプロイをしない。
 - 依頼された作業以外にも役立つ改善案や次の一手があれば、勝手に実装せず、待たずに簡潔に提案する。

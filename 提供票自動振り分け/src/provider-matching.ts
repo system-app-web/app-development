@@ -1,3 +1,5 @@
+import { normalizeServiceCategoryValue } from './service-categories.ts';
+
 export const DELIVERY_METHOD_ISSUE = '送付方法が未設定です';
 export const SERVICE_MATCH_ISSUE = '同じ事業所番号の送付方法をサービス種類で特定できません';
 export const SERVICE_MASTER_MISSING_ISSUE = '該当するサービス種類の事業所マスタがありません';
@@ -36,11 +38,25 @@ export type ProviderMasterMatch<T extends ProviderMasterLike> =
 
 export const normalizeProviderNumber = (value: string) => value.normalize('NFKC').trim();
 
+export function canAutoAssignServiceCategory(entry: ProviderMasterLike, candidateCount: number, observedCategoryCount: number) {
+  return candidateCount === 1
+    && observedCategoryCount === 1
+    && !normalizeServiceCategory(entry.serviceCategory)
+    && !entry.deliveryMethod.trim()
+    && !entry.needsServiceReview;
+}
+
+/** 同じマスタ要確認を提供票側でも重ねて数えないための判定。 */
+export function hasIndependentGroupReview(issues: string[], hasMissingRequiredInfo: boolean, masterReviewCountedSeparately: boolean) {
+  const masterReviewIssues = new Set([SERVICE_MATCH_ISSUE, SERVICE_MASTER_MISSING_ISSUE, MASTER_ROUTE_REVIEW_ISSUE]);
+  return hasMissingRequiredInfo || issues.some((issue) => (
+    issue !== DELIVERY_METHOD_ISSUE
+    && (!masterReviewCountedSeparately || !masterReviewIssues.has(issue))
+  ));
+}
+
 export function normalizeServiceCategory(value?: string | null) {
-  const category = (value ?? '').normalize('NFKC').replace(/\s+/gu, '').trim();
-  if (category === '居宅療養') return '居宅療養管理指導';
-  if (category === '訪問リハ' || category === '訪問リハビリ') return '訪問リハビリテーション';
-  return category;
+  return normalizeServiceCategoryValue(value);
 }
 
 export function providerIdentityKey(providerNumber: string, serviceCategory?: string) {
@@ -82,12 +98,24 @@ export function reconcileProviderMaster<T extends ProviderMasterLike>(entries: T
 
   for (const rows of grouped.values()) {
     if (rows.length === 1) {
-      reconciled.push({ ...rows[0], serviceCategory: normalizeServiceCategory(rows[0].serviceCategory) || rows[0].serviceCategory });
-      if (rows[0].needsServiceReview) warningNumbers.add(normalizeProviderNumber(rows[0].providerNumber));
+      reconciled.push({
+        ...rows[0],
+        serviceCategory: normalizeServiceCategory(rows[0].serviceCategory) || rows[0].serviceCategory,
+        needsServiceReview: false,
+      });
       continue;
     }
 
     const category = normalizeServiceCategory(rows[0].serviceCategory);
+    if (!category) {
+      // 古い未判定行は送付方法が同じでも意図を推測せず、個別のまま残す。
+      rows.forEach((row) => {
+        reconciled.push({ ...row, needsServiceReview: row.needsServiceReview ?? true });
+      });
+      warningNumbers.add(normalizeProviderNumber(rows[0].providerNumber));
+      continue;
+    }
+
     const deliveryMethods = [...new Set(rows.map((row) => row.deliveryMethod).filter(Boolean))];
     if (deliveryMethods.length > 1) {
       rows.forEach((row) => {
@@ -147,8 +175,6 @@ export function refreshProviderGroupRouting<T extends ProviderGroupLike, M exten
     group.reviewed = false;
   } else if (match.kind === 'matched') {
     const entry = match.entry;
-    const serviceCategory = normalizeServiceCategory(group.serviceCategory);
-    if (!normalizeServiceCategory(entry.serviceCategory) && serviceCategory) entry.serviceCategory = serviceCategory;
     if (!group.providerName.trim() && entry.providerName.trim()) {
       group.providerName = entry.providerName.trim();
       group.issues = group.issues.filter((issue) => issue !== '事業所名を判定できません');

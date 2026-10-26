@@ -5,12 +5,16 @@ import {
   applyProviderMasterChoice,
   canAutoAssignServiceCategory,
   createProviderRouteIdentityFingerprint,
+  createProviderRoutePageFingerprints,
+  DELIVERY_METHOD_ISSUE,
   findProviderServiceRoute,
   getProviderMasterWarningNumbers,
   hasIndependentGroupReview,
   matchProviderMaster,
   reconcileProviderMaster,
   refreshRoutingSafetyForGroups,
+  PROVIDER_NUMBER_ISSUE,
+  saveProviderGroupRouteChoice,
   SERVICE_MATCH_ISSUE,
   upsertProviderServiceRoute,
 } from './provider-matching.ts';
@@ -30,6 +34,13 @@ const baseGroup = (overrides = {}) => ({
   reviewed: false,
   ...overrides,
 });
+
+function confirmGroupChoice(group, entries, routes = []) {
+  const savedRoutes = saveProviderGroupRouteChoice(group, routes);
+  refreshRoutingSafetyForGroups([group], entries, savedRoutes);
+  group.reviewed = true;
+  return savedRoutes;
+}
 
 describe('サービス種類を使った事業所マスタ照合', () => {
   it('マスタ名を略称にしても、番号とサービス種類で一致する', () => {
@@ -185,6 +196,133 @@ describe('サービス種類を使った事業所マスタ照合', () => {
     assert.notEqual(await createProviderRouteIdentityFingerprint({ ...group, clientName: '別の利用者' }, sources), first);
   });
 
+  it('番号なしページで確認済みにした事業所・種類・送り先をリセット後に復元する', () => {
+    const masters = [
+      { id: 'fake-office-a', providerNumber: '9999900001', providerName: '架空の訪問看護事業所', serviceCategory: '訪問看護', deliveryMethod: '' },
+    ];
+    const selected = baseGroup({
+      providerNumber: '9999900001',
+      serviceCategory: '訪問看護',
+      deliveryMethod: 'FAX',
+      routeIdentityFingerprint: 'fingerprint-before-confirm',
+      routePageFingerprints: ['page-without-number'],
+      issues: [PROVIDER_NUMBER_ISSUE, DELIVERY_METHOD_ISSUE],
+      needsReview: true,
+      reviewed: false,
+    });
+    const settings = { providerServiceRoutes: confirmGroupChoice(selected, masters) };
+    assert.equal(selected.needsReview, false);
+    assert.equal(selected.reviewed, true);
+    assert.equal(settings.providerServiceRoutes.length, 1);
+
+    let currentResult = { groups: [selected] };
+    currentResult = undefined; // 実際のリセットも結果だけを消し、保存設定には触れません。
+    assert.equal(currentResult, undefined);
+    assert.equal(settings.providerServiceRoutes.length, 1);
+
+    const reuploaded = baseGroup({
+      providerNumber: '',
+      serviceCategory: '',
+      routeIdentityFingerprint: 'fingerprint-changed-after-ocr',
+      routePageFingerprints: ['page-without-number'],
+      issues: [PROVIDER_NUMBER_ISSUE, DELIVERY_METHOD_ISSUE],
+      needsReview: true,
+    });
+    refreshRoutingSafetyForGroups([reuploaded], masters, settings.providerServiceRoutes);
+    assert.equal(reuploaded.providerNumber, '9999900001');
+    assert.equal(reuploaded.serviceCategory, '訪問看護');
+    assert.equal(reuploaded.deliveryMethod, 'FAX');
+    assert.equal(reuploaded.needsReview, false);
+    assert.equal([reuploaded].filter((group) => group.needsReview).length, 0);
+  });
+
+  it('続きページだけに分かれて再読込されても、共有するPDFページ指紋から復元する', () => {
+    const masters = [
+      { providerNumber: '9999900002', providerName: '架空の訪問リハ事業所', serviceCategory: '訪問リハビリテーション', deliveryMethod: '' },
+    ];
+    const selected = baseGroup({
+      providerNumber: '9999900002',
+      serviceCategory: '訪問リハビリテーション',
+      deliveryMethod: 'メール',
+      routeIdentityFingerprint: 'old-name-month-fingerprint',
+      routePageFingerprints: ['page-10', 'page-11', 'page-12'],
+    });
+    const savedRoutes = confirmGroupChoice(selected, masters);
+    assert.equal(selected.needsReview, false);
+
+    const reuploadedContinuation = baseGroup({
+      providerNumber: '',
+      providerName: '読み取りが少し変わった事業所表記',
+      clientName: '利用者A（読み取り差）',
+      serviceMonth: '令和8年11月',
+      serviceCategory: '',
+      routeIdentityFingerprint: 'new-name-month-fingerprint',
+      routePageFingerprints: ['page-12'],
+      issues: [PROVIDER_NUMBER_ISSUE, DELIVERY_METHOD_ISSUE],
+      needsReview: true,
+    });
+    refreshRoutingSafetyForGroups([reuploadedContinuation], masters, savedRoutes);
+    assert.equal(reuploadedContinuation.providerNumber, '9999900002');
+    assert.equal(reuploadedContinuation.serviceCategory, '訪問リハビリテーション');
+    assert.equal(reuploadedContinuation.deliveryMethod, 'メール');
+    assert.equal(reuploadedContinuation.needsReview, false);
+    assert.equal([reuploadedContinuation].filter((group) => group.needsReview).length, 0);
+  });
+
+  it('同じ事業所番号が複数ある場合も、確認済みの選択だけを同じPDFに適用する', () => {
+    const masters = [
+      { providerNumber: '9999900003', providerName: '架空事業所A', serviceCategory: '訪問リハビリテーション', deliveryMethod: '' },
+      { providerNumber: '9999900003', providerName: '架空事業所B', serviceCategory: '居宅療養管理指導', deliveryMethod: '' },
+    ];
+    const selected = baseGroup({
+      providerNumber: '9999900003',
+      serviceCategory: '',
+      deliveryMethod: '',
+      routeIdentityFingerprint: 'old-fingerprint',
+      routePageFingerprints: ['duplicate-number-page'],
+    });
+    refreshRoutingSafetyForGroups([selected], masters);
+    assert.equal(selected.needsReview, true);
+    assert.ok(selected.issues.includes(SERVICE_MATCH_ISSUE));
+
+    selected.serviceCategory = '居宅療養管理指導';
+    selected.deliveryMethod = 'FAX';
+    const savedRoutes = confirmGroupChoice(selected, masters);
+    assert.equal(selected.needsReview, false);
+    assert.equal(selected.reviewed, true);
+
+    const reuploaded = baseGroup({
+      providerNumber: '9999900003',
+      serviceCategory: '',
+      routeIdentityFingerprint: 'new-fingerprint',
+      routePageFingerprints: ['duplicate-number-page'],
+    });
+    refreshRoutingSafetyForGroups([reuploaded], masters, savedRoutes);
+    assert.equal(reuploaded.serviceCategory, '居宅療養管理指導');
+    assert.equal(reuploaded.deliveryMethod, 'FAX');
+    assert.equal(reuploaded.needsReview, false);
+    assert.equal([reuploaded].filter((group) => group.needsReview).length, 0);
+
+    const differentPage = baseGroup({
+      providerNumber: '9999900003',
+      serviceCategory: '',
+      routePageFingerprints: ['another-provider-slip-page'],
+    });
+    refreshRoutingSafetyForGroups([differentPage], masters, savedRoutes);
+    assert.equal(differentPage.needsReview, true);
+    assert.ok(differentPage.issues.includes(SERVICE_MATCH_ISSUE));
+  });
+
+  it('ページ指紋は名前・年月の読み取り差に影響されず、同じPDFページで一致する', async () => {
+    const source = [{ id: 'source-a', hash: 'fictional-pdf-content-hash' }];
+    const original = await createProviderRoutePageFingerprints({ pages: [{ sourceId: 'source-a', pageIndex: 16 }] }, source);
+    const changedRecognition = await createProviderRoutePageFingerprints({ pages: [{ sourceId: 'source-a', pageIndex: 16 }] }, source);
+    const nextPage = await createProviderRoutePageFingerprints({ pages: [{ sourceId: 'source-a', pageIndex: 17 }] }, source);
+    assert.equal(original.length, 1);
+    assert.deepEqual(changedRecognition, original);
+    assert.notDeepEqual(nextPage, original);
+  });
+
   it('確認表の編集後に安全判定を再計算すると状態が更新される', () => {
     const group = baseGroup({ clientName: '', issues: ['利用者名を判定できません'] });
     const masters = [{ providerNumber: '1234567890', providerName: '訪リハ', serviceCategory: '訪問リハビリテーション', deliveryMethod: 'FAX' }];
@@ -258,7 +396,7 @@ describe('サービス種類を使った事業所マスタ照合', () => {
 
   it('識別指紋付きの保存済み送り先ルールを読み込める', async () => {
     const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-    const route = { providerNumber: '1234567890', serviceCategory: '訪問介護', deliveryMethod: 'FAX', identityFingerprint: 'a'.repeat(64) };
+    const route = { providerNumber: '1234567890', serviceCategory: '訪問介護', deliveryMethod: 'FAX', identityFingerprint: 'a'.repeat(64), pageFingerprints: ['b'.repeat(64)] };
     const data = { version: 1, providerMaster: [], geminiEnabled: false, providerServiceRoutes: [route] };
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,

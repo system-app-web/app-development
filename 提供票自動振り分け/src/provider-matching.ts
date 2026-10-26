@@ -27,6 +27,7 @@ export type ProviderGroupLike = {
   serviceCategory: string;
   serviceMonth: string;
   routeIdentityFingerprint?: string;
+  routePageFingerprints?: string[];
   pages?: Array<{ sourceId: string; pageIndex: number }>;
   deliveryMethod?: string;
   issues: string[];
@@ -89,6 +90,22 @@ export async function createProviderRouteIdentityFingerprint(
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
 }
 
+/** OCRに依存しない、元PDFの各ページごとの識別指紋を作ります。 */
+export async function createProviderRoutePageFingerprints(
+  group: Pick<ProviderGroupLike, 'pages'>,
+  sources: Array<{ id: string; hash: string }> = [],
+) {
+  const hashesById = new Map(sources.map((source) => [source.id, source.hash]));
+  const pageKeys = [...new Set((group.pages ?? []).flatMap((page) => {
+    const hash = hashesById.get(page.sourceId);
+    return hash ? [`${hash}:${page.pageIndex}`] : [];
+  }))];
+  return Promise.all(pageKeys.map(async (pageKey) => {
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(pageKey));
+    return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
+  }));
+}
+
 function normalizeRouteIdentityText(value: string) {
   return value.normalize('NFKC').toLocaleLowerCase('ja').replace(/[\s・,，.。\-－‐()（）]/gu, '');
 }
@@ -97,54 +114,116 @@ export function providerIdentityKey(providerNumber: string, serviceCategory?: st
   return JSON.stringify([normalizeProviderNumber(providerNumber), normalizeServiceCategory(serviceCategory)]);
 }
 
-export function findProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory?: string, identityFingerprint?: string) {
+export function findProviderServiceRoute(
+  routes: ProviderServiceRoute[],
+  providerNumber: string,
+  serviceCategory?: string,
+  identityFingerprint?: string,
+  pageFingerprints: string[] = [],
+) {
   const numberKey = normalizeProviderNumber(providerNumber);
   const categoryKey = normalizeServiceCategory(serviceCategory);
-  if (!numberKey) return undefined;
-  const numberRoutes = routes.filter((route) => normalizeProviderNumber(route.providerNumber) === numberKey);
+  const numberRoutes = numberKey ? routes.filter((route) => normalizeProviderNumber(route.providerNumber) === numberKey) : routes;
   const fingerprint = identityFingerprint?.trim() ?? '';
-  let matches: ProviderServiceRoute[];
+  const pageKeys = new Set(pageFingerprints.filter(Boolean));
+  const overlappingPages = (route: ProviderServiceRoute) => route.pageFingerprints?.some((page) => pageKeys.has(page)) ?? false;
 
-  if (categoryKey) {
-    const categoryRoutes = numberRoutes.filter((route) => normalizeServiceCategory(route.serviceCategory) === categoryKey);
-    const identityMatches = fingerprint
-      ? categoryRoutes.filter((route) => route.identityFingerprint?.trim() === fingerprint)
-      : [];
-    matches = identityMatches.length ? identityMatches : categoryRoutes.filter((route) => !route.identityFingerprint?.trim());
-  } else {
-    const identityMatches = fingerprint
-      ? numberRoutes.filter((route) => route.identityFingerprint?.trim() === fingerprint)
-      : [];
-    matches = identityMatches.length
-      ? identityMatches
-      : numberRoutes.filter((route) => !route.identityFingerprint?.trim() && !normalizeServiceCategory(route.serviceCategory));
+  const pickUniqueRoute = (matches: ProviderServiceRoute[], matchedByIdentity: boolean) => {
+    const unique = new Map<string, ProviderServiceRoute>();
+    matches.forEach((route) => {
+      if (!route.deliveryMethod.trim() || !route.providerNumber.trim()) return;
+      const key = JSON.stringify([
+        normalizeProviderNumber(route.providerNumber),
+        normalizeServiceCategory(route.serviceCategory),
+        route.deliveryMethod.trim(),
+      ]);
+      unique.set(key, route);
+    });
+    if (unique.size !== 1) return undefined;
+    const route = [...unique.values()][0];
+    return {
+      providerNumber: normalizeProviderNumber(route.providerNumber),
+      serviceCategory: normalizeServiceCategory(route.serviceCategory),
+      deliveryMethod: route.deliveryMethod.trim(),
+      matchedByIdentity,
+    };
+  };
+
+  if (pageKeys.size) {
+    const pageMatches = routes.filter(overlappingPages);
+    const route = pickUniqueRoute(pageMatches, true);
+    if (route) return route;
+    if (pageMatches.length) return undefined;
   }
 
-  const choices = new Map<string, { serviceCategory: string; deliveryMethod: string }>();
-  matches.forEach((route) => {
-    const deliveryMethod = route.deliveryMethod.trim();
-    if (!deliveryMethod) return;
-    const category = normalizeServiceCategory(route.serviceCategory);
-    choices.set(JSON.stringify([category, deliveryMethod]), { serviceCategory: category, deliveryMethod });
-  });
-  if (choices.size !== 1) return undefined;
-  const choice = [...choices.values()][0];
-  return { providerNumber: numberKey, ...choice };
+  if (fingerprint) {
+    const identityMatches = routes.filter((route) => route.identityFingerprint?.trim() === fingerprint);
+    const route = pickUniqueRoute(identityMatches, true);
+    if (route) return route;
+    if (identityMatches.length) return undefined;
+  }
+
+  if (!numberKey) return undefined;
+  if (categoryKey) {
+    return pickUniqueRoute(numberRoutes.filter((route) => normalizeServiceCategory(route.serviceCategory) === categoryKey), false);
+  }
+  if (fingerprint || pageKeys.size) return undefined;
+  return pickUniqueRoute(numberRoutes.filter((route) => !route.identityFingerprint?.trim() && !route.pageFingerprints?.length), false);
 }
 
 /** 同じ番号＋種類の古い設定は置き換え、明示的に選んだ送り先を一件だけ記憶します。 */
-export function upsertProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory: string, deliveryMethod: string, identityFingerprint?: string) {
+export function upsertProviderServiceRoute(
+  routes: ProviderServiceRoute[],
+  providerNumber: string,
+  serviceCategory: string,
+  deliveryMethod: string,
+  identityFingerprint?: string,
+  pageFingerprints: string[] = [],
+) {
   const numberKey = normalizeProviderNumber(providerNumber);
   const categoryKey = normalizeServiceCategory(serviceCategory);
   const method = deliveryMethod.trim();
   if (!numberKey || !method) return routes;
   const fingerprint = identityFingerprint?.trim() ?? '';
+  const pageKeys = [...new Set(pageFingerprints.filter(Boolean))];
+  const hasIdentity = Boolean(fingerprint || pageKeys.length);
+  const matchesExisting = (route: ProviderServiceRoute) => {
+    if (normalizeProviderNumber(route.providerNumber) !== numberKey) return false;
+    const sameCategory = normalizeServiceCategory(route.serviceCategory) === categoryKey;
+    if (fingerprint && route.identityFingerprint?.trim() === fingerprint) return true;
+    if (!pageKeys.length) return false;
+    const existingPages = route.pageFingerprints ?? [];
+    const overlaps = existingPages.some((page) => pageKeys.includes(page));
+    const exactPageSet = existingPages.length === pageKeys.length && existingPages.every((page) => pageKeys.includes(page));
+    return overlaps && (sameCategory || exactPageSet);
+  };
+  const existing = routes.filter(matchesExisting);
+  const mergedPageKeys = [...new Set([...existing.flatMap((route) => route.pageFingerprints ?? []), ...pageKeys])];
   return [
     ...routes.filter((route) => normalizeProviderNumber(route.providerNumber) !== numberKey
       || normalizeServiceCategory(route.serviceCategory) !== categoryKey
-      || (fingerprint ? route.identityFingerprint?.trim() !== fingerprint : Boolean(route.identityFingerprint?.trim()))),
-    { providerNumber: numberKey, serviceCategory: categoryKey, deliveryMethod: method, ...(fingerprint ? { identityFingerprint: fingerprint } : {}) },
+      || (hasIdentity ? !matchesExisting(route) : Boolean(route.identityFingerprint?.trim() || route.pageFingerprints?.length))),
+    {
+      providerNumber: numberKey,
+      serviceCategory: categoryKey,
+      deliveryMethod: method,
+      ...(fingerprint ? { identityFingerprint: fingerprint } : {}),
+      ...(mergedPageKeys.length ? { pageFingerprints: mergedPageKeys } : {}),
+    },
   ];
+}
+
+/** 確認済みにする操作でも、行で選ばれた事業所・種類・送り先を保存します。 */
+export function saveProviderGroupRouteChoice<T extends ProviderGroupLike>(group: T, routes: ProviderServiceRoute[] = []) {
+  if (!group.providerNumber.trim() || !group.deliveryMethod?.trim()) return routes;
+  return upsertProviderServiceRoute(
+    routes,
+    group.providerNumber,
+    group.serviceCategory,
+    group.deliveryMethod,
+    group.routeIdentityFingerprint,
+    group.routePageFingerprints,
+  );
 }
 
 /** 事業所名は帳票ファイル名用の別名なので、照合には使いません。 */
@@ -261,7 +340,13 @@ export function getProviderMasterWarningNumbers(entries: ProviderMasterLike[]) {
 }
 
 export function refreshProviderGroupRouting<T extends ProviderGroupLike, M extends ProviderMasterLike>(group: T, entries: M[], serviceRoutes: ProviderServiceRoute[] = []) {
-  const serviceRoute = findProviderServiceRoute(serviceRoutes, group.providerNumber, group.serviceCategory, group.routeIdentityFingerprint);
+  const serviceRoute = findProviderServiceRoute(
+    serviceRoutes,
+    group.providerNumber,
+    group.serviceCategory,
+    group.routeIdentityFingerprint,
+    group.routePageFingerprints,
+  );
   const match = serviceRoute
     ? { kind: 'routed' as const, route: serviceRoute }
     : matchProviderMaster(entries, group.providerNumber, group.serviceCategory);
@@ -277,8 +362,15 @@ export function refreshProviderGroupRouting<T extends ProviderGroupLike, M exten
     group.reviewed = false;
   } else if (match.kind === 'routed') {
     group.deliveryMethod = match.route.deliveryMethod;
-    if (!normalizeServiceCategory(group.serviceCategory) && match.route.serviceCategory) {
+    group.providerNumber = match.route.providerNumber;
+    if ((match.route.matchedByIdentity || !normalizeServiceCategory(group.serviceCategory)) && match.route.serviceCategory) {
       group.serviceCategory = match.route.serviceCategory;
+    }
+    if (!group.providerName.trim()) {
+      const masterMatch = matchProviderMaster(entries, group.providerNumber, group.serviceCategory);
+      if (masterMatch.kind === 'matched' && masterMatch.entry.providerName.trim()) {
+        group.providerName = masterMatch.entry.providerName.trim();
+      }
     }
   } else if (match.kind === 'matched') {
     const entry = match.entry;
@@ -324,7 +416,14 @@ export function applyProviderMasterChoice<T extends ProviderGroupLike, M extends
   if (!normalizeServiceCategory(group.serviceCategory) && normalizeServiceCategory(entry.serviceCategory)) {
     group.serviceCategory = normalizeServiceCategory(entry.serviceCategory);
   }
-  const nextRoutes = upsertProviderServiceRoute(serviceRoutes, entry.providerNumber, group.serviceCategory, entry.deliveryMethod, group.routeIdentityFingerprint);
+  const nextRoutes = upsertProviderServiceRoute(
+    serviceRoutes,
+    entry.providerNumber,
+    group.serviceCategory,
+    entry.deliveryMethod,
+    group.routeIdentityFingerprint,
+    group.routePageFingerprints,
+  );
   refreshProviderGroupRouting(group, entries, nextRoutes);
   return nextRoutes;
 }

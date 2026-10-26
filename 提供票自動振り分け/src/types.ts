@@ -10,6 +10,8 @@ export type SlipGroup = {
   serviceCategory: string;
   /** 今回のPDF内の提供票を識別する一時値。永続保存には名前ではなくハッシュのみ使います。 */
   routeIdentityFingerprint?: string;
+  /** OCR結果の変化に左右されない、元PDFとページ番号から作る一時指紋一覧。 */
+  routePageFingerprints?: string[];
   /** Gemini補助判定へ送る場合だけ使う、事業所関連行のローカル断片。保存はしない。 */
   geminiExcerpt: string;
   geminiUsed: boolean;
@@ -52,13 +54,15 @@ export type ProviderMasterEntry = {
   needsServiceReview?: boolean;
 };
 
-/** 利用者が要確認画面で決めた、番号＋サービス種類ごとの送付先。 */
+/** 利用者が要確認画面で決めた送付先。番号＋種類に加え、同じ提供票ページでも照合します。 */
 export type ProviderServiceRoute = {
   providerNumber: string;
   serviceCategory: string;
   deliveryMethod: DeliveryMethod;
   /** 事業所・利用者名と対象PDFページから生成したSHA-256。名前そのものは保存しません。 */
   identityFingerprint?: string;
+  /** 同じPDFのページが一致すれば、OCR名や年月、グループ分けの差を越えて照合します。 */
+  pageFingerprints?: string[];
 };
 
 /** 個人名やPDF本体は保存しない。マスタと利用者が入力した設定だけを日次バックアップする。 */

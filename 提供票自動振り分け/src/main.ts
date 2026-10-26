@@ -5,6 +5,7 @@ import { analysePdfs, createFilePreview, createMergedProviderPdf, createProvider
 import { DEFAULT_DELIVERY_METHODS, type AnalysisResult, type AppSavedData, type DeliveryMethodOption, type ProviderMasterEntry, type SlipGroup } from './types';
 import { emptySavedData, exportSavedData, importSavedData, loadSavedData, saveSavedData } from './storage';
 import { requestGeminiSuggestion } from './gemini-service';
+import { assistUnresolvedProviderNames } from './provider-assistance';
 import { SERVICE_CATEGORY_GROUPS, SERVICE_CATEGORY_OPTIONS } from './service-categories.ts';
 import { canCreateOutputs, canToggleForceDownload } from './output-policy';
 import {
@@ -1002,86 +1003,21 @@ async function preview(groupId: string) {
   }
 }
 
-const providerIdentityIssues = new Set(['事業所名を判定できません', '10桁の事業所番号を判定できません']);
-
 function normalizedProviderName(value: string) {
   return value.normalize('NFKC').toLocaleLowerCase('ja').replace(/[\s・,，.。\-－‐()（）]/gu, '');
 }
 
-function providerNamesCompatible(left: string, right: string) {
-  const a = normalizedProviderName(left);
-  const b = normalizedProviderName(right);
-  return !a || !b || a === b || a.includes(b) || b.includes(a);
-}
-
-function applyAutomaticGeminiSuggestion(group: SlipGroup, suggestion: Awaited<ReturnType<typeof requestGeminiSuggestion>>) {
-  if (suggestion.confidence < 0.9) return false;
-  if (group.providerNumber && suggestion.providerNumber && group.providerNumber !== suggestion.providerNumber) return false;
-
-  const suggestedCategory = suggestion.isHomeMedicalCare === true ? '居宅療養管理指導' : '';
-  if (group.serviceCategory && suggestedCategory
-    && normalizeServiceCategory(group.serviceCategory) !== normalizeServiceCategory(suggestedCategory)) return false;
-  if (!group.serviceCategory && suggestedCategory) group.serviceCategory = suggestedCategory;
-
-  const candidateNumber = group.providerNumber || suggestion.providerNumber || '';
-  let master = findProviderMaster(candidateNumber, group.serviceCategory);
-  if (master) {
-    if (!master.providerName.trim() && suggestion.providerName?.trim()) master.providerName = suggestion.providerName.trim();
-  } else {
-    if (!suggestion.providerNumber || suggestion.confidence < 0.95 || group.providerNumber) return false;
-    const suggestedName = suggestion.providerName?.trim() || group.providerName.trim();
-    if (!suggestedName || !providerNamesCompatible(group.providerName, suggestedName)) return false;
-    master = createProviderMasterEntry(suggestion.providerNumber, suggestedName, group.serviceCategory);
-    savedData.providerMaster.unshift(master);
-    sectionOpen.master = true;
-  }
-
-  group.providerNumber = master.providerNumber;
-  group.providerName ||= master.providerName.trim() || suggestion.providerName?.trim() || '';
-  group.issues = group.issues.filter((issue) => !providerIdentityIssues.has(issue));
-  group.needsReview = group.issues.length > 0;
-  group.geminiUsed = true;
-  return true;
-}
-
-function addGeminiCandidateForReview(group: SlipGroup, suggestion: Awaited<ReturnType<typeof requestGeminiSuggestion>>) {
-  const candidates = [
-    suggestion.providerName && `事業所名候補：${suggestion.providerName}`,
-    suggestion.providerNumber && `事業所番号候補：${suggestion.providerNumber}`,
-    suggestion.isHomeMedicalCare === true && '居宅療養管理指導の可能性',
-    suggestion.reason,
-  ].filter(Boolean).join(' / ');
-  group.issues = group.issues.filter((issue) => !issue.startsWith('自動確認候補：'));
-  group.issues.push(`自動確認候補：${candidates || '事業所マスタと照合できません'}（確認してください・確信度 ${Math.round(suggestion.confidence * 100)}%）`);
-  group.needsReview = true;
-  group.reviewed = false;
-}
-
 async function automaticallyAssistUnresolvedOffices() {
-  const targets = result?.groups.filter((group) => group.issues.some((issue) => providerIdentityIssues.has(issue)) && group.geminiExcerpt.trim()) ?? [];
-  if (!targets.length) return;
-
-  type Suggestion = Awaited<ReturnType<typeof requestGeminiSuggestion>>;
-  const cachedSuggestions = new Map<string, Suggestion>();
-  for (const [index, group] of targets.entries()) {
-    setProgress(`${index + 1} / ${targets.length}件　事業所情報を補助確認中`);
-    const cacheKey = `${group.providerName}|${group.providerNumber}|${group.geminiExcerpt}`;
-    try {
-      let suggestion = cachedSuggestions.get(cacheKey);
-      if (!suggestion) {
-        suggestion = await requestGeminiSuggestion({ excerpt: group.geminiExcerpt, providerName: group.providerName, providerNumber: group.providerNumber, missing: group.issues });
-        cachedSuggestions.set(cacheKey, suggestion);
-      }
-      if (!applyAutomaticGeminiSuggestion(group, suggestion)) addGeminiCandidateForReview(group, suggestion);
-    } catch {
-      for (const pending of targets.slice(index)) {
-        pending.issues.push('事業所情報を自動確認できませんでした。事業所マスタを確認してください。');
-        pending.needsReview = true;
-        pending.reviewed = false;
-      }
-      break;
-    }
-  }
+  if (!result) return;
+  await assistUnresolvedProviderNames(result.groups, savedData.providerMaster, {
+    requestSuggestion: requestGeminiSuggestion,
+    findMaster: findProviderMaster,
+    createEntry: createProviderMasterEntry,
+    onMasterAdded: () => { sectionOpen.master = true; },
+    onProgress: setProgress,
+  });
+  const ensured = ensureProviderMasterForGroups(result.groups);
+  if (ensured.added) sectionOpen.master = true;
   refreshRoutingSafety();
   persist();
 }

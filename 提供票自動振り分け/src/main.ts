@@ -10,6 +10,7 @@ import { canCreateOutputs, canToggleForceDownload } from './output-policy';
 import {
   applyProviderMasterChoice,
   canAutoAssignServiceCategory,
+  createProviderRouteIdentityFingerprint,
   findProviderServiceRoute,
   hasIndependentGroupReview,
   matchProviderMaster,
@@ -53,8 +54,8 @@ const groupStatus = (group: SlipGroup, singleFolderExport = false) => {
   return group.needsReview && !group.reviewed ? '要確認' : '確認済み';
 };
 const download = (bytes: BlobPart, name: string) => { const url = URL.createObjectURL(new Blob([bytes])); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
-const findProviderMaster = (providerNumber: string, serviceCategory?: string): ProviderMasterEntry | undefined => {
-  const serviceRoute = findProviderServiceRoute(savedData.providerServiceRoutes ?? [], providerNumber, serviceCategory);
+const findProviderMaster = (providerNumber: string, serviceCategory?: string, identityFingerprint?: string): ProviderMasterEntry | undefined => {
+  const serviceRoute = findProviderServiceRoute(savedData.providerServiceRoutes ?? [], providerNumber, serviceCategory, identityFingerprint);
   if (serviceRoute) return {
     id: undefined,
     providerNumber: serviceRoute.providerNumber,
@@ -66,7 +67,7 @@ const findProviderMaster = (providerNumber: string, serviceCategory?: string): P
   const match = matchProviderMaster(savedData.providerMaster, providerNumber, serviceCategory);
   return match.kind === 'matched' ? match.entry : undefined;
 };
-const masterFor = (group: SlipGroup) => findProviderMaster(group.providerNumber, group.serviceCategory);
+const masterFor = (group: SlipGroup) => findProviderMaster(group.providerNumber, group.serviceCategory, group.routeIdentityFingerprint);
 const providerMatchKeyFor = (group: SlipGroup) => {
   const master = masterFor(group);
   if (master?.id) return master.id;
@@ -111,7 +112,7 @@ function ensureProviderMasterForGroups(groups: SlipGroup[]) {
     if (!number) continue;
     const category = normalizeServiceCategory(group.serviceCategory);
     const candidates = savedData.providerMaster.filter((entry) => normalizeProviderNumber(entry.providerNumber) === number);
-    if (findProviderServiceRoute(savedData.providerServiceRoutes ?? [], number, category)) continue;
+    if (findProviderServiceRoute(savedData.providerServiceRoutes ?? [], number, category, group.routeIdentityFingerprint)) continue;
     const exact = category ? candidates.filter((entry) => normalizeServiceCategory(entry.serviceCategory) === category) : [];
     if (exact.length) {
       if (exact.length > 1) continue;
@@ -822,10 +823,17 @@ function bindEvents() {
     refreshRoutingSafety();
     render();
   }));
-  document.querySelectorAll<HTMLSelectElement>('select[data-route-choice]').forEach((select) => select.addEventListener('change', () => {
+  document.querySelectorAll<HTMLSelectElement>('select[data-route-choice]').forEach((select) => select.addEventListener('change', async () => {
     const group = result?.groups.find((item) => item.id === select.closest('tr')?.dataset.id);
     if (!group) return;
     if (select.dataset.routeChoice === 'providerMaster') {
+      const selectedMaster = savedData.providerMaster.find((entry) => entry.id === select.value);
+      if (selectedMaster && result) {
+        group.routeIdentityFingerprint = await createProviderRouteIdentityFingerprint(
+          { ...group, providerNumber: selectedMaster.providerNumber },
+          result.sources,
+        );
+      }
       savedData.providerServiceRoutes = applyProviderMasterChoice(
         group,
         select.value,
@@ -839,11 +847,15 @@ function bindEvents() {
     } else if (select.dataset.routeChoice === 'deliveryMethod') {
       group.deliveryMethod = select.value;
       if (group.serviceCategory && select.value) {
+        if (result) {
+          group.routeIdentityFingerprint = await createProviderRouteIdentityFingerprint(group, result.sources);
+        }
         savedData.providerServiceRoutes = upsertProviderServiceRoute(
           savedData.providerServiceRoutes ?? [],
           group.providerNumber,
           group.serviceCategory,
           select.value,
+          group.routeIdentityFingerprint,
         );
         persist();
       }
@@ -985,7 +997,11 @@ async function startRouting() {
   showIntakeProgress();
   busy = true; setProgress('PDFを読み込み中');
   try {
-    const loaded = await loadPdfFiles(pdfs, setProgress); const analysis = await analysePdfs(loaded.sources, loaded.duplicateFiles, setProgress); result = analysis; queuedFiles = []; downloaded = 0; outputName = ''; sectionOpen.verification = false;
+    const loaded = await loadPdfFiles(pdfs, setProgress); const analysis = await analysePdfs(loaded.sources, loaded.duplicateFiles, setProgress); result = analysis;
+    await Promise.all(result.groups.map(async (group) => {
+      group.routeIdentityFingerprint = await createProviderRouteIdentityFingerprint(group, result!.sources);
+    }));
+    queuedFiles = []; downloaded = 0; outputName = ''; sectionOpen.verification = false;
     const ensured = ensureProviderMasterForGroups(result.groups);
     if (ensured.changed) persist();
     refreshRoutingSafety();

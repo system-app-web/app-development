@@ -4,6 +4,7 @@ import { extractServiceCategory, mergePageFacts, shouldStartNewSlip } from './an
 import {
   applyProviderMasterChoice,
   canAutoAssignServiceCategory,
+  createProviderRouteIdentityFingerprint,
   findProviderServiceRoute,
   getProviderMasterWarningNumbers,
   hasIndependentGroupReview,
@@ -116,6 +117,74 @@ describe('サービス種類を使った事業所マスタ照合', () => {
     assert.equal(nextSecond.deliveryMethod, 'メール');
   });
 
+  it('要確認で選んだ送り先はリセット後の同じPDFにも適用し、種類未判定を復元する', () => {
+    const masters = [
+      { providerNumber: '1234567890', providerName: '事業所A', serviceCategory: '訪問リハビリテーション', deliveryMethod: 'メール' },
+      { providerNumber: '1234567890', providerName: '事業所A', serviceCategory: '居宅療養管理指導', deliveryMethod: 'FAX' },
+    ];
+    const identityFingerprint = 'a'.repeat(64);
+    const first = baseGroup({
+      id: 'group-before-reset',
+      serviceCategory: '',
+      routeIdentityFingerprint: identityFingerprint,
+    });
+    refreshRoutingSafetyForGroups([first], masters);
+    assert.equal(first.needsReview, true);
+    assert.ok(first.issues.includes(SERVICE_MATCH_ISSUE));
+
+    first.serviceCategory = '訪問リハビリテーション';
+    first.deliveryMethod = 'メール';
+    const savedData = {
+      providerServiceRoutes: upsertProviderServiceRoute(
+        [], first.providerNumber, first.serviceCategory, first.deliveryMethod, identityFingerprint,
+      ),
+    };
+    refreshRoutingSafetyForGroups([first], masters, savedData.providerServiceRoutes);
+    assert.equal(first.needsReview, false);
+    assert.equal(first.deliveryMethod, 'メール');
+
+    // アプリの「リセット」は今回の結果だけを空にし、保存済みルールには触れない。
+    let currentResult = { groups: [first] };
+    currentResult = undefined;
+    assert.equal(currentResult, undefined);
+    assert.equal(savedData.providerServiceRoutes.length, 1);
+
+    const reuploaded = baseGroup({
+      id: 'group-after-reset',
+      serviceCategory: '',
+      routeIdentityFingerprint: identityFingerprint,
+    });
+    refreshRoutingSafetyForGroups([reuploaded], masters, savedData.providerServiceRoutes);
+    assert.equal(reuploaded.needsReview, false);
+    assert.equal(reuploaded.serviceCategory, '訪問リハビリテーション');
+    assert.equal(reuploaded.deliveryMethod, 'メール');
+    assert.ok(!reuploaded.issues.includes(SERVICE_MATCH_ISSUE));
+
+    const differentSlip = baseGroup({ serviceCategory: '', routeIdentityFingerprint: 'b'.repeat(64) });
+    refreshRoutingSafetyForGroups([differentSlip], masters, savedData.providerServiceRoutes);
+    assert.equal(differentSlip.needsReview, true);
+    assert.ok(differentSlip.issues.includes(SERVICE_MATCH_ISSUE));
+  });
+
+  it('提供票の照合指紋は同じ読み取り内容とPDFページから再現できる', async () => {
+    const group = baseGroup({
+      providerName: ' 事業所 A ',
+      clientName: '利用者 A',
+      serviceMonth: '令和8年10月',
+      pages: [{ sourceId: 'source-a', pageIndex: 16 }, { sourceId: 'source-a', pageIndex: 17 }],
+    });
+    const sources = [{ id: 'source-a', hash: 'fake-pdf-hash' }];
+    const first = await createProviderRouteIdentityFingerprint(group, sources);
+    const reuploaded = await createProviderRouteIdentityFingerprint({
+      ...group,
+      providerName: '事業所A',
+      clientName: '利用者A',
+    }, sources);
+    assert.match(first, /^[0-9a-f]{64}$/u);
+    assert.equal(reuploaded, first);
+    assert.notEqual(await createProviderRouteIdentityFingerprint({ ...group, clientName: '別の利用者' }, sources), first);
+  });
+
   it('確認表の編集後に安全判定を再計算すると状態が更新される', () => {
     const group = baseGroup({ clientName: '', issues: ['利用者名を判定できません'] });
     const masters = [{ providerNumber: '1234567890', providerName: '訪リハ', serviceCategory: '訪問リハビリテーション', deliveryMethod: 'FAX' }];
@@ -173,6 +242,23 @@ describe('サービス種類を使った事業所マスタ照合', () => {
   it('保存済みの番号＋種類の送り先ルールを読み込める', async () => {
     const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
     const route = { providerNumber: '1234567890', serviceCategory: '訪問介護', deliveryMethod: 'FAX' };
+    const data = { version: 1, providerMaster: [], geminiEnabled: false, providerServiceRoutes: [route] };
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: { getItem: () => JSON.stringify(data), setItem: () => {} },
+    });
+    try {
+      const loaded = await loadSavedData();
+      assert.deepEqual(loaded.providerServiceRoutes, [route]);
+    } finally {
+      if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
+      else delete globalThis.localStorage;
+    }
+  });
+
+  it('識別指紋付きの保存済み送り先ルールを読み込める', async () => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    const route = { providerNumber: '1234567890', serviceCategory: '訪問介護', deliveryMethod: 'FAX', identityFingerprint: 'a'.repeat(64) };
     const data = { version: 1, providerMaster: [], geminiEnabled: false, providerServiceRoutes: [route] };
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,

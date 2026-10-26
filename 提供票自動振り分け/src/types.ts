@@ -8,6 +8,8 @@ export type SlipGroup = {
   providerNumber: string;
   /** 帳票から分かるサービス種類。番号が重複した事業所の照合に使います。 */
   serviceCategory: string;
+  /** 今回のPDF内の提供票を識別する一時値。永続保存には名前ではなくハッシュのみ使います。 */
+  routeIdentityFingerprint?: string;
   /** Gemini補助判定へ送る場合だけ使う、事業所関連行のローカル断片。保存はしない。 */
   geminiExcerpt: string;
   geminiUsed: boolean;
@@ -55,6 +57,8 @@ export type ProviderServiceRoute = {
   providerNumber: string;
   serviceCategory: string;
   deliveryMethod: DeliveryMethod;
+  /** 事業所・利用者名と対象PDFページから生成したSHA-256。名前そのものは保存しません。 */
+  identityFingerprint?: string;
 };
 
 /** 個人名やPDF本体は保存しない。マスタと利用者が入力した設定だけを日次バックアップする。 */

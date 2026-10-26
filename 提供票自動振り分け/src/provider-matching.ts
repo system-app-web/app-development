@@ -26,6 +26,8 @@ export type ProviderGroupLike = {
   providerName: string;
   serviceCategory: string;
   serviceMonth: string;
+  routeIdentityFingerprint?: string;
+  pages?: Array<{ sourceId: string; pageIndex: number }>;
   deliveryMethod?: string;
   issues: string[];
   needsReview: boolean;
@@ -60,31 +62,88 @@ export function normalizeServiceCategory(value?: string | null) {
   return normalizeServiceCategoryValue(value);
 }
 
+/**
+ * 手動選択を同じ提供票へ安全に結び付けるための指紋を作ります。
+ * 利用者名・事業所名は保存せず、事業所番号、読み取れた名前、月、PDFページのSHA-256だけを入力にします。
+ */
+export async function createProviderRouteIdentityFingerprint(
+  group: Pick<ProviderGroupLike, 'providerNumber' | 'providerName' | 'clientName' | 'serviceMonth' | 'pages'>,
+  sources: Array<{ id: string; hash: string }> = [],
+) {
+  const number = normalizeProviderNumber(group.providerNumber);
+  const providerName = normalizeRouteIdentityText(group.providerName);
+  const clientName = normalizeRouteIdentityText(group.clientName);
+  if (!number || (!providerName && !clientName)) return '';
+
+  const hashesById = new Map(sources.map((source) => [source.id, source.hash]));
+  const pages = (group.pages ?? []).map((page) => [hashesById.get(page.sourceId) ?? '', page.pageIndex])
+    .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+  const facts = JSON.stringify([
+    number,
+    providerName,
+    clientName,
+    normalizeRouteIdentityText(group.serviceMonth),
+    pages,
+  ]);
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(facts));
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+function normalizeRouteIdentityText(value: string) {
+  return value.normalize('NFKC').toLocaleLowerCase('ja').replace(/[\s・,，.。\-－‐()（）]/gu, '');
+}
+
 export function providerIdentityKey(providerNumber: string, serviceCategory?: string) {
   return JSON.stringify([normalizeProviderNumber(providerNumber), normalizeServiceCategory(serviceCategory)]);
 }
 
-export function findProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory?: string) {
+export function findProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory?: string, identityFingerprint?: string) {
   const numberKey = normalizeProviderNumber(providerNumber);
   const categoryKey = normalizeServiceCategory(serviceCategory);
   if (!numberKey) return undefined;
-  const matches = routes.filter((route) => normalizeProviderNumber(route.providerNumber) === numberKey
-    && normalizeServiceCategory(route.serviceCategory) === categoryKey);
-  const deliveryMethods = new Set(matches.map((route) => route.deliveryMethod.trim()).filter(Boolean));
-  if (deliveryMethods.size !== 1) return undefined;
-  return { providerNumber: numberKey, serviceCategory: categoryKey, deliveryMethod: [...deliveryMethods][0] };
+  const numberRoutes = routes.filter((route) => normalizeProviderNumber(route.providerNumber) === numberKey);
+  const fingerprint = identityFingerprint?.trim() ?? '';
+  let matches: ProviderServiceRoute[];
+
+  if (categoryKey) {
+    const categoryRoutes = numberRoutes.filter((route) => normalizeServiceCategory(route.serviceCategory) === categoryKey);
+    const identityMatches = fingerprint
+      ? categoryRoutes.filter((route) => route.identityFingerprint?.trim() === fingerprint)
+      : [];
+    matches = identityMatches.length ? identityMatches : categoryRoutes.filter((route) => !route.identityFingerprint?.trim());
+  } else {
+    const identityMatches = fingerprint
+      ? numberRoutes.filter((route) => route.identityFingerprint?.trim() === fingerprint)
+      : [];
+    matches = identityMatches.length
+      ? identityMatches
+      : numberRoutes.filter((route) => !route.identityFingerprint?.trim() && !normalizeServiceCategory(route.serviceCategory));
+  }
+
+  const choices = new Map<string, { serviceCategory: string; deliveryMethod: string }>();
+  matches.forEach((route) => {
+    const deliveryMethod = route.deliveryMethod.trim();
+    if (!deliveryMethod) return;
+    const category = normalizeServiceCategory(route.serviceCategory);
+    choices.set(JSON.stringify([category, deliveryMethod]), { serviceCategory: category, deliveryMethod });
+  });
+  if (choices.size !== 1) return undefined;
+  const choice = [...choices.values()][0];
+  return { providerNumber: numberKey, ...choice };
 }
 
 /** 同じ番号＋種類の古い設定は置き換え、明示的に選んだ送り先を一件だけ記憶します。 */
-export function upsertProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory: string, deliveryMethod: string) {
+export function upsertProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory: string, deliveryMethod: string, identityFingerprint?: string) {
   const numberKey = normalizeProviderNumber(providerNumber);
   const categoryKey = normalizeServiceCategory(serviceCategory);
   const method = deliveryMethod.trim();
   if (!numberKey || !method) return routes;
+  const fingerprint = identityFingerprint?.trim() ?? '';
   return [
     ...routes.filter((route) => normalizeProviderNumber(route.providerNumber) !== numberKey
-      || normalizeServiceCategory(route.serviceCategory) !== categoryKey),
-    { providerNumber: numberKey, serviceCategory: categoryKey, deliveryMethod: method },
+      || normalizeServiceCategory(route.serviceCategory) !== categoryKey
+      || (fingerprint ? route.identityFingerprint?.trim() !== fingerprint : Boolean(route.identityFingerprint?.trim()))),
+    { providerNumber: numberKey, serviceCategory: categoryKey, deliveryMethod: method, ...(fingerprint ? { identityFingerprint: fingerprint } : {}) },
   ];
 }
 
@@ -202,7 +261,7 @@ export function getProviderMasterWarningNumbers(entries: ProviderMasterLike[]) {
 }
 
 export function refreshProviderGroupRouting<T extends ProviderGroupLike, M extends ProviderMasterLike>(group: T, entries: M[], serviceRoutes: ProviderServiceRoute[] = []) {
-  const serviceRoute = findProviderServiceRoute(serviceRoutes, group.providerNumber, group.serviceCategory);
+  const serviceRoute = findProviderServiceRoute(serviceRoutes, group.providerNumber, group.serviceCategory, group.routeIdentityFingerprint);
   const match = serviceRoute
     ? { kind: 'routed' as const, route: serviceRoute }
     : matchProviderMaster(entries, group.providerNumber, group.serviceCategory);
@@ -218,6 +277,9 @@ export function refreshProviderGroupRouting<T extends ProviderGroupLike, M exten
     group.reviewed = false;
   } else if (match.kind === 'routed') {
     group.deliveryMethod = match.route.deliveryMethod;
+    if (!normalizeServiceCategory(group.serviceCategory) && match.route.serviceCategory) {
+      group.serviceCategory = match.route.serviceCategory;
+    }
   } else if (match.kind === 'matched') {
     const entry = match.entry;
     group.deliveryMethod = entry.deliveryMethod;
@@ -262,7 +324,7 @@ export function applyProviderMasterChoice<T extends ProviderGroupLike, M extends
   if (!normalizeServiceCategory(group.serviceCategory) && normalizeServiceCategory(entry.serviceCategory)) {
     group.serviceCategory = normalizeServiceCategory(entry.serviceCategory);
   }
-  const nextRoutes = upsertProviderServiceRoute(serviceRoutes, entry.providerNumber, group.serviceCategory, entry.deliveryMethod);
+  const nextRoutes = upsertProviderServiceRoute(serviceRoutes, entry.providerNumber, group.serviceCategory, entry.deliveryMethod, group.routeIdentityFingerprint);
   refreshProviderGroupRouting(group, entries, nextRoutes);
   return nextRoutes;
 }

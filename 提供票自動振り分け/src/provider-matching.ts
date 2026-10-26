@@ -322,6 +322,109 @@ export function reconcileProviderMaster<T extends ProviderMasterLike>(entries: T
   return { entries: reconciled, mergedCount, warningNumbers: [...warningNumbers] };
 }
 
+/** PDFの提供票群から、空の事業所名だけを補い、不足するマスタ行を作ります。 */
+export function ensureProviderMasterEntries<T extends ProviderMasterLike>(
+  entries: T[],
+  groups: ProviderGroupLike[],
+  serviceRoutes: ProviderServiceRoute[] = [],
+  createEntry: (providerNumber: string, providerName: string, serviceCategory?: string) => T,
+  now: () => string = () => new Date().toISOString(),
+) {
+  const before = JSON.stringify(entries);
+  const nextEntries = entries.map((entry) => ({ ...entry }));
+  const categoriesByNumber = new Map<string, Set<string>>();
+  const namesByNumber = new Map<string, Set<string>>();
+  const namesByIdentity = new Map<string, Set<string>>();
+
+  groups.forEach((group) => {
+    const number = normalizeProviderNumber(group.providerNumber);
+    const category = normalizeServiceCategory(group.serviceCategory);
+    const name = group.providerName.trim();
+    if (!number) return;
+    if (category) categoriesByNumber.set(number, new Set([...(categoriesByNumber.get(number) ?? []), category]));
+    if (!name) return;
+    namesByNumber.set(number, new Set([...(namesByNumber.get(number) ?? []), name]));
+    const identity = providerIdentityKey(number, category);
+    namesByIdentity.set(identity, new Set([...(namesByIdentity.get(identity) ?? []), name]));
+  });
+
+  const nameForGroup = (group: ProviderGroupLike, number: string, category: string) => {
+    const ownName = group.providerName.trim();
+    if (ownName) return ownName;
+    const namesForIdentity = namesByIdentity.get(providerIdentityKey(number, category));
+    if (namesForIdentity?.size === 1) return [...namesForIdentity][0];
+    if (namesForIdentity?.size) return '';
+    const namesForNumber = namesByNumber.get(number);
+    return namesForNumber?.size === 1 ? [...namesForNumber][0] : '';
+  };
+  const setMissingNames = (rows: T[], name: string) => {
+    if (!name) return;
+    rows.forEach((entry) => {
+      if (entry.providerName.trim()) return;
+      entry.providerName = name;
+      entry.updatedAt = now();
+    });
+  };
+
+  let added = 0;
+  const additions = new Map<string, T>();
+  const addEntry = (key: string, number: string, name: string, category = '') => {
+    const pending = additions.get(key);
+    if (pending) {
+      if (!pending.providerName.trim() && name) pending.providerName = name;
+      return;
+    }
+    additions.set(key, createEntry(number, name, category));
+    added++;
+  };
+
+  for (const group of groups) {
+    const number = normalizeProviderNumber(group.providerNumber);
+    if (!number) continue;
+    const category = normalizeServiceCategory(group.serviceCategory);
+    const providerName = nameForGroup(group, number, category);
+    const candidates = nextEntries.filter((entry) => normalizeProviderNumber(entry.providerNumber) === number);
+    const exact = category ? candidates.filter((entry) => normalizeServiceCategory(entry.serviceCategory) === category) : [];
+
+    // 同じ番号＋種類の行が複数あっても、空欄の名前は補います。入力済みの名前には触れません。
+    if (exact.length) {
+      setMissingNames(exact, providerName);
+      continue;
+    }
+
+    const untyped = candidates.filter((entry) => !normalizeServiceCategory(entry.serviceCategory));
+    if (!category) {
+      if (!candidates.length) {
+        const key = providerIdentityKey(number, '');
+        if (findProviderServiceRoute(serviceRoutes, number, '', group.routeIdentityFingerprint, group.routePageFingerprints)) continue;
+        addEntry(key, number, providerName);
+      } else if (candidates.length === 1 || namesByNumber.get(number)?.size === 1) {
+        setMissingNames(candidates, providerName);
+      }
+      continue;
+    }
+
+    if (untyped.length === 1) {
+      setMissingNames(untyped, providerName);
+      if (canAutoAssignServiceCategory(untyped[0], candidates.length, categoriesByNumber.get(number)?.size ?? 0)) {
+        untyped[0].serviceCategory = category;
+        untyped[0].updatedAt = now();
+      }
+      continue;
+    }
+    if (untyped.length) {
+      if (namesByNumber.get(number)?.size === 1) setMissingNames(untyped, providerName);
+      continue;
+    }
+
+    if (findProviderServiceRoute(serviceRoutes, number, category, group.routeIdentityFingerprint, group.routePageFingerprints)) continue;
+    addEntry(providerIdentityKey(number, category), number, providerName, category);
+  }
+
+  if (additions.size) nextEntries.unshift(...additions.values());
+  return { entries: nextEntries, added, changed: before !== JSON.stringify(nextEntries) };
+}
+
 export function getProviderMasterWarningNumbers(entries: ProviderMasterLike[]) {
   const byNumber = new Map<string, ProviderMasterLike[]>();
   entries.forEach((entry) => {

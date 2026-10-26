@@ -7,6 +7,7 @@ import {
   createProviderRouteIdentityFingerprint,
   createProviderRoutePageFingerprints,
   DELIVERY_METHOD_ISSUE,
+  ensureProviderMasterEntries,
   findProviderServiceRoute,
   getProviderMasterWarningNumbers,
   hasIndependentGroupReview,
@@ -35,6 +36,16 @@ const baseGroup = (overrides = {}) => ({
   ...overrides,
 });
 
+let fakeMasterId = 0;
+const makeFakeMasterEntry = (providerNumber, providerName, serviceCategory = '') => ({
+  id: `fake-master-${++fakeMasterId}`,
+  providerNumber,
+  providerName,
+  serviceCategory,
+  deliveryMethod: '',
+  updatedAt: '2026-10-01T00:00:00.000Z',
+});
+
 function confirmGroupChoice(group, entries, routes = []) {
   const savedRoutes = saveProviderGroupRouteChoice(group, routes);
   refreshRoutingSafetyForGroups([group], entries, savedRoutes);
@@ -43,6 +54,65 @@ function confirmGroupChoice(group, entries, routes = []) {
 }
 
 describe('サービス種類を使った事業所マスタ照合', () => {
+  it('空のマスタへ2ページの提供票を読み込むと事業所名を登録する', () => {
+    const result = ensureProviderMasterEntries([], [baseGroup({
+      providerNumber: '9999900011',
+      providerName: '架空の二ページ事業所',
+      serviceCategory: '訪問看護',
+      pages: [{ sourceId: 'fake-pdf', pageIndex: 0 }, { sourceId: 'fake-pdf', pageIndex: 1 }],
+    })], [], makeFakeMasterEntry);
+    assert.equal(result.added, 1);
+    assert.equal(result.entries[0].providerName, '架空の二ページ事業所');
+  });
+
+  it('3ページ以上の提供票でも事業所名を登録する', () => {
+    const result = ensureProviderMasterEntries([], [baseGroup({
+      providerNumber: '9999900012',
+      providerName: '架空の複数ページ事業所',
+      serviceCategory: '訪問リハビリテーション',
+      pages: [0, 1, 2, 3].map((pageIndex) => ({ sourceId: 'fake-pdf', pageIndex })),
+    })], [], makeFakeMasterEntry);
+    assert.equal(result.added, 1);
+    assert.equal(result.entries[0].providerName, '架空の複数ページ事業所');
+  });
+
+  it('同じ番号・種類の先行グループが空名でも、後続で読めた名前を新規行へ反映する', () => {
+    const result = ensureProviderMasterEntries([], [
+      baseGroup({ providerNumber: '9999900015', providerName: '', serviceCategory: '訪問看護' }),
+      baseGroup({ providerNumber: '9999900015', providerName: '架空の後続ページ事業所', serviceCategory: '訪問看護' }),
+    ], [], makeFakeMasterEntry);
+    assert.equal(result.added, 1);
+    assert.equal(result.entries[0].providerName, '架空の後続ページ事業所');
+  });
+
+  it('同じ事業所番号の複数提供票を種類別に登録し、同種類の重複行も空名を補う', () => {
+    const groups = [
+      baseGroup({ providerNumber: '9999900013', providerName: '架空の訪問看護事業所', serviceCategory: '訪問看護' }),
+      baseGroup({ providerNumber: '9999900013', providerName: '架空の居宅療養事業所', serviceCategory: '居宅療養管理指導' }),
+    ];
+    const added = ensureProviderMasterEntries([], groups, [], makeFakeMasterEntry);
+    assert.equal(added.entries.length, 2);
+    assert.deepEqual(added.entries.map((entry) => entry.providerName), ['架空の訪問看護事業所', '架空の居宅療養事業所']);
+
+    const duplicateRows = [
+      makeFakeMasterEntry('9999900013', '', '訪問看護'),
+      { ...makeFakeMasterEntry('9999900013', '', '訪問看護'), deliveryMethod: 'FAX' },
+    ];
+    const filled = ensureProviderMasterEntries(duplicateRows, [groups[0]], [], makeFakeMasterEntry);
+    assert.deepEqual(filled.entries.map((entry) => entry.providerName), ['架空の訪問看護事業所', '架空の訪問看護事業所']);
+  });
+
+  it('入力済みの事業所名は提供票の名称で上書きしない', () => {
+    const existing = makeFakeMasterEntry('9999900014', '手入力した略称', '訪問看護');
+    const result = ensureProviderMasterEntries([existing], [baseGroup({
+      providerNumber: '9999900014',
+      providerName: '提供票に記載の別名称',
+      serviceCategory: '訪問看護',
+    })], [], makeFakeMasterEntry);
+    assert.equal(result.entries[0].providerName, '手入力した略称');
+    assert.equal(result.added, 0);
+  });
+
   it('マスタ名を略称にしても、番号とサービス種類で一致する', () => {
     const master = { providerNumber: '1234567890', providerName: '訪リハ', serviceCategory: '訪問リハビリテーション', deliveryMethod: 'FAX' };
     const match = matchProviderMaster([master], '1234567890', '訪問リハビリテーション');

@@ -1,7 +1,12 @@
 .master { padding: 24px; margin-top: 18px; }
 .backup-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .master-table { margin-top: 14px; }
-.master-table table { min-width: 820px; }
+.master-table table { min-width: 1000px; table-layout: fixed; }
+.master-table col.master-number-column { width: 150px; }
+.master-table col.master-service-column { width: 198px; }
+.master-table col.master-name-column { width: auto; }
+.master-table col.master-route-column { width: 285px; }
+.master-table col.master-action-column { width: 72px; }
 .master-service-category { color: #5d6270; font-size: 12px; }
 .master-table select { width: 100%; border: 1px solid #d8d9df; border-radius: 7px; padding: 7px 8px; font: inherit; background: #fff; }
 .empty-master { margin: 18px 0 0; padding: 13px 14px; background: #f6f8fc; border-radius: 10px; color: #5d6270; font-size: 13px; line-height: 1.6; }
@@ -16,6 +21,7 @@
 .master-status.registered { color: #18783d; }
 .master-table select.master-route-unset { border-color: #e7a0a7; background-color: #fff1f2; color: #982832; font-weight: 750; box-shadow: inset 0 0 0 1px rgba(231, 160, 167, .22); }
 .master-table select.master-route-unset:focus-visible { outline: 3px solid rgba(190, 48, 60, .28); outline-offset: 2px; }
+.master-table th:last-child, .master-table td:last-child { white-space: nowrap; }
 .master-delete-button { display: inline-flex; align-items: center; gap: 6px; }
 .master-delete-button:disabled { opacity: .65; cursor: progress; }
 .progress-spinner.small { width: 15px; height: 15px; border-width: 2px; }
@@ -38,6 +44,12 @@
 .delivery-method-remove { padding: 9px 4px; color: #9f2631; white-space: nowrap; }
 .delivery-method-add { margin-top: 12px; padding: 8px 0; }
 .delivery-method-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e8e9ed; }
+@media (max-width: 1100px) {
+  .master-table col.master-number-column { width: 140px; }
+  .master-table col.master-service-column { width: 176px; }
+  .master-table col.master-route-column { width: 270px; }
+  .master-table col.master-action-column { width: 64px; }
+}
 @media (max-width: 640px) {
   .delivery-method-dialog { padding: 18px; }
   .delivery-method-edit-row { grid-template-columns: minmax(0, 1fr); }

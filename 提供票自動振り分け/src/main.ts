@@ -6,7 +6,9 @@ import { DEFAULT_DELIVERY_METHODS, type AnalysisResult, type AppSavedData, type 
 import { emptySavedData, exportSavedData, importSavedData, loadSavedData, saveSavedData } from './storage';
 import { requestGeminiSuggestion } from './gemini-service';
 import { SERVICE_CATEGORY_GROUPS, SERVICE_CATEGORY_OPTIONS } from './service-categories.ts';
+import { canCreateOutputs, canToggleForceDownload } from './output-policy';
 import {
+  applyProviderMasterChoice,
   canAutoAssignServiceCategory,
   findProviderServiceRoute,
   hasIndependentGroupReview,
@@ -181,7 +183,7 @@ const deliveryMethodNameFor = (value: string) => deliveryMethodOptions().find((m
 const deliveryFolderNameFor = (value: string) => deliveryMethodOptions().find((method) => method.value === value)?.folderName || value;
 const outputBlocked = (group: SlipGroup, allowMissingDeliveryMethod = false) => !group.providerNumber || !providerNameFor(group) || !group.clientName.trim() || !group.serviceMonth.trim() || (!allowMissingDeliveryMethod && !masterFor(group)?.deliveryMethod);
 const persist = () => saveSavedData(savedData);
-let singleFolderExportChecked = false;
+let forceDownloadChecked = false;
 const monthlyFolderTitle = (month: string) => {
   const monthNumber = month.match(/([0-9]{1,2})月/u)?.[1];
   return monthNumber ? `${Number(monthNumber)}月　提供表` : '提供年月未確定　提供表';
@@ -344,8 +346,7 @@ function renderView() {
   const activeGroups = groups.filter((group) => !isStoppedGroup(group));
   const masterSetupKeys = new Set(activeGroups.filter((group) => group.providerNumber && !masterFor(group)?.deliveryMethod).map(providerMatchKeyFor));
   const masterSetupCount = masterSetupKeys.size;
-  if (!masterSetupCount) singleFolderExportChecked = false;
-  const singleFolderExport = singleFolderExportChecked && masterSetupCount > 0;
+  const singleFolderExport = forceDownloadChecked && masterSetupCount > 0;
   const reviewKeys = new Set<string>();
   groups.forEach((group) => {
     const stopped = isStoppedGroup(group);
@@ -377,7 +378,18 @@ function renderView() {
   const reviewCount = reviewKeys.size + (result?.duplicateFiles.length ?? 0);
   const blockedCount = groups.filter((group) => outputBlocked(group, singleFolderExport || isStoppedGroup(group))).length;
   const mixedMonths = Boolean(result && result.uniqueMonths.length !== 1);
-  const canExport = Boolean(result && !busy && !queuedFiles.length && reviewCount === 0 && blockedCount === 0 && !mixedMonths && assigned === result.totalPages && groups.length);
+  const canExport = canCreateOutputs({
+    hasResult: Boolean(result),
+    busy,
+    queuedFileCount: queuedFiles.length,
+    reviewCount,
+    blockedCount,
+    mixedMonths,
+    assignedPageCount: assigned,
+    totalPageCount: result?.totalPages ?? 0,
+    groupCount: groups.length,
+    forceDownload: forceDownloadChecked,
+  });
   const progressMessage = app.dataset.progress || '処理を準備中';
   app.innerHTML = `
     <main class="shell">
@@ -400,10 +412,10 @@ function renderView() {
             <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>
             <input id="folderInput" type="file" accept="application/pdf,.pdf" webkitdirectory multiple hidden>
           </div>
-        ` : outputPanel(canExport, reviewCount, blockedCount, masterSetupCount, mixedMonths, groups.length, assigned, result.totalPages, singleFolderExport)}
+        ` : outputPanel(canExport, reviewCount, blockedCount, masterSetupCount, mixedMonths, groups.length, assigned, result.totalPages, singleFolderExport, forceDownloadChecked)}
       `)}
       ${masterArea(singleFolderExport)}
-      ${result && !busy ? reviewArea(groups, reviewCount, assigned, singleFolderExport) : ''}
+      ${result && !busy ? reviewArea(groups, reviewCount, assigned, singleFolderExport, forceDownloadChecked) : ''}
     </main>
     <dialog id="previewDialog" class="preview-dialog" aria-labelledby="previewTitle"><form method="dialog"><button class="close" aria-label="閉じる"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></form><h3 id="previewTitle" tabindex="-1" autofocus>元PDFページ</h3><div id="previewPages" class="preview-pages"></div></dialog>
     ${clientStopDialogOpen && result && !busy ? clientStopDialog(groups) : ''}
@@ -449,7 +461,33 @@ function serviceCategoryOptions(currentValue?: string) {
   return `${renderOption('', '未判定')}${preservedValue}${groups}`;
 }
 
+function providerMasterChoices(group: SlipGroup) {
+  const candidates = savedData.providerMaster.filter((entry) => entry.providerNumber.trim() && entry.deliveryMethod.trim());
+  const nameKey = normalizedProviderName(group.providerName);
+  const suggested = nameKey.length >= 4
+    ? candidates.find((entry) => {
+      const candidateName = normalizedProviderName(entry.providerName);
+      return candidateName.length >= 4 && (candidateName === nameKey || candidateName.includes(nameKey) || nameKey.includes(candidateName));
+    })
+    : undefined;
+  return [...candidates].sort((left, right) => Number(right.id === suggested?.id) - Number(left.id === suggested?.id));
+}
+
 function reviewRouteControls(group: SlipGroup) {
+  if (!group.providerNumber.trim()) {
+    const candidates = providerMasterChoices(group);
+    const first = candidates[0];
+    const groupName = normalizedProviderName(group.providerName);
+    const firstName = normalizedProviderName(first?.providerName ?? '');
+    const suggested = first && groupName.length >= 4 && firstName.length >= 4
+      && (firstName === groupName || firstName.includes(groupName) || groupName.includes(firstName)) ? first : undefined;
+    const hint = suggested
+      ? `候補：${suggested.providerName}（選択してください）`
+      : candidates.length ? '事業所マスタから選んでください' : '送付方法が設定済みの候補はありません';
+    return `<div class="review-route-controls">
+      <label><span>事業所マスタから選ぶ</span><select data-route-choice="providerMaster" aria-label="事業所マスタから選ぶ" ${candidates.length ? '' : 'disabled'}><option value="" selected>${escapeHtml(hint)}</option>${candidates.map((entry) => `<option value="${escapeHtml(entry.id ?? '')}">${escapeHtml([entry.providerName || '名称未設定', entry.providerNumber, deliveryMethodNameFor(entry.deliveryMethod)].join('｜'))}</option>`).join('')}</select></label>
+    </div>`;
+  }
   if (!group.issues.includes(SERVICE_MATCH_ISSUE)) return '';
   const selectedMethod = group.deliveryMethod ?? '';
   const methodIsConfigured = deliveryMethodOptions().some((method) => method.value === selectedMethod);
@@ -466,15 +504,18 @@ function fixedSection(key: string, title: string, meta: string, content: string)
   return `<section class="card fold-section ${key}-section"><div class="fold-summary intake-fixed-summary"><span class="fold-title">${title}</span>${meta}</div><div class="fold-body">${content}</div></section>`;
 }
 
-function outputPanel(canExport: boolean, reviewCount: number, blockedCount: number, masterSetupCount: number, mixedMonths: boolean, groupCount: number, assigned: number, totalPages: number, singleFolderExport: boolean) {
-  const reason = reviewCount ? `要確認 ${reviewCount}件を確認してから保存できます。` : blockedCount ? `必須情報または振り分け先が未設定の ${blockedCount}件を先に確認してください。` : mixedMonths ? '対象年月が1か月に揃ってから保存できます。' : '';
-  const statusLabel = canExport ? '保存可能' : masterSetupCount && !singleFolderExport ? '事業所マスタ未設定' : '確認が必要';
+function outputPanel(canExport: boolean, reviewCount: number, blockedCount: number, masterSetupCount: number, mixedMonths: boolean, groupCount: number, assigned: number, totalPages: number, singleFolderExport: boolean, forceDownload: boolean) {
+  const forcedWithReview = forceDownload && canExport && (reviewCount > 0 || blockedCount > 0);
+  const reason = mixedMonths ? '対象年月が1か月に揃ってから保存できます。' : reviewCount ? `要確認 ${reviewCount}件を確認してから保存できます。` : blockedCount ? `必須情報または振り分け先が未設定の ${blockedCount}件を先に確認してください。` : '';
+  const statusLabel = canExport ? forcedWithReview ? '強制保存可能' : '保存可能' : masterSetupCount && !singleFolderExport ? '事業所マスタ未設定' : '確認が必要';
   const downloadButton = `<button class="primary output-button output-button-large" data-action="create" ${canExport && !busy ? '' : 'disabled'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H10l2 2h7.5A1.5 1.5 0 0 1 21 9.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M3.5 11h17"/></svg>${busy ? 'ZIPを作成中…' : '振り分け完了フォルダをダウンロード'}</button>`;
-  const saveReason = !canExport && !masterSetupCount ? `<div class="output-status">${escapeHtml(reason || '内容を確認してから保存できます。')}</div>` : '';
+  const saveReason = forcedWithReview
+    ? '<div class="output-status" role="status">要確認の書類も出力します。保存後、ZIP内の書類と送付先を確認してください。</div>'
+    : !canExport ? `<div class="output-status">${escapeHtml(reason || '内容を確認してから保存できます。')}</div>` : '';
   const saveActions = `<div class="result-save-row has-master-setup"><div class="result-save-actions has-master-setup">
-    <div class="master-action-column"><button class="primary master-jump-button" data-action="go-master" ${canExport ? 'disabled' : ''}>事業所マスタへ移動</button></div>
+    <div class="master-action-column"><button class="primary master-jump-button" data-action="go-master" ${canExport && !forceDownload ? 'disabled' : ''}>事業所マスタへ移動</button></div>
     <div class="stop-action-column">${clientStopControl()}</div>
-    <div class="download-action-column">${downloadButton}<label class="single-folder-option ${canExport ? 'is-locked' : ''}"><span class="single-folder-choice"><input type="checkbox" data-action="single-folder-export" ${singleFolderExport ? 'checked' : ''} ${canExport ? 'disabled' : ''}><span>送付方法を使用しない方は一括して一つのフォルダに作成</span></span><small>チェックすると、送付方法が未設定でも保存できます。</small></label></div>
+    <div class="download-action-column">${downloadButton}<label class="single-folder-option"><span class="single-folder-choice"><input type="checkbox" data-action="single-folder-export" aria-describedby="force-download-help" ${forceDownload ? 'checked' : ''} ${canToggleForceDownload(Boolean(result), busy) ? '' : 'disabled'}><span>強制的にダウンロード可能にする</span></span><small id="force-download-help">要確認の書類も出力されます。送付方法未設定は一つのフォルダにまとめ、保存後に内容と送付先を確認してください。</small></label></div>
   </div></div>`;
   return `<section class="result-actions">
     <div class="result-actions-heading"><div><span class="eyebrow">振り分け完了</span><h2>${groupCount}件を振り分けました</h2></div></div>
@@ -578,14 +619,14 @@ function clientStopDialog(groups: SlipGroup[]) {
   </dialog>`;
 }
 
-function reviewArea(groups: SlipGroup[], reviewCount: number, assigned: number, singleFolderExport: boolean) {
+function reviewArea(groups: SlipGroup[], reviewCount: number, assigned: number, singleFolderExport: boolean, forceDownload: boolean) {
   const providers = new Map<string, SlipGroup[]>();
   groups.forEach((group) => { const name = `${deliveryMethodNameFor(destinationFor(group))}｜${providerNameFor(group) || '事業所名未判定'}（${group.providerNumber || '番号未判定'}）`; providers.set(name, [...(providers.get(name) ?? []), group]); });
   const month = result!.uniqueMonths.length === 1 ? result!.uniqueMonths[0] : '提供年月未確定';
   return `
     ${result!.duplicateFiles.length ? `<section class="warning"><strong>重複して投入されたPDFがあります</strong><span>${result!.duplicateFiles.map(escapeHtml).join('、')}</span><button data-action="ack-duplicates" class="quiet">内容を確認して続行</button></section>` : ''}
     ${foldSection('verification', '振り分け内容を確認', `${reviewCount ? `要確認 ${reviewCount}件` : '要確認なし'} · ${groups.length}件`, `
-      <div class="section-head"><div><p>名前や事業所名を修正できます。${singleFolderExport ? '送付方法未設定は今回の一括保存では使いません。ほかの要確認は解消してください。' : '要確認が残る間は出力できません。'}</p></div><div class="check-total ${assigned === result!.totalPages ? 'good' : 'danger'}">ページ整合性：${assigned} / ${result!.totalPages}</div></div>
+      <div class="section-head"><div><p>名前や事業所名を修正できます。${forceDownload ? '強制出力を選択中です。要確認の書類も出力されるため、保存後に確認してください。' : singleFolderExport ? '送付方法未設定は今回の一括保存では使いません。' : '要確認が残る間は出力できません。'}</p></div><div class="check-total ${assigned === result!.totalPages ? 'good' : 'danger'}">ページ整合性：${assigned} / ${result!.totalPages}</div></div>
       <div class="table-wrap" data-scroll-area="verification"><table><thead><tr><th>状態</th><th>振り分け先</th><th>事業所名・番号</th><th>利用者名</th><th>ページ</th><th>提供年月</th><th>確認</th></tr></thead><tbody>
         ${groups.map((group) => {
           const stopped = isStoppedGroup(group);
@@ -752,7 +793,7 @@ function bindEvents() {
     requestAnimationFrame(() => app.querySelector<HTMLButtonElement>(`[data-action="toggle-office-stop"][data-client-index="${button.dataset.clientIndex}"][data-office-index="${button.dataset.officeIndex}"]`)?.focus({ preventScroll: true }));
   }));
   document.querySelector<HTMLInputElement>('[data-action="single-folder-export"]')?.addEventListener('change', (event) => {
-    singleFolderExportChecked = (event.currentTarget as HTMLInputElement).checked;
+    forceDownloadChecked = (event.currentTarget as HTMLInputElement).checked;
     render();
     app.querySelector<HTMLInputElement>('[data-action="single-folder-export"]')?.focus({ preventScroll: true });
   });
@@ -760,7 +801,7 @@ function bindEvents() {
   document.querySelector('[data-action="folder"]')?.addEventListener('click', (event) => { event.stopPropagation(); document.querySelector<HTMLInputElement>('#folderInput')?.click(); });
   document.querySelector('[data-action="reset"]')?.addEventListener('click', () => {
     if (busy || !confirm('振り分け結果と選択中PDFの一覧をリセットします。元のPDFファイルは削除されません。よろしいですか？')) return;
-    queuedFiles = []; result = undefined; downloaded = 0; outputName = ''; singleFolderExportChecked = false; stoppedGroupIds.clear(); clientStopDialogOpen = false; clientSearchTerm = ''; render();
+    queuedFiles = []; result = undefined; downloaded = 0; outputName = ''; forceDownloadChecked = false; stoppedGroupIds.clear(); clientStopDialogOpen = false; clientSearchTerm = ''; render();
   });
   document.querySelector<HTMLInputElement>('#fileInput')?.addEventListener('change', (event) => queueFiles([...(event.target.files ?? [])]));
   document.querySelector<HTMLInputElement>('#folderInput')?.addEventListener('change', (event) => queueFiles([...(event.target.files ?? [])]));
@@ -784,7 +825,15 @@ function bindEvents() {
   document.querySelectorAll<HTMLSelectElement>('select[data-route-choice]').forEach((select) => select.addEventListener('change', () => {
     const group = result?.groups.find((item) => item.id === select.closest('tr')?.dataset.id);
     if (!group) return;
-    if (select.dataset.routeChoice === 'serviceCategory') {
+    if (select.dataset.routeChoice === 'providerMaster') {
+      savedData.providerServiceRoutes = applyProviderMasterChoice(
+        group,
+        select.value,
+        savedData.providerMaster,
+        savedData.providerServiceRoutes ?? [],
+      );
+      persist();
+    } else if (select.dataset.routeChoice === 'serviceCategory') {
       group.serviceCategory = normalizeServiceCategory(select.value);
       group.deliveryMethod = '';
     } else if (select.dataset.routeChoice === 'deliveryMethod') {
@@ -929,7 +978,7 @@ function removeQueued(id: string) {
 async function startRouting() {
   if (!queuedFiles.length || queuedFiles.some((item) => !item.thumbnail && !item.previewError) || busy) return;
   const pdfs = queuedFiles.map((item) => item.file);
-  singleFolderExportChecked = false;
+  forceDownloadChecked = false;
   stoppedGroupIds.clear();
   clientStopDialogOpen = false;
   clientSearchTerm = '';
@@ -1074,7 +1123,7 @@ async function createAllOutputs() {
   if (!result) return;
   const activeGroups = result.groups.filter((group) => !isStoppedGroup(group));
   const stoppedGroups = result.groups.filter(isStoppedGroup);
-  const singleFolderExport = singleFolderExportChecked && activeGroups.some((group) => group.providerNumber && !masterFor(group)?.deliveryMethod);
+  const singleFolderExport = forceDownloadChecked && activeGroups.some((group) => group.providerNumber && !masterFor(group)?.deliveryMethod);
   const month = result.uniqueMonths[0] || '提供年月未確定';
   const singleFolderTitle = monthlyFolderTitle(month);
   const mergedGroups = activeGroups.filter((group) => destinationFor(group) === 'PDF結合');

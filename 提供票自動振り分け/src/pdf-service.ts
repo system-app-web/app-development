@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { extractPageFacts, providerEvidence, shouldStartNewSlip, type PageFacts } from './analysis-rules';
+import { extractPageFacts, mergePageFacts, providerEvidence, shouldStartNewSlip, type PageFacts } from './analysis-rules';
 import type { AnalysisResult, PageRef, SlipGroup, SourcePdf } from './types';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -152,7 +152,7 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
         if (!current) continue;
         current.pages.push(pageRef);
         current.clientName ||= facts.clientName ?? '';
-        if (facts.isAppendix && facts.providerName) {
+        if (facts.isAppendix && facts.providerName && facts.providerNumber) {
           // 別表の「事業所名」列は主票上部の省略表示より優先します。
           current.providerName = facts.providerName;
         } else {
@@ -165,13 +165,7 @@ export async function analysePdfs(sources: SourcePdf[], duplicateFiles: string[]
         if (evidence) current.geminiExcerpt = `${current.geminiExcerpt}\n${evidence}`.slice(0, 1600);
         current.serviceMonth ||= facts.serviceMonth ?? '';
         if (!facts.textFound) current.issues.push(`P${serial}: 文字情報を取得できませんでした`);
-        currentFacts = start
-          ? facts
-          : {
-            ...currentFacts,
-            ...Object.fromEntries(Object.entries(facts).filter(([key, value]) => key !== 'isAppendix' && Boolean(value))),
-            isAppendix: facts.isAppendix,
-          } as PageFacts;
+        currentFacts = start || !currentFacts ? facts : mergePageFacts(currentFacts, facts);
         lastSourceId = source.id;
         await sleepFrame();
       }

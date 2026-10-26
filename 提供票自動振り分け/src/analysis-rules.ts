@@ -254,6 +254,18 @@ export function extractPageFacts(items: TextItem[]): PageFacts {
 export function shouldStartNewSlip(current: PageFacts | undefined, next: PageFacts): boolean {
   if (!current) return true;
   const bothNumbersKnown = Boolean(current.providerNumber && next.providerNumber);
+
+  const clientChanged = Boolean(next.clientName && current.clientName && next.clientName !== current.clientName);
+  if (clientChanged) return true;
+
+  // 番号のあるページの後に番号なしページが続く場合は、同じ提供票の続きとして扱います。
+  // 種類やページ見出しだけで分割すると、3ページ目以降が単独の要確認になってしまいます。
+  if (current.providerNumber && !next.providerNumber) {
+    const monthChanged = Boolean(next.serviceMonth && current.serviceMonth && next.serviceMonth !== current.serviceMonth);
+    if (monthChanged) return true;
+    return false;
+  }
+
   if (current.serviceCategory && next.serviceCategory && current.serviceCategory !== next.serviceCategory) return true;
 
   // 主票→別表は同じ書類の続きです。主票の右上名称が省略形でも、別表の番号・名称で確定します。
@@ -266,11 +278,18 @@ export function shouldStartNewSlip(current: PageFacts | undefined, next: PageFac
     if (next.isSlipHeading) return true;
   }
 
-  const clientChanged = Boolean(next.clientName && current.clientName && next.clientName !== current.clientName);
-  if (clientChanged) return true;
   if (bothNumbersKnown) return current.providerNumber !== next.providerNumber;
 
   // 同じ種類の連続ページでは、事業所番号を優先し、番号が欠けているときだけ名称を使います。
   return Boolean(next.providerName && current.providerName
     && clean(next.providerName).replace(/\s/g, '') !== clean(current.providerName).replace(/\s/g, ''));
+}
+
+/** ページ解析中に、次ページで読み取れた事実だけを追加します。 */
+export function mergePageFacts(current: PageFacts, next: PageFacts): PageFacts {
+  return {
+    ...current,
+    ...Object.fromEntries(Object.entries(next).filter(([key, value]) => key !== 'isAppendix' && Boolean(value))),
+    isAppendix: next.isAppendix,
+  } as PageFacts;
 }

@@ -67,7 +67,7 @@ export function providerIdentityKey(providerNumber: string, serviceCategory?: st
 export function findProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory?: string) {
   const numberKey = normalizeProviderNumber(providerNumber);
   const categoryKey = normalizeServiceCategory(serviceCategory);
-  if (!numberKey || !categoryKey) return undefined;
+  if (!numberKey) return undefined;
   const matches = routes.filter((route) => normalizeProviderNumber(route.providerNumber) === numberKey
     && normalizeServiceCategory(route.serviceCategory) === categoryKey);
   const deliveryMethods = new Set(matches.map((route) => route.deliveryMethod.trim()).filter(Boolean));
@@ -80,7 +80,7 @@ export function upsertProviderServiceRoute(routes: ProviderServiceRoute[], provi
   const numberKey = normalizeProviderNumber(providerNumber);
   const categoryKey = normalizeServiceCategory(serviceCategory);
   const method = deliveryMethod.trim();
-  if (!numberKey || !categoryKey || !method) return routes;
+  if (!numberKey || !method) return routes;
   return [
     ...routes.filter((route) => normalizeProviderNumber(route.providerNumber) !== numberKey
       || normalizeServiceCategory(route.serviceCategory) !== categoryKey),
@@ -245,4 +245,24 @@ export function refreshProviderGroupRouting<T extends ProviderGroupLike, M exten
 export function refreshRoutingSafetyForGroups<T extends ProviderGroupLike, M extends ProviderMasterLike>(groups: T[], entries: M[], serviceRoutes: ProviderServiceRoute[] = []) {
   groups.forEach((group) => refreshProviderGroupRouting(group, entries, serviceRoutes));
   return groups;
+}
+
+/** 要確認画面で選んだマスタを、その場の振り分けと次回以降の番号＋種類ルールに反映します。 */
+export function applyProviderMasterChoice<T extends ProviderGroupLike, M extends ProviderMasterLike>(
+  group: T,
+  masterId: string,
+  entries: M[],
+  serviceRoutes: ProviderServiceRoute[] = [],
+) {
+  const entry = entries.find((candidate) => candidate.id === masterId && candidate.deliveryMethod.trim());
+  if (!entry) return serviceRoutes;
+
+  group.providerNumber = entry.providerNumber;
+  group.providerName = entry.providerName.trim() || group.providerName;
+  if (!normalizeServiceCategory(group.serviceCategory) && normalizeServiceCategory(entry.serviceCategory)) {
+    group.serviceCategory = normalizeServiceCategory(entry.serviceCategory);
+  }
+  const nextRoutes = upsertProviderServiceRoute(serviceRoutes, entry.providerNumber, group.serviceCategory, entry.deliveryMethod);
+  refreshProviderGroupRouting(group, entries, nextRoutes);
+  return nextRoutes;
 }

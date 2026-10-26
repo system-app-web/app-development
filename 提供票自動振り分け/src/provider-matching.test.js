@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { extractServiceCategory, shouldStartNewSlip } from './analysis-rules.ts';
+import { extractServiceCategory, mergePageFacts, shouldStartNewSlip } from './analysis-rules.ts';
 import {
+  applyProviderMasterChoice,
   canAutoAssignServiceCategory,
   findProviderServiceRoute,
   getProviderMasterWarningNumbers,
@@ -12,6 +13,7 @@ import {
   SERVICE_MATCH_ISSUE,
   upsertProviderServiceRoute,
 } from './provider-matching.ts';
+import { canCreateOutputs, canToggleForceDownload } from './output-policy.ts';
 import { loadSavedData } from './storage.ts';
 import { SERVICE_CATEGORY_GROUPS, SERVICE_CATEGORY_OPTIONS, serviceCategoryForCodePrefix } from './service-categories.ts';
 
@@ -320,5 +322,64 @@ describe('サービス種類を使った事業所マスタ照合', () => {
     const current = { clientName: '利用者A', providerNumber: '1234567890', providerName: '事業所', serviceCategory: '訪問リハビリテーション', isAppendix: false, isSlipHeading: true };
     const next = { ...current, serviceCategory: '居宅療養管理指導' };
     assert.equal(shouldStartNewSlip(current, next), true);
+  });
+
+  it('番号がある最初のページに続く3ページを一つにまとめ、同じ送り先へ振り分ける', () => {
+    const pages = [
+      { clientName: '利用者A', providerName: '事業所A', providerNumber: '9999900001', serviceCategory: '訪問リハビリテーション', serviceMonth: '令和8年10月', isSlipHeading: true, isAppendix: false, textFound: true },
+      { clientName: '利用者A', providerName: '事業所A', serviceCategory: '居宅療養管理指導', serviceMonth: '令和8年10月', isSlipHeading: true, isAppendix: true, textFound: true },
+      { clientName: '利用者A', providerName: '別の名称表記', serviceCategory: '通所介護', serviceMonth: '令和8年10月', isSlipHeading: true, isAppendix: true, textFound: true },
+    ];
+    const pageGroups = [];
+    let currentFacts;
+    pages.forEach((facts) => {
+      if (shouldStartNewSlip(currentFacts, facts)) pageGroups.push([facts]);
+      else pageGroups.at(-1).push(facts);
+      currentFacts = currentFacts ? mergePageFacts(currentFacts, facts) : facts;
+    });
+    assert.equal(pageGroups.length, 1);
+    assert.equal(pageGroups[0].length, 3);
+    assert.equal(currentFacts.providerNumber, '9999900001');
+
+    const group = baseGroup({ providerNumber: currentFacts.providerNumber, pages: [1, 2, 3] });
+    refreshRoutingSafetyForGroups([group], [
+      { id: 'master-a', providerNumber: '9999900001', providerName: '事業所A', serviceCategory: '訪問リハビリテーション', deliveryMethod: 'FAX' },
+    ]);
+    assert.equal(group.needsReview, false);
+    assert.equal(group.deliveryMethod, 'FAX');
+  });
+
+  it('従来どおり2ページの提供票も一つにまとめる', () => {
+    const first = { clientName: '利用者A', providerName: '事業所A', providerNumber: '9999900002', serviceCategory: '訪問看護', serviceMonth: '令和8年10月', isSlipHeading: true, isAppendix: false, textFound: true };
+    const second = { clientName: '利用者A', providerName: '事業所A', serviceCategory: '訪問看護', serviceMonth: '令和8年10月', isSlipHeading: true, isAppendix: true, textFound: true };
+    assert.equal(shouldStartNewSlip(first, second), false);
+    assert.equal(mergePageFacts(first, second).providerNumber, '9999900002');
+  });
+
+  it('事業所マスタを選ぶと番号と送り先を反映し、要確認を解除して次回用ルールを保存する', () => {
+    const group = baseGroup({
+      providerNumber: '', providerName: 'PDFの候補名', serviceCategory: '', deliveryMethod: '',
+      issues: ['10桁の事業所番号を判定できません', '送付方法が未設定です'], needsReview: true,
+    });
+    const master = { id: 'master-a', providerNumber: '9999900003', providerName: '架空の事業所', serviceCategory: '', deliveryMethod: 'FAX' };
+    const routes = applyProviderMasterChoice(group, 'master-a', [master]);
+    refreshRoutingSafetyForGroups([group], [master], routes);
+    assert.equal(group.providerNumber, '9999900003');
+    assert.equal(group.providerName, '架空の事業所');
+    assert.equal(group.deliveryMethod, 'FAX');
+    assert.equal(group.needsReview, false);
+    assert.deepEqual(routes, [{ providerNumber: '9999900003', serviceCategory: '', deliveryMethod: 'FAX' }]);
+  });
+
+  it('要確認が残っていても強制出力でき、通常時は確認を省略しない', () => {
+    const state = {
+      hasResult: true, busy: false, queuedFileCount: 0, reviewCount: 1, blockedCount: 1,
+      mixedMonths: false, assignedPageCount: 3, totalPageCount: 3, groupCount: 1,
+    };
+    assert.equal(canToggleForceDownload(true, false), true);
+    assert.equal(canCreateOutputs({ ...state, forceDownload: false }), false);
+    assert.equal(canCreateOutputs({ ...state, forceDownload: true }), true);
+    assert.equal(canCreateOutputs({ ...state, forceDownload: true, mixedMonths: true }), false);
+    assert.equal(canCreateOutputs({ ...state, forceDownload: true, assignedPageCount: 2 }), false);
   });
 });

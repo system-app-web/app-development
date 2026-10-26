@@ -50,6 +50,13 @@ export type ProviderMasterEntry = {
   needsServiceReview?: boolean;
 };
 
+/** 利用者が要確認画面で決めた、番号＋サービス種類ごとの送付先。 */
+export type ProviderServiceRoute = {
+  providerNumber: string;
+  serviceCategory: string;
+  deliveryMethod: DeliveryMethod;
+};
+
 /** 個人名やPDF本体は保存しない。マスタと利用者が入力した設定だけを日次バックアップする。 */
 export type AppSavedData = {
   version: 1;
@@ -58,6 +65,8 @@ export type AppSavedData = {
   providerMasterOrderInitialized?: boolean;
   geminiEnabled: boolean;
   deliveryMethods?: DeliveryMethodOption[];
+  /** 旧保存データでは未定義。既存マスタを変更せず、曖昧な振り分けだけを補う。 */
+  providerServiceRoutes?: ProviderServiceRoute[];
 };
 
 export type SourcePdf = {

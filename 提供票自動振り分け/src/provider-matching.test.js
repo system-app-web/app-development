@@ -3,12 +3,14 @@ import { describe, it } from 'node:test';
 import { extractServiceCategory, shouldStartNewSlip } from './analysis-rules.ts';
 import {
   canAutoAssignServiceCategory,
+  findProviderServiceRoute,
   getProviderMasterWarningNumbers,
   hasIndependentGroupReview,
   matchProviderMaster,
   reconcileProviderMaster,
   refreshRoutingSafetyForGroups,
   SERVICE_MATCH_ISSUE,
+  upsertProviderServiceRoute,
 } from './provider-matching.ts';
 import { loadSavedData } from './storage.ts';
 import { SERVICE_CATEGORY_GROUPS, SERVICE_CATEGORY_OPTIONS, serviceCategoryForCodePrefix } from './service-categories.ts';
@@ -60,6 +62,58 @@ describe('サービス種類を使った事業所マスタ照合', () => {
     assert.equal(group.deliveryMethod, '');
   });
 
+  it('種類が一致しても送り先の異なる未判定行が残る場合は推測しない', () => {
+    const masters = [
+      { providerNumber: '1234567890', providerName: '事業所A', serviceCategory: '訪問介護', deliveryMethod: 'FAX' },
+      { providerNumber: '1234567890', providerName: '事業所B', serviceCategory: '', deliveryMethod: 'メール' },
+    ];
+    const match = matchProviderMaster(masters, '1234567890', '訪問介護');
+    assert.equal(match.kind, 'ambiguous');
+  });
+
+  it('同じ番号のマスタが1行なら、サービス種類が空でもその送り先に振り分ける', () => {
+    const master = { providerNumber: '1234567890', providerName: '事業所A', serviceCategory: '', deliveryMethod: 'FAX', needsServiceReview: true };
+    const group = baseGroup({ serviceCategory: '' });
+    refreshRoutingSafetyForGroups([group], [master]);
+    assert.equal(group.needsReview, false);
+    assert.equal(group.deliveryMethod, 'FAX');
+    assert.ok(!group.issues.includes(SERVICE_MATCH_ISSUE));
+  });
+
+  it('同じ番号の2件を種類・送り先で決めると、その場で要確認が消え、次回も自動振り分けする', () => {
+    const masters = [
+      { providerNumber: '1234567890', providerName: '事業所A', serviceCategory: '', deliveryMethod: 'メール' },
+      { providerNumber: '1234567890', providerName: '事業所B', serviceCategory: '', deliveryMethod: 'FAX' },
+    ];
+    const first = baseGroup({ id: 'group-a', serviceCategory: '' });
+    const second = baseGroup({ id: 'group-b', serviceCategory: '' });
+    refreshRoutingSafetyForGroups([first, second], masters);
+    assert.ok([first, second].every((group) => group.needsReview && group.issues.includes(SERVICE_MATCH_ISSUE)));
+    first.issues.push('送付方法が未設定です', '事業所マスタの送付方法を再確認してください', '該当するサービス種類の事業所マスタがありません');
+
+    first.serviceCategory = '訪問介護';
+    first.deliveryMethod = 'FAX';
+    let savedRoutes = upsertProviderServiceRoute([], first.providerNumber, first.serviceCategory, first.deliveryMethod);
+    second.serviceCategory = '訪問看護';
+    second.deliveryMethod = 'メール';
+    savedRoutes = upsertProviderServiceRoute(savedRoutes, second.providerNumber, second.serviceCategory, second.deliveryMethod);
+    refreshRoutingSafetyForGroups([first, second], masters, savedRoutes);
+    assert.ok([first, second].every((group) => group.needsReview === false && !group.issues.includes(SERVICE_MATCH_ISSUE)));
+    assert.deepEqual(first.issues, []);
+    assert.equal(first.deliveryMethod, 'FAX');
+    assert.equal(second.deliveryMethod, 'メール');
+    assert.equal(masters.length, 2);
+    assert.equal(findProviderServiceRoute(savedRoutes, first.providerNumber, first.serviceCategory)?.deliveryMethod, 'FAX');
+
+    const nextFirst = baseGroup({ serviceCategory: '訪問介護' });
+    const nextSecond = baseGroup({ serviceCategory: '訪問看護' });
+    refreshRoutingSafetyForGroups([nextFirst, nextSecond], masters, savedRoutes);
+    assert.equal(nextFirst.needsReview, false);
+    assert.equal(nextFirst.deliveryMethod, 'FAX');
+    assert.equal(nextSecond.needsReview, false);
+    assert.equal(nextSecond.deliveryMethod, 'メール');
+  });
+
   it('確認表の編集後に安全判定を再計算すると状態が更新される', () => {
     const group = baseGroup({ clientName: '', issues: ['利用者名を判定できません'] });
     const masters = [{ providerNumber: '1234567890', providerName: '訪リハ', serviceCategory: '訪問リハビリテーション', deliveryMethod: 'FAX' }];
@@ -87,6 +141,44 @@ describe('サービス種類を使った事業所マスタ照合', () => {
       assert.equal(loaded.providerMaster[0].providerName, '略称');
       assert.equal(loaded.providerMaster[0].deliveryMethod, 'FAX');
       assert.equal(loaded.providerMaster[0].serviceCategory, undefined);
+    } finally {
+      if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
+      else delete globalThis.localStorage;
+    }
+  });
+
+  it('保存済みサービス種類は残し、新しい送り先設定がなくても旧データとして読み込める', async () => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    const legacy = {
+      version: 1,
+      providerMaster: [{ id: 'old', providerNumber: '1234567890', providerName: '略称', serviceCategory: '居宅療養管理指導', deliveryMethod: 'FAX', updatedAt: '2026-10-01T00:00:00.000Z' }],
+      geminiEnabled: false,
+    };
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: { getItem: () => JSON.stringify(legacy), setItem: () => {} },
+    });
+    try {
+      const loaded = await loadSavedData();
+      assert.equal(loaded.providerMaster[0].serviceCategory, '居宅療養管理指導');
+      assert.equal(loaded.providerServiceRoutes, undefined);
+    } finally {
+      if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
+      else delete globalThis.localStorage;
+    }
+  });
+
+  it('保存済みの番号＋種類の送り先ルールを読み込める', async () => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    const route = { providerNumber: '1234567890', serviceCategory: '訪問介護', deliveryMethod: 'FAX' };
+    const data = { version: 1, providerMaster: [], geminiEnabled: false, providerServiceRoutes: [route] };
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: { getItem: () => JSON.stringify(data), setItem: () => {} },
+    });
+    try {
+      const loaded = await loadSavedData();
+      assert.deepEqual(loaded.providerServiceRoutes, [route]);
     } finally {
       if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
       else delete globalThis.localStorage;

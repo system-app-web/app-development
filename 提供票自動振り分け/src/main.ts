@@ -8,7 +8,7 @@ import { requestGeminiSuggestion } from './gemini-service';
 import { SERVICE_CATEGORY_GROUPS, SERVICE_CATEGORY_OPTIONS } from './service-categories.ts';
 import {
   canAutoAssignServiceCategory,
-  getProviderMasterWarningNumbers,
+  findProviderServiceRoute,
   hasIndependentGroupReview,
   matchProviderMaster,
   normalizeProviderNumber,
@@ -16,6 +16,8 @@ import {
   providerIdentityKey,
   reconcileProviderMaster,
   refreshRoutingSafetyForGroups,
+  SERVICE_MATCH_ISSUE,
+  upsertProviderServiceRoute,
 } from './provider-matching';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -49,7 +51,16 @@ const groupStatus = (group: SlipGroup, singleFolderExport = false) => {
   return group.needsReview && !group.reviewed ? '要確認' : '確認済み';
 };
 const download = (bytes: BlobPart, name: string) => { const url = URL.createObjectURL(new Blob([bytes])); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
-const findProviderMaster = (providerNumber: string, serviceCategory?: string) => {
+const findProviderMaster = (providerNumber: string, serviceCategory?: string): ProviderMasterEntry | undefined => {
+  const serviceRoute = findProviderServiceRoute(savedData.providerServiceRoutes ?? [], providerNumber, serviceCategory);
+  if (serviceRoute) return {
+    id: undefined,
+    providerNumber: serviceRoute.providerNumber,
+    providerName: '',
+    serviceCategory: serviceRoute.serviceCategory,
+    deliveryMethod: serviceRoute.deliveryMethod,
+    updatedAt: '',
+  };
   const match = matchProviderMaster(savedData.providerMaster, providerNumber, serviceCategory);
   return match.kind === 'matched' ? match.entry : undefined;
 };
@@ -98,6 +109,7 @@ function ensureProviderMasterForGroups(groups: SlipGroup[]) {
     if (!number) continue;
     const category = normalizeServiceCategory(group.serviceCategory);
     const candidates = savedData.providerMaster.filter((entry) => normalizeProviderNumber(entry.providerNumber) === number);
+    if (findProviderServiceRoute(savedData.providerServiceRoutes ?? [], number, category)) continue;
     const exact = category ? candidates.filter((entry) => normalizeServiceCategory(entry.serviceCategory) === category) : [];
     if (exact.length) {
       if (exact.length > 1) continue;
@@ -211,7 +223,7 @@ const stoppedClientCount = (groups: SlipGroup[] = result?.groups ?? []) => clien
 const stoppedOfficeCount = (groups: SlipGroup[] = result?.groups ?? []) => clientEntries(groups).reduce((total, entry) => total + clientOfficeEntries(entry).filter((office) => office.groups.every(isStoppedGroup)).length, 0);
 function refreshRoutingSafety() {
   const masterBefore = JSON.stringify(savedData.providerMaster);
-  refreshRoutingSafetyForGroups(result?.groups ?? [], savedData.providerMaster);
+  refreshRoutingSafetyForGroups(result?.groups ?? [], savedData.providerMaster, savedData.providerServiceRoutes ?? []);
   if (masterBefore !== JSON.stringify(savedData.providerMaster)) persist();
 }
 
@@ -324,6 +336,7 @@ function renderView() {
         masterField: active.dataset.masterField,
         groupId: active.closest<HTMLTableRowElement>('tr[data-id]')?.dataset.id,
         groupField: active.dataset.field,
+        groupRouteChoice: active.dataset.routeChoice,
       }
     : undefined;
   const groups = result?.groups ?? [];
@@ -411,6 +424,9 @@ function renderView() {
       } else if (focusTarget?.groupId && focusTarget.groupField) {
         nextFocus = Array.from(document.querySelectorAll<HTMLInputElement>('[data-field]'))
           .find((field) => field.closest<HTMLTableRowElement>('tr[data-id]')?.dataset.id === focusTarget.groupId && field.dataset.field === focusTarget.groupField);
+      } else if (focusTarget?.groupId && focusTarget.groupRouteChoice) {
+        nextFocus = Array.from(document.querySelectorAll<HTMLSelectElement>('select[data-route-choice]'))
+          .find((field) => field.closest<HTMLTableRowElement>('tr[data-id]')?.dataset.id === focusTarget.groupId && field.dataset.routeChoice === focusTarget.groupRouteChoice);
       }
       nextFocus?.focus({ preventScroll: true });
       window.scrollTo(0, scrollPosition);
@@ -431,6 +447,19 @@ function serviceCategoryOptions(currentValue?: string) {
     ? renderOption(current, `${current}（保存済み）`)
     : '';
   return `${renderOption('', '未判定')}${preservedValue}${groups}`;
+}
+
+function reviewRouteControls(group: SlipGroup) {
+  if (!group.issues.includes(SERVICE_MATCH_ISSUE)) return '';
+  const selectedMethod = group.deliveryMethod ?? '';
+  const methodIsConfigured = deliveryMethodOptions().some((method) => method.value === selectedMethod);
+  const preservedMethod = selectedMethod && !methodIsConfigured
+    ? `<option value="${escapeHtml(selectedMethod)}" selected>${escapeHtml(selectedMethod)}（保存済み）</option>`
+    : '';
+  return `<div class="review-route-controls">
+    <label><span>サービス種類</span><select data-route-choice="serviceCategory" aria-label="${escapeHtml(group.providerNumber)}のサービス種類を選択">${serviceCategoryOptions(group.serviceCategory)}</select></label>
+    <label><span>送り先</span><select data-route-choice="deliveryMethod" aria-label="${escapeHtml(group.providerNumber)}の送り先を選択" ${normalizeServiceCategory(group.serviceCategory) ? '' : 'disabled'}><option value="" ${selectedMethod ? '' : 'selected'}>選択してください</option>${preservedMethod}${deliveryMethodOptions().map((method) => `<option value="${escapeHtml(method.value)}" ${selectedMethod === method.value ? 'selected' : ''}>${escapeHtml(method.name)}</option>`).join('')}</select></label>
+  </div>`;
 }
 
 function fixedSection(key: string, title: string, meta: string, content: string) {
@@ -472,21 +501,12 @@ function queuePanel() {
 function masterArea(singleFolderExport: boolean) {
   // 設定状況の変化で一覧内の位置が動かないよう、保存されている順序をそのまま使う。
   const entries = [...savedData.providerMaster];
-  const warningNumbers = getProviderMasterWarningNumbers(entries);
-  const warningMessages = warningNumbers.map((number) => {
-    const rows = entries.filter((entry) => normalizeProviderNumber(entry.providerNumber) === number);
-    const hasUnclassifiedRows = rows.some((entry) => !normalizeServiceCategory(entry.serviceCategory));
-    return hasUnclassifiedRows
-      ? `事業所番号 ${number} が複数登録されていますが、サービス種類が空欄のため送付先を決められません。各行のサービス種類を選んでください。`
-      : `事業所番号 ${number} のサービス種類・送付方法が重複しており、送付先を決められません。各行を確認してください。`;
-  });
   const needsSetup = entries.filter((entry) => !entry.providerName.trim() || !entry.deliveryMethod).length;
   const needsRoute = entries.filter((entry) => !entry.deliveryMethod).length;
   return foldSection('master', '事業所マスタ', `${needsSetup ? `要設定 ${needsSetup}件 · ` : ''}登録 ${entries.length}件`, `<div class="section-head master-head"><div><h2>事業所番号と振り分け先・送付方法</h2></div><div class="backup-buttons"><button class="quiet" data-action="edit-delivery-methods">送付方法項目編集</button><button class="quiet" data-action="backup">バックアップ</button><button class="quiet" data-action="import">データ挿入</button><input id="backupInput" type="file" accept="application/json,.json" hidden></div></div>
     ${needsSetup ? `<div class="master-alert" role="status"><strong>${needsRoute ? '振り分け先を選択してください' : '事業所名を入力してください'}</strong><span>${singleFolderExport && needsRoute ? '今回の一括保存では送付方法を使いません。事業所名など、ほかの不足情報は通常どおり確認してください。' : needsRoute ? '赤色の欄を設定しないとダウンロードできません。' : '色の付いた欄を確認してください。'}</span></div>` : ''}
-    ${warningMessages.length ? `<div class="master-alert" role="status"><strong>事業所番号の確認が必要です</strong><span>${warningMessages.map(escapeHtml).join(' ')}</span></div>` : ''}
     ${masterActionError ? `<div class="master-operation-error" role="alert">${escapeHtml(masterActionError)}</div>` : ''}
-    ${entries.length ? `<div class="table-wrap master-table" data-scroll-area="master"><table><thead><tr><th>10桁の事業所番号</th><th>サービス種類</th><th>事業所名（略称可）</th><th>振り分け先・送付方法</th><th></th></tr></thead><tbody>${entries.map((entry) => { const missingName = !entry.providerName.trim(); const missingRoute = !entry.deliveryMethod; const category = normalizeServiceCategory(entry.serviceCategory); const requiresServiceChoice = !category && warningNumbers.includes(normalizeProviderNumber(entry.providerNumber)); const state = missingName ? 'needs-name' : missingRoute || entry.needsServiceReview || requiresServiceChoice ? 'needs-route' : 'registered'; const label = requiresServiceChoice ? 'サービス種類を選択' : entry.needsServiceReview ? '送付方法を確認' : missingName ? (missingRoute ? '名称・振り分け先を入力' : '事業所名を入力') : missingRoute ? '振り分け先を選択' : '登録済み'; const isDeleting = deletingMasterId === entry.id; return `<tr data-master="${escapeHtml(entry.id || '')}" class="master-${state}"><td>${escapeHtml(entry.providerNumber)}<small class="master-status ${state}">${label}</small></td><td><select data-master-field="serviceCategory" aria-label="${escapeHtml(entry.providerNumber)}のサービス種類" class="master-service-category">${serviceCategoryOptions(category)}</select></td><td><input data-master-field="providerName" value="${escapeHtml(entry.providerName)}"></td><td><select data-master-field="deliveryMethod" aria-label="${escapeHtml(entry.providerNumber)}の送付方法" class="${missingRoute ? 'master-route-unset' : ''}"><option value="" ${entry.deliveryMethod === '' ? 'selected' : ''}>未設定（要確認）</option>${deliveryMethodOptions().map((method) => `<option value="${escapeHtml(method.value)}" ${entry.deliveryMethod === method.value ? 'selected' : ''}>${escapeHtml(method.name)}</option>`).join('')}</select></td><td><button class="quiet master-delete-button" data-action="delete-master" data-id="${escapeHtml(entry.id || '')}" ${deletingMasterId ? 'disabled' : ''}>${isDeleting ? '<i class="progress-spinner small" aria-hidden="true"></i>削除中…' : '削除'}</button></td></tr>`; }).join('')}</tbody></table></div>` : `<p class="empty-master">PDFを解析すると、新しい事業所番号がここに追加されます。送付方法が未設定の書類は必ず「要確認」になります。</p>`}
+    ${entries.length ? `<div class="table-wrap master-table" data-scroll-area="master"><table><thead><tr><th>10桁の事業所番号</th><th>事業所名（略称可）</th><th>振り分け先・送付方法</th><th></th></tr></thead><tbody>${entries.map((entry) => { const missingName = !entry.providerName.trim(); const missingRoute = !entry.deliveryMethod; const state = missingName ? 'needs-name' : missingRoute ? 'needs-route' : 'registered'; const label = missingName ? (missingRoute ? '名称・振り分け先を入力' : '事業所名を入力') : missingRoute ? '振り分け先を選択' : '登録済み'; const isDeleting = deletingMasterId === entry.id; return `<tr data-master="${escapeHtml(entry.id || '')}" class="master-${state}"><td>${escapeHtml(entry.providerNumber)}<small class="master-status ${state}">${label}</small></td><td><input data-master-field="providerName" value="${escapeHtml(entry.providerName)}"></td><td><select data-master-field="deliveryMethod" aria-label="${escapeHtml(entry.providerNumber)}の送付方法" class="${missingRoute ? 'master-route-unset' : ''}"><option value="" ${entry.deliveryMethod === '' ? 'selected' : ''}>未設定（要確認）</option>${deliveryMethodOptions().map((method) => `<option value="${escapeHtml(method.value)}" ${entry.deliveryMethod === method.value ? 'selected' : ''}>${escapeHtml(method.name)}</option>`).join('')}</select></td><td><button class="quiet master-delete-button" data-action="delete-master" data-id="${escapeHtml(entry.id || '')}" ${deletingMasterId ? 'disabled' : ''}>${isDeleting ? '<i class="progress-spinner small" aria-hidden="true"></i>削除中…' : '削除'}</button></td></tr>`; }).join('')}</tbody></table></div>` : `<p class="empty-master">PDFを解析すると、新しい事業所番号がここに追加されます。送付方法が未設定の書類は必ず「要確認」になります。</p>`}
   `, true);
 }
 
@@ -573,7 +593,10 @@ function reviewArea(groups: SlipGroup[], reviewCount: number, assigned: number, 
           const bypassedMissingMethod = (stopped || singleFolderExport) && group.needsReview && !group.reviewed && onlyDeliveryMethodMissing;
           const needsReview = group.needsReview && !group.reviewed && !bypassedMissingMethod;
           const issues = group.issues.filter((issue) => !(stopped && issue === deliveryMethodIssue)).map((issue) => issue === deliveryMethodIssue && singleFolderExport ? '送付方法は今回使用しません' : issue);
-          return `<tr data-id="${group.id}" class="${needsReview ? 'needs-review' : ''}"><td><span class="status ${stopped ? 'stopped' : needsReview ? 'warn' : 'ok'}">${groupStatus(group, singleFolderExport)}</span>${issues.length ? `<small>${issues.map(escapeHtml).join(' / ')}</small>` : ''}</td><td><b>${stopped ? '送付停止' : escapeHtml(deliveryMethodNameFor(destinationFor(group)))}</b></td><td><input data-field="providerName" value="${escapeHtml(group.providerName)}" aria-label="事業所名"></td><td><input class="inline-input" data-field="clientName" value="${escapeHtml(group.clientName)}" aria-label="利用者名"></td><td><div class="verification-page-cell"><span>${range(group)}</span><button class="quiet page-preview-link" data-action="preview" data-id="${group.id}">PDFを見る</button></div></td><td><input data-field="serviceMonth" value="${escapeHtml(group.serviceMonth)}" aria-label="提供年月"></td><td>${needsReview ? `<button class="confirm" data-action="confirm" data-id="${group.id}">確認済みにする</button>` : '<span class="muted">確認済み</span>'}</td></tr>`;
+          const routeControls = stopped ? '' : reviewRouteControls(group);
+          const routeContent = routeControls || `<b>${stopped ? '送付停止' : escapeHtml(deliveryMethodNameFor(destinationFor(group)))}</b>`;
+          const issueClass = group.issues.includes(SERVICE_MATCH_ISSUE) ? 'provider-route-warning' : '';
+          return `<tr data-id="${group.id}" class="${needsReview ? 'needs-review' : ''}"><td><span class="status ${stopped ? 'stopped' : needsReview ? 'warn' : 'ok'}">${groupStatus(group, singleFolderExport)}</span>${issues.length ? `<small class="${issueClass}">${issues.map(escapeHtml).join(' / ')}</small>` : ''}</td><td>${routeContent}</td><td><input data-field="providerName" value="${escapeHtml(group.providerName)}" aria-label="事業所名"></td><td><input class="inline-input" data-field="clientName" value="${escapeHtml(group.clientName)}" aria-label="利用者名"></td><td><div class="verification-page-cell"><span>${range(group)}</span><button class="quiet page-preview-link" data-action="preview" data-id="${group.id}">PDFを見る</button></div></td><td><input data-field="serviceMonth" value="${escapeHtml(group.serviceMonth)}" aria-label="提供年月"></td><td>${needsReview ? `<button class="confirm" data-action="confirm" data-id="${group.id}">確認済みにする</button>` : '<span class="muted">確認済み</span>'}</td></tr>`;
         }).join('')}
       </tbody></table></div>
     `, false)}
@@ -758,6 +781,28 @@ function bindEvents() {
     refreshRoutingSafety();
     render();
   }));
+  document.querySelectorAll<HTMLSelectElement>('select[data-route-choice]').forEach((select) => select.addEventListener('change', () => {
+    const group = result?.groups.find((item) => item.id === select.closest('tr')?.dataset.id);
+    if (!group) return;
+    if (select.dataset.routeChoice === 'serviceCategory') {
+      group.serviceCategory = normalizeServiceCategory(select.value);
+      group.deliveryMethod = '';
+    } else if (select.dataset.routeChoice === 'deliveryMethod') {
+      group.deliveryMethod = select.value;
+      if (group.serviceCategory && select.value) {
+        savedData.providerServiceRoutes = upsertProviderServiceRoute(
+          savedData.providerServiceRoutes ?? [],
+          group.providerNumber,
+          group.serviceCategory,
+          select.value,
+        );
+        persist();
+      }
+    }
+    group.reviewed = false;
+    refreshRoutingSafety();
+    render();
+  }));
   document.querySelectorAll<HTMLElement>('[data-action="confirm"]').forEach((button) => button.addEventListener('click', () => { const group = result?.groups.find((item) => item.id === button.dataset.id); if (group) { group.reviewed = true; render(); } }));
   document.querySelector('[data-action="ack-duplicates"]')?.addEventListener('click', () => { if (result) { result.duplicateFiles = []; render(); } });
   document.querySelector('[data-action="go-master"]')?.addEventListener('click', () => {
@@ -793,9 +838,9 @@ function bindEvents() {
   });
   document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-master-field]').forEach((input) => input.addEventListener('change', () => {
     const id = input.closest('tr')?.dataset.master; const entry = savedData.providerMaster.find((item) => item.id === id); if (!entry) return;
-    const field = input.dataset.masterField as 'providerName' | 'deliveryMethod' | 'serviceCategory';
+    const field = input.dataset.masterField as 'providerName' | 'deliveryMethod';
     entry[field] = input.value as never;
-    if (field === 'serviceCategory' || field === 'deliveryMethod') entry.needsServiceReview = false;
+    if (field === 'deliveryMethod') entry.needsServiceReview = false;
     entry.updatedAt = new Date().toISOString();
     const normalized = normalizeProviderMaster(savedData, id);
     persist(); refreshRoutingSafety();

@@ -1,7 +1,8 @@
 import { normalizeServiceCategoryValue } from './service-categories.ts';
+import type { ProviderServiceRoute } from './types.ts';
 
 export const DELIVERY_METHOD_ISSUE = '送付方法が未設定です';
-export const SERVICE_MATCH_ISSUE = '同じ事業所番号の送付方法をサービス種類で特定できません';
+export const SERVICE_MATCH_ISSUE = '同じ事業所番号の提供票が2つあります。サービス種類を選んでください';
 export const SERVICE_MASTER_MISSING_ISSUE = '該当するサービス種類の事業所マスタがありません';
 export const MASTER_ROUTE_REVIEW_ISSUE = '事業所マスタの送付方法を再確認してください';
 export const PROVIDER_NAME_ISSUE = '事業所名を判定できません';
@@ -63,6 +64,30 @@ export function providerIdentityKey(providerNumber: string, serviceCategory?: st
   return JSON.stringify([normalizeProviderNumber(providerNumber), normalizeServiceCategory(serviceCategory)]);
 }
 
+export function findProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory?: string) {
+  const numberKey = normalizeProviderNumber(providerNumber);
+  const categoryKey = normalizeServiceCategory(serviceCategory);
+  if (!numberKey || !categoryKey) return undefined;
+  const matches = routes.filter((route) => normalizeProviderNumber(route.providerNumber) === numberKey
+    && normalizeServiceCategory(route.serviceCategory) === categoryKey);
+  const deliveryMethods = new Set(matches.map((route) => route.deliveryMethod.trim()).filter(Boolean));
+  if (deliveryMethods.size !== 1) return undefined;
+  return { providerNumber: numberKey, serviceCategory: categoryKey, deliveryMethod: [...deliveryMethods][0] };
+}
+
+/** 同じ番号＋種類の古い設定は置き換え、明示的に選んだ送り先を一件だけ記憶します。 */
+export function upsertProviderServiceRoute(routes: ProviderServiceRoute[], providerNumber: string, serviceCategory: string, deliveryMethod: string) {
+  const numberKey = normalizeProviderNumber(providerNumber);
+  const categoryKey = normalizeServiceCategory(serviceCategory);
+  const method = deliveryMethod.trim();
+  if (!numberKey || !categoryKey || !method) return routes;
+  return [
+    ...routes.filter((route) => normalizeProviderNumber(route.providerNumber) !== numberKey
+      || normalizeServiceCategory(route.serviceCategory) !== categoryKey),
+    { providerNumber: numberKey, serviceCategory: categoryKey, deliveryMethod: method },
+  ];
+}
+
 /** 事業所名は帳票ファイル名用の別名なので、照合には使いません。 */
 export function matchProviderMaster<T extends ProviderMasterLike>(
   entries: T[],
@@ -78,11 +103,25 @@ export function matchProviderMaster<T extends ProviderMasterLike>(
   const categoryKey = normalizeServiceCategory(serviceCategory);
   if (candidates.length === 1) return { kind: 'matched', entry: candidates[0] };
 
-  if (!categoryKey) return { kind: 'ambiguous', candidates };
+  const sameConfiguredRoute = candidates.every((entry) => Boolean(entry.deliveryMethod.trim())
+    && entry.deliveryMethod.trim() === candidates[0].deliveryMethod.trim());
+  if (!categoryKey) return sameConfiguredRoute ? { kind: 'matched', entry: candidates[0] } : { kind: 'ambiguous', candidates };
+
   const matching = candidates.filter((entry) => normalizeServiceCategory(entry.serviceCategory) === categoryKey);
-  if (matching.length === 1) return { kind: 'matched', entry: matching[0] };
-  if (matching.length > 1 || candidates.some((entry) => !normalizeServiceCategory(entry.serviceCategory))) return { kind: 'ambiguous', candidates };
-  return { kind: 'missing' };
+  const unclassified = candidates.filter((entry) => !normalizeServiceCategory(entry.serviceCategory));
+  if (matching.length === 1) {
+    const matchingRoute = matching[0].deliveryMethod.trim();
+    const unclassifiedConflicts = unclassified.some((entry) => entry.deliveryMethod.trim() !== matchingRoute);
+    return unclassifiedConflicts ? { kind: 'ambiguous', candidates: [...matching, ...unclassified] } : { kind: 'matched', entry: matching[0] };
+  }
+  if (matching.length > 1) {
+    const sameMatchingRoute = matching.every((entry) => Boolean(entry.deliveryMethod.trim())
+      && entry.deliveryMethod.trim() === matching[0].deliveryMethod.trim());
+    const matchingRoute = matching[0].deliveryMethod.trim();
+    const unclassifiedConflicts = unclassified.some((entry) => entry.deliveryMethod.trim() !== matchingRoute);
+    return sameMatchingRoute && !unclassifiedConflicts ? { kind: 'matched', entry: matching[0] } : { kind: 'ambiguous', candidates: [...matching, ...unclassified] };
+  }
+  return { kind: 'ambiguous', candidates };
 }
 
 export function reconcileProviderMaster<T extends ProviderMasterLike>(entries: T[], preferredId?: string) {
@@ -162,8 +201,11 @@ export function getProviderMasterWarningNumbers(entries: ProviderMasterLike[]) {
   return [...warnings];
 }
 
-export function refreshProviderGroupRouting<T extends ProviderGroupLike, M extends ProviderMasterLike>(group: T, entries: M[]) {
-  const match = matchProviderMaster(entries, group.providerNumber, group.serviceCategory);
+export function refreshProviderGroupRouting<T extends ProviderGroupLike, M extends ProviderMasterLike>(group: T, entries: M[], serviceRoutes: ProviderServiceRoute[] = []) {
+  const serviceRoute = findProviderServiceRoute(serviceRoutes, group.providerNumber, group.serviceCategory);
+  const match = serviceRoute
+    ? { kind: 'routed' as const, route: serviceRoute }
+    : matchProviderMaster(entries, group.providerNumber, group.serviceCategory);
   const dynamicIssues = new Set([
     DELIVERY_METHOD_ISSUE, SERVICE_MATCH_ISSUE, SERVICE_MASTER_MISSING_ISSUE, MASTER_ROUTE_REVIEW_ISSUE,
     PROVIDER_NAME_ISSUE, PROVIDER_NUMBER_ISSUE, CLIENT_NAME_ISSUE, SERVICE_MONTH_ISSUE,
@@ -172,20 +214,22 @@ export function refreshProviderGroupRouting<T extends ProviderGroupLike, M exten
 
   if (match.kind === 'ambiguous') {
     group.issues.push(SERVICE_MATCH_ISSUE);
+    group.deliveryMethod = '';
     group.reviewed = false;
+  } else if (match.kind === 'routed') {
+    group.deliveryMethod = match.route.deliveryMethod;
   } else if (match.kind === 'matched') {
     const entry = match.entry;
+    group.deliveryMethod = entry.deliveryMethod;
     if (!group.providerName.trim() && entry.providerName.trim()) {
       group.providerName = entry.providerName.trim();
       group.issues = group.issues.filter((issue) => issue !== '事業所名を判定できません');
     }
-    if (entry.needsServiceReview) group.issues.push(MASTER_ROUTE_REVIEW_ISSUE);
     if (!entry.deliveryMethod) group.issues.push(DELIVERY_METHOD_ISSUE);
-    if (entry.needsServiceReview || !entry.deliveryMethod) group.reviewed = false;
+    if (!entry.deliveryMethod) group.reviewed = false;
   } else {
-    const sameNumberRows = entries.filter((entry) => normalizeProviderNumber(entry.providerNumber) === normalizeProviderNumber(group.providerNumber));
-    if (sameNumberRows.length) group.issues.push(SERVICE_MASTER_MISSING_ISSUE);
-    else group.issues.push(DELIVERY_METHOD_ISSUE);
+    group.deliveryMethod = '';
+    group.issues.push(DELIVERY_METHOD_ISSUE);
     group.reviewed = false;
   }
 
@@ -198,7 +242,7 @@ export function refreshProviderGroupRouting<T extends ProviderGroupLike, M exten
   return match;
 }
 
-export function refreshRoutingSafetyForGroups<T extends ProviderGroupLike, M extends ProviderMasterLike>(groups: T[], entries: M[]) {
-  groups.forEach((group) => refreshProviderGroupRouting(group, entries));
+export function refreshRoutingSafetyForGroups<T extends ProviderGroupLike, M extends ProviderMasterLike>(groups: T[], entries: M[], serviceRoutes: ProviderServiceRoute[] = []) {
+  groups.forEach((group) => refreshProviderGroupRouting(group, entries, serviceRoutes));
   return groups;
 }

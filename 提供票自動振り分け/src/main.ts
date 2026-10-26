@@ -11,6 +11,7 @@ import {
   applyProviderMasterChoice,
   canAutoAssignServiceCategory,
   createProviderRouteIdentityFingerprint,
+  createProviderRoutePageFingerprints,
   findProviderServiceRoute,
   hasIndependentGroupReview,
   matchProviderMaster,
@@ -19,8 +20,8 @@ import {
   providerIdentityKey,
   reconcileProviderMaster,
   refreshRoutingSafetyForGroups,
+  saveProviderGroupRouteChoice,
   SERVICE_MATCH_ISSUE,
-  upsertProviderServiceRoute,
 } from './provider-matching';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -54,8 +55,8 @@ const groupStatus = (group: SlipGroup, singleFolderExport = false) => {
   return group.needsReview && !group.reviewed ? '要確認' : '確認済み';
 };
 const download = (bytes: BlobPart, name: string) => { const url = URL.createObjectURL(new Blob([bytes])); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
-const findProviderMaster = (providerNumber: string, serviceCategory?: string, identityFingerprint?: string): ProviderMasterEntry | undefined => {
-  const serviceRoute = findProviderServiceRoute(savedData.providerServiceRoutes ?? [], providerNumber, serviceCategory, identityFingerprint);
+const findProviderMaster = (providerNumber: string, serviceCategory?: string, identityFingerprint?: string, pageFingerprints: string[] = []): ProviderMasterEntry | undefined => {
+  const serviceRoute = findProviderServiceRoute(savedData.providerServiceRoutes ?? [], providerNumber, serviceCategory, identityFingerprint, pageFingerprints);
   if (serviceRoute) return {
     id: undefined,
     providerNumber: serviceRoute.providerNumber,
@@ -67,7 +68,7 @@ const findProviderMaster = (providerNumber: string, serviceCategory?: string, id
   const match = matchProviderMaster(savedData.providerMaster, providerNumber, serviceCategory);
   return match.kind === 'matched' ? match.entry : undefined;
 };
-const masterFor = (group: SlipGroup) => findProviderMaster(group.providerNumber, group.serviceCategory, group.routeIdentityFingerprint);
+const masterFor = (group: SlipGroup) => findProviderMaster(group.providerNumber, group.serviceCategory, group.routeIdentityFingerprint, group.routePageFingerprints);
 const providerMatchKeyFor = (group: SlipGroup) => {
   const master = masterFor(group);
   if (master?.id) return master.id;
@@ -112,7 +113,7 @@ function ensureProviderMasterForGroups(groups: SlipGroup[]) {
     if (!number) continue;
     const category = normalizeServiceCategory(group.serviceCategory);
     const candidates = savedData.providerMaster.filter((entry) => normalizeProviderNumber(entry.providerNumber) === number);
-    if (findProviderServiceRoute(savedData.providerServiceRoutes ?? [], number, category, group.routeIdentityFingerprint)) continue;
+    if (findProviderServiceRoute(savedData.providerServiceRoutes ?? [], number, category, group.routeIdentityFingerprint, group.routePageFingerprints)) continue;
     const exact = category ? candidates.filter((entry) => normalizeServiceCategory(entry.serviceCategory) === category) : [];
     if (exact.length) {
       if (exact.length > 1) continue;
@@ -228,6 +229,25 @@ function refreshRoutingSafety() {
   const masterBefore = JSON.stringify(savedData.providerMaster);
   refreshRoutingSafetyForGroups(result?.groups ?? [], savedData.providerMaster, savedData.providerServiceRoutes ?? []);
   if (masterBefore !== JSON.stringify(savedData.providerMaster)) persist();
+}
+
+async function refreshRouteIdentity(group: SlipGroup, providerNumber = group.providerNumber) {
+  if (!result) return;
+  const [identityFingerprint, pageFingerprints] = await Promise.all([
+    createProviderRouteIdentityFingerprint({ ...group, providerNumber }, result.sources),
+    createProviderRoutePageFingerprints(group, result.sources),
+  ]);
+  group.routeIdentityFingerprint = identityFingerprint;
+  group.routePageFingerprints = pageFingerprints;
+}
+
+function saveConfirmedRouteChoice(group: SlipGroup) {
+  const before = savedData.providerServiceRoutes ?? [];
+  const after = saveProviderGroupRouteChoice(group, before);
+  if (after === before) return false;
+  savedData.providerServiceRoutes = after;
+  persist();
+  return true;
 }
 
 function showRenderFailure(error: unknown) {
@@ -829,10 +849,7 @@ function bindEvents() {
     if (select.dataset.routeChoice === 'providerMaster') {
       const selectedMaster = savedData.providerMaster.find((entry) => entry.id === select.value);
       if (selectedMaster && result) {
-        group.routeIdentityFingerprint = await createProviderRouteIdentityFingerprint(
-          { ...group, providerNumber: selectedMaster.providerNumber },
-          result.sources,
-        );
+        await refreshRouteIdentity(group, selectedMaster.providerNumber);
       }
       savedData.providerServiceRoutes = applyProviderMasterChoice(
         group,
@@ -847,24 +864,23 @@ function bindEvents() {
     } else if (select.dataset.routeChoice === 'deliveryMethod') {
       group.deliveryMethod = select.value;
       if (group.serviceCategory && select.value) {
-        if (result) {
-          group.routeIdentityFingerprint = await createProviderRouteIdentityFingerprint(group, result.sources);
-        }
-        savedData.providerServiceRoutes = upsertProviderServiceRoute(
-          savedData.providerServiceRoutes ?? [],
-          group.providerNumber,
-          group.serviceCategory,
-          select.value,
-          group.routeIdentityFingerprint,
-        );
-        persist();
+        await refreshRouteIdentity(group);
+        saveConfirmedRouteChoice(group);
       }
     }
     group.reviewed = false;
     refreshRoutingSafety();
     render();
   }));
-  document.querySelectorAll<HTMLElement>('[data-action="confirm"]').forEach((button) => button.addEventListener('click', () => { const group = result?.groups.find((item) => item.id === button.dataset.id); if (group) { group.reviewed = true; render(); } }));
+  document.querySelectorAll<HTMLElement>('[data-action="confirm"]').forEach((button) => button.addEventListener('click', async () => {
+    const group = result?.groups.find((item) => item.id === button.dataset.id);
+    if (!group) return;
+    await refreshRouteIdentity(group);
+    saveConfirmedRouteChoice(group);
+    refreshRoutingSafety();
+    group.reviewed = true;
+    render();
+  }));
   document.querySelector('[data-action="ack-duplicates"]')?.addEventListener('click', () => { if (result) { result.duplicateFiles = []; render(); } });
   document.querySelector('[data-action="go-master"]')?.addEventListener('click', () => {
     const ensured = ensureProviderMasterForGroups(result?.groups.filter((group) => !isStoppedGroup(group)) ?? []);
@@ -998,9 +1014,7 @@ async function startRouting() {
   busy = true; setProgress('PDFを読み込み中');
   try {
     const loaded = await loadPdfFiles(pdfs, setProgress); const analysis = await analysePdfs(loaded.sources, loaded.duplicateFiles, setProgress); result = analysis;
-    await Promise.all(result.groups.map(async (group) => {
-      group.routeIdentityFingerprint = await createProviderRouteIdentityFingerprint(group, result!.sources);
-    }));
+    await Promise.all(result.groups.map((group) => refreshRouteIdentity(group)));
     queuedFiles = []; downloaded = 0; outputName = ''; sectionOpen.verification = false;
     const ensured = ensureProviderMasterForGroups(result.groups);
     if (ensured.changed) persist();

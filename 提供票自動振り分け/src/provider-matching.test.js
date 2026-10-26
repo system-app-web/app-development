@@ -22,6 +22,7 @@ import {
 import { canCreateOutputs, canToggleForceDownload } from './output-policy.ts';
 import { loadSavedData } from './storage.ts';
 import { SERVICE_CATEGORY_GROUPS, SERVICE_CATEGORY_OPTIONS, serviceCategoryForCodePrefix } from './service-categories.ts';
+import { applyAutomaticGeminiSuggestion, assistUnresolvedProviderNames } from './provider-assistance.ts';
 
 const baseGroup = (overrides = {}) => ({
   clientName: '利用者A',
@@ -52,6 +53,164 @@ function confirmGroupChoice(group, entries, routes = []) {
   group.reviewed = true;
   return savedRoutes;
 }
+
+const unresolvedOffice = (overrides = {}) => baseGroup({
+  providerNumber: '9999900021', providerName: '', serviceCategory: '訪問看護',
+  geminiExcerpt: '事業所番号 9999900021', geminiUsed: false,
+  issues: ['事業所名を判定できません'], needsReview: true,
+  ...overrides,
+});
+const officeSuggestion = (overrides = {}) => ({
+  providerNumber: '9999900021', providerName: '架空の補助確認事業所', confidence: 0.96,
+  isHomeMedicalCare: false, reason: '架空の回答', requiresReview: true, ...overrides,
+});
+
+describe('事業所名の補助確認と再補完', () => {
+  it('PDFに名前がなく高確信度の回答があると、保存対象の空欄を補い、補助確認後も維持する', async () => {
+    const group = unresolvedOffice();
+    const masters = ensureProviderMasterEntries([], [group], [], makeFakeMasterEntry).entries;
+    // 保存済みルール経由の照合では、表示用の一時マスタが返る場合もあります。
+    await assistUnresolvedProviderNames([group], masters, {
+      createEntry: makeFakeMasterEntry,
+      findMaster: () => ({ ...masters[0] }),
+      requestSuggestion: async () => officeSuggestion(),
+    });
+    const after = ensureProviderMasterEntries(masters, [group], [], makeFakeMasterEntry);
+    assert.equal(after.entries[0].providerName, '架空の補助確認事業所');
+    assert.equal(group.providerName, '架空の補助確認事業所');
+    assert.ok(!JSON.stringify(after.entries).includes(group.clientName));
+    assert.ok(!('clientName' in after.entries[0]));
+  });
+
+  it('同じ番号の種類違い・種類なし・複数行でも、空の名前をすべて補う', async () => {
+    const group = unresolvedOffice();
+    const masters = [
+      makeFakeMasterEntry(group.providerNumber, '', '居宅療養管理指導'),
+      makeFakeMasterEntry(group.providerNumber, '', ''),
+      makeFakeMasterEntry(group.providerNumber, '', ''),
+    ];
+    await assistUnresolvedProviderNames([group], masters, {
+      createEntry: makeFakeMasterEntry, requestSuggestion: async () => officeSuggestion({ isHomeMedicalCare: true }),
+    });
+    assert.ok(masters.every((entry) => entry.providerName === '架空の補助確認事業所'));
+    assert.deepEqual(masters.map((entry) => entry.serviceCategory), ['居宅療養管理指導', '', '']);
+    assert.equal(group.serviceCategory, '訪問看護');
+    assert.equal(masters.length, 3);
+  });
+
+  it('確信度が0.9未満でも番号一致なら空欄を補い、確認表示は残す', async () => {
+    const group = unresolvedOffice();
+    const masters = [makeFakeMasterEntry(group.providerNumber, '', '')];
+    await assistUnresolvedProviderNames([group], masters, {
+      createEntry: makeFakeMasterEntry, requestSuggestion: async () => officeSuggestion({ confidence: 0.6 }),
+    });
+    assert.equal(masters[0].providerName, '架空の補助確認事業所');
+    assert.equal(masters[0].serviceCategory, '');
+    assert.equal(masters[0].deliveryMethod, '');
+    assert.equal(group.needsReview, true);
+    assert.ok(group.issues.some((issue) => issue.startsWith('自動確認候補：')));
+  });
+
+  it('1ページ目に名前がなく別ページで読めた名前を、Geminiを呼ばずに登録する', async () => {
+    const firstPage = { providerNumber: '9999900021', serviceCategory: '訪問看護', providerName: '', isAppendix: false };
+    const continued = mergePageFacts(firstPage, { providerName: '架空の続きページ事業所', serviceCategory: '', isAppendix: true });
+    const group = unresolvedOffice({ ...continued, pages: [0, 1, 2].map((pageIndex) => ({ sourceId: 'fake-pdf', pageIndex })) });
+    const masters = [makeFakeMasterEntry(group.providerNumber, '', '')];
+    let requests = 0;
+    await assistUnresolvedProviderNames([group], masters, {
+      createEntry: makeFakeMasterEntry, requestSuggestion: async () => { requests++; throw new Error('呼び出さない'); },
+    });
+    assert.equal(masters[0].providerName, '架空の続きページ事業所');
+    assert.equal(requests, 0);
+  });
+
+  it('同じ番号の別提供票で読めた名前は、種類にかかわらず空欄を補う', async () => {
+    const missing = unresolvedOffice();
+    const named = unresolvedOffice({ providerName: '架空の別提供票事業所', serviceCategory: '居宅療養管理指導' });
+    const masters = [makeFakeMasterEntry(missing.providerNumber, '', '訪問看護')];
+    let requests = 0;
+    await assistUnresolvedProviderNames([missing, named], masters, {
+      createEntry: makeFakeMasterEntry, requestSuggestion: async () => { requests++; throw new Error('通信エラー'); },
+    });
+    assert.equal(masters[0].providerName, '架空の別提供票事業所');
+    assert.equal(missing.providerName, '架空の別提供票事業所');
+    assert.equal(requests, 0);
+    assert.ok(!missing.issues.some((issue) => issue.startsWith('事業所情報の補助確認：')));
+  });
+
+  it('Gemini失敗時にPDFにも名前がなければ空欄を維持し、ログイン・通信の理由を表示する', async () => {
+    for (const [error, expected] of [
+      [new Error('スタッフポータルのログインを確認できません'), 'ポータルからアプリを開き直す'],
+      [new TypeError('Failed to fetch'), '通信できず'],
+      [new Error('Gemini APIキーが設定されていません'), '補助確認の設定が完了していません'],
+      [new Error('server internal secret-detail'), '補助確認サービスを利用できません'],
+    ]) {
+      const group = unresolvedOffice();
+      const masters = [makeFakeMasterEntry(group.providerNumber, '', '')];
+      await assistUnresolvedProviderNames([group], masters, {
+        createEntry: makeFakeMasterEntry, requestSuggestion: async () => { throw error; },
+      });
+      refreshRoutingSafetyForGroups([group], masters);
+      assert.equal(masters[0].providerName, '');
+      assert.equal(group.needsReview, true);
+      assert.ok(group.issues.some((issue) => issue.includes(expected)));
+      assert.ok(!group.issues.join('').includes('secret-detail'));
+    }
+  });
+
+  it('1件の通信失敗で後続の補助確認を打ち切らない', async () => {
+    const groups = [unresolvedOffice(), unresolvedOffice({ providerNumber: '9999900022', geminiExcerpt: '事業所番号 9999900022' })];
+    const masters = groups.map((group) => makeFakeMasterEntry(group.providerNumber, '', ''));
+    let requests = 0;
+    await assistUnresolvedProviderNames(groups, masters, {
+      createEntry: makeFakeMasterEntry,
+      requestSuggestion: async (input) => {
+        requests++;
+        if (input.providerNumber === '9999900021') throw new Error('通信エラー');
+        return officeSuggestion({ providerNumber: input.providerNumber });
+      },
+    });
+    assert.equal(requests, 2);
+    assert.equal(masters[0].providerName, '');
+    assert.equal(masters[1].providerName, '架空の補助確認事業所');
+  });
+
+  it('Geminiが名前を答えても入力済みの略称・送り先は上書きしない', () => {
+    const group = unresolvedOffice();
+    const masters = [{ ...makeFakeMasterEntry(group.providerNumber, 'スタッフ入力済み略称', '訪問看護'), deliveryMethod: 'FAX' }];
+    applyAutomaticGeminiSuggestion(group, officeSuggestion(), masters, { createEntry: makeFakeMasterEntry });
+    assert.equal(masters[0].providerName, 'スタッフ入力済み略称');
+    assert.equal(masters[0].deliveryMethod, 'FAX');
+  });
+
+  it('補助確認の失敗後に同じ番号の別提供票で名前が分かれば、空欄と失敗表示を補う', async () => {
+    const groups = [unresolvedOffice(), unresolvedOffice({ geminiExcerpt: '同じ番号の別提供票 9999900021' })];
+    const masters = [makeFakeMasterEntry(groups[0].providerNumber, '', '')];
+    let requests = 0;
+    await assistUnresolvedProviderNames(groups, masters, {
+      createEntry: makeFakeMasterEntry,
+      requestSuggestion: async () => {
+        if (++requests === 1) throw new Error('通信エラー');
+        return officeSuggestion();
+      },
+    });
+    assert.equal(requests, 2);
+    assert.equal(masters[0].providerName, '架空の補助確認事業所');
+    assert.ok(groups.every((group) => group.providerName === '架空の補助確認事業所'));
+    assert.ok(groups.every((group) => !group.issues.some((issue) => issue.startsWith('事業所情報の補助確認：'))));
+  });
+
+  it('Geminiの番号がPDFの番号と違うときは名前を書き込まない', async () => {
+    const group = unresolvedOffice();
+    const masters = [makeFakeMasterEntry(group.providerNumber, '', '')];
+    await assistUnresolvedProviderNames([group], masters, {
+      createEntry: makeFakeMasterEntry, requestSuggestion: async () => officeSuggestion({ providerNumber: '9999900099' }),
+    });
+    assert.equal(masters[0].providerName, '');
+    assert.equal(group.providerNumber, '9999900021');
+    assert.equal(group.needsReview, true);
+  });
+});
 
 describe('サービス種類を使った事業所マスタ照合', () => {
   it('空のマスタへ2ページの提供票を読み込むと事業所名を登録する', () => {

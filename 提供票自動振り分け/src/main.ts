@@ -9,13 +9,12 @@ import { SERVICE_CATEGORY_GROUPS, SERVICE_CATEGORY_OPTIONS } from './service-cat
 import { canCreateOutputs, canToggleForceDownload } from './output-policy';
 import {
   applyProviderMasterChoice,
-  canAutoAssignServiceCategory,
   createProviderRouteIdentityFingerprint,
   createProviderRoutePageFingerprints,
+  ensureProviderMasterEntries,
   findProviderServiceRoute,
   hasIndependentGroupReview,
   matchProviderMaster,
-  normalizeProviderNumber,
   normalizeServiceCategory,
   providerIdentityKey,
   reconcileProviderMaster,
@@ -98,69 +97,16 @@ function normalizeProviderMaster(data: AppSavedData, preferredId?: string) {
 function ensureProviderMasterForGroups(groups: SlipGroup[]) {
   const before = JSON.stringify(savedData.providerMaster);
   normalizeProviderMaster(savedData);
-  const categoriesByNumber = new Map<string, Set<string>>();
-  groups.forEach((group) => {
-    const number = normalizeProviderNumber(group.providerNumber);
-    const category = normalizeServiceCategory(group.serviceCategory);
-    if (!number || !category) return;
-    categoriesByNumber.set(number, new Set([...(categoriesByNumber.get(number) ?? []), category]));
-  });
-  let added = 0;
-  const additions = new Map<string, ProviderMasterEntry>();
-
-  for (const group of groups) {
-    const number = normalizeProviderNumber(group.providerNumber);
-    if (!number) continue;
-    const category = normalizeServiceCategory(group.serviceCategory);
-    const candidates = savedData.providerMaster.filter((entry) => normalizeProviderNumber(entry.providerNumber) === number);
-    if (findProviderServiceRoute(savedData.providerServiceRoutes ?? [], number, category, group.routeIdentityFingerprint, group.routePageFingerprints)) continue;
-    const exact = category ? candidates.filter((entry) => normalizeServiceCategory(entry.serviceCategory) === category) : [];
-    if (exact.length) {
-      if (exact.length > 1) continue;
-      if (!exact[0].providerName.trim() && group.providerName.trim()) {
-        exact[0].providerName = group.providerName.trim();
-        exact[0].updatedAt = new Date().toISOString();
-      }
-      continue;
-    }
-    if (!category) {
-      if (!candidates.length) {
-        const key = providerIdentityKey(number, '');
-        if (!additions.has(key)) {
-          additions.set(key, createProviderMasterEntry(number, group.providerName.trim()));
-          added++;
-        }
-      } else if (candidates.length === 1 && !candidates[0].providerName.trim() && group.providerName.trim()) {
-        candidates[0].providerName = group.providerName.trim();
-        candidates[0].updatedAt = new Date().toISOString();
-      }
-      continue;
-    }
-
-    const untyped = candidates.filter((entry) => !normalizeServiceCategory(entry.serviceCategory));
-    if (untyped.length === 1 && canAutoAssignServiceCategory(untyped[0], candidates.length, categoriesByNumber.get(number)?.size ?? 0)) {
-      // 旧データの唯一の未設定行でも、送付方法が未設定で要確認でない場合だけ補います。
-      untyped[0].serviceCategory = category;
-      if (!untyped[0].providerName.trim() && group.providerName.trim()) untyped[0].providerName = group.providerName.trim();
-      untyped[0].updatedAt = new Date().toISOString();
-      continue;
-    }
-
-    // 既存の未判定行がある場合は、送付方法を持つ別行へPDFの種類を当てず、手動選択を待ちます。
-    if (untyped.length) continue;
-
-    // 同じ番号の別サービスは推測で既存行へ割り当てず、種類を明記した行を用意します。
-    const key = providerIdentityKey(number, category);
-    if (!additions.has(key)) {
-      additions.set(key, createProviderMasterEntry(number, group.providerName.trim(), category));
-      added++;
-    }
-  }
-
-  if (additions.size) savedData.providerMaster.unshift(...additions.values());
+  const ensured = ensureProviderMasterEntries(
+    savedData.providerMaster,
+    groups,
+    savedData.providerServiceRoutes ?? [],
+    createProviderMasterEntry,
+  );
+  savedData.providerMaster = ensured.entries;
   normalizeProviderMaster(savedData);
   return {
-    added,
+    added: ensured.added,
     changed: before !== JSON.stringify(savedData.providerMaster),
   };
 }

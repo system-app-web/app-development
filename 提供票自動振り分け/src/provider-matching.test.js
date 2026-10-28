@@ -212,6 +212,108 @@ describe('事業所名の補助確認と再補完', () => {
   });
 });
 
+describe('主票と別表のページ区切り', () => {
+  const numbers = { A: '9999900101', B: '9999900102', C: '9999900103', D: '9999900104' };
+  const slipPages = (office, { client = '架空利用者A', mainPages = 1, appendixPages = 1 } = {}) => [
+    ...Array.from({ length: mainPages }, (_, index) => ({
+      office, part: 'main', index,
+      facts: { clientName: client, serviceCategory: '訪問看護', serviceMonth: '令和8年10月', isAppendix: false, isSlipHeading: true, textFound: true },
+    })),
+    ...Array.from({ length: appendixPages }, (_, index) => ({
+      office, part: 'appendix', index,
+      facts: {
+        clientName: client, serviceCategory: '訪問看護', serviceMonth: '令和8年10月',
+        isAppendix: true, isSlipHeading: true, textFound: true,
+        ...(index === 0 ? { providerNumber: numbers[office], providerName: `架空事業所${office}` } : {}),
+      },
+    })),
+  ];
+
+  // 実際のPDF解析と同じく、開始時は事実をリセットし、続きでは読み取れた情報を引き継ぎます。
+  const groupPages = (pages) => {
+    const groups = [];
+    let currentFacts;
+    for (const page of pages) {
+      const start = shouldStartNewSlip(currentFacts, page.facts);
+      if (start) groups.push({ pages: [], facts: page.facts });
+      const group = groups.at(-1);
+      group.pages.push(page);
+      currentFacts = start ? page.facts : mergePageFacts(currentFacts, page.facts);
+      group.facts = currentFacts;
+    }
+    return groups;
+  };
+  const assertSets = (pages, expectedLengths) => {
+    const groups = groupPages(pages);
+    assert.deepEqual(groups.map((group) => group.pages.length), expectedLengths);
+    assert.deepEqual(groups.flatMap((group) => group.pages), pages, '全ページを欠落・重複なく割り当てる');
+    for (const group of groups) {
+      const office = group.pages[0].office;
+      assert.ok(group.pages.every((page) => page.office === office), '別の事業所のページを混ぜない');
+      assert.equal(group.facts.providerNumber, numbers[office]);
+    }
+    return groups;
+  };
+
+  it('同じ利用者のA・B・Cで、主票に番号がなく別表だけに番号があっても各2ページになる', () => {
+    assertSets([...slipPages('A'), ...slipPages('B'), ...slipPages('C')], [2, 2, 2]);
+  });
+
+  it('利用者が途中で変わっても、事業所ごとに主票・別表の2ページになる', () => {
+    const pages = [...slipPages('A'), ...slipPages('B', { client: '架空利用者B' }), ...slipPages('C', { client: '架空利用者B' })];
+    const groups = assertSets(pages, [2, 2, 2]);
+    assert.deepEqual(groups.map((group) => group.facts.clientName), ['架空利用者A', '架空利用者B', '架空利用者B']);
+  });
+
+  it('主票1ページと別表2ページ以上を1つにまとめ、番号なしの別表続きも要確認にしない', () => {
+    for (const appendixPages of [2, 3]) {
+      const [set] = assertSets(slipPages('A', { appendixPages }), [1 + appendixPages]);
+      const group = baseGroup({ ...set.facts, pages: set.pages });
+      refreshRoutingSafetyForGroups([group], [{ ...makeFakeMasterEntry(numbers.A, '架空事業所A', '訪問看護'), deliveryMethod: 'FAX' }]);
+      assert.equal(group.needsReview, false);
+      assert.equal(group.deliveryMethod, 'FAX');
+    }
+  });
+
+  it('主票2ページと別表1ページを1つにまとめる', () => {
+    const [set] = assertSets(slipPages('B', { mainPages: 2 }), [3]);
+    const group = baseGroup({ ...set.facts, pages: set.pages });
+    refreshRoutingSafetyForGroups([group], [{ ...makeFakeMasterEntry(numbers.B, '架空事業所B', '訪問看護'), deliveryMethod: 'メール' }]);
+    assert.equal(group.needsReview, false);
+    assert.equal(group.deliveryMethod, 'メール');
+  });
+
+  it('2ページと3ページ以上の提供票が混ざっても、それぞれのページ数で区切る', () => {
+    assertSets([
+      ...slipPages('A'), ...slipPages('B', { appendixPages: 3 }),
+      ...slipPages('C', { mainPages: 2 }), ...slipPages('D'),
+    ], [2, 4, 3, 2]);
+  });
+
+  it('振り分け後の各提供票が、続きや別表ではなく最初の主票から始まる', () => {
+    const pages = [
+      ...slipPages('A', { mainPages: 2 }), ...slipPages('B', { appendixPages: 2 }),
+      ...slipPages('C', { client: '架空利用者B' }), ...slipPages('D', { client: '架空利用者B', mainPages: 2, appendixPages: 2 }),
+    ];
+    for (const group of assertSets(pages, [3, 3, 2, 4])) {
+      assert.equal(group.pages[0].part, 'main');
+      assert.equal(group.pages[0].index, 0);
+      assert.equal(group.pages[0].facts.isSlipHeading, true);
+      assert.equal(group.pages[0].facts.isAppendix, false);
+    }
+  });
+
+  it('別表→見出し付き主票は、前後の番号が読めるかどうかにかかわらず区切る', () => {
+    for (const previousNumber of [undefined, numbers.A]) {
+      for (const nextNumber of [undefined, numbers.A, numbers.B]) {
+        const previous = { ...slipPages('A')[1].facts, providerNumber: previousNumber };
+        const next = { ...slipPages('B')[0].facts, providerNumber: nextNumber };
+        assert.equal(shouldStartNewSlip(previous, next), true);
+      }
+    }
+  });
+});
+
 describe('サービス種類を使った事業所マスタ照合', () => {
   it('空のマスタへ2ページの提供票を読み込むと事業所名を登録する', () => {
     const result = ensureProviderMasterEntries([], [baseGroup({

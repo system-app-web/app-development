@@ -258,8 +258,12 @@ export function shouldStartNewSlip(current: PageFacts | undefined, next: PageFac
   const clientChanged = Boolean(next.clientName && current.clientName && next.clientName !== current.clientName);
   if (clientChanged) return true;
 
-  // 番号のあるページの後に番号なしページが続く場合は、同じ提供票の続きとして扱います。
-  // 種類やページ見出しだけで分割すると、3ページ目以降が単独の要確認になってしまいます。
+  // 別表の後に見出し付きの主票が始まったら、番号の有無にかかわらず新しいセットです。
+  // 主票は番号なしの場合があるため、「番号なしページは続き」の判定より先に確認します。
+  if (current.isAppendix && !next.isAppendix && next.isSlipHeading) return true;
+
+  // 新しい主票ではない番号なしページは、同じ提供票の続きとして扱います。
+  // 別表の続きなどを種類だけで分割すると、3ページ目以降が単独の要確認になってしまいます。
   if (current.providerNumber && !next.providerNumber) {
     const monthChanged = Boolean(next.serviceMonth && current.serviceMonth && next.serviceMonth !== current.serviceMonth);
     if (monthChanged) return true;
@@ -271,11 +275,6 @@ export function shouldStartNewSlip(current: PageFacts | undefined, next: PageFac
   // 主票→別表は同じ書類の続きです。主票の右上名称が省略形でも、別表の番号・名称で確定します。
   if (!current.isAppendix && next.isAppendix) {
     return bothNumbersKnown && current.providerNumber !== next.providerNumber;
-  }
-
-  // 別表の後に見出し付きの主票が始まったら新しいセットです。
-  if (current.isAppendix && !next.isAppendix) {
-    if (next.isSlipHeading) return true;
   }
 
   if (bothNumbersKnown) return current.providerNumber !== next.providerNumber;

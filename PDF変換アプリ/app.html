@@ -993,6 +993,8 @@
     const DPI = 320;
     const CARE_DPI = 600;
     const CARE_PREVIEW_RENDER_SCALE = 3;
+    const CARE_CANVAS_PIXELS = 16000000;
+    const CARE_CANVAS_SIDE = 16384;
     const PENCIL_OVERLAY_DPI = DPI;
     const MM_TO_PX = DPI / 25.4;
     const originalSizes = {
@@ -1380,8 +1382,17 @@
       const worker = await getOrientationWorker();
       setStatus(`${fileName} 1ページ目の向きを自動判定中です。`);
       // Care-insurance documents in one file use the same orientation. Checking once avoids OCR per page.
-      const baseline = normalizeOrientation(cropDocument(canvases[0]));
-      const { data } = await worker.detect(makeOrientationPreview(baseline));
+      const cropped = cropDocument(canvases[0]);
+      const baseline = normalizeOrientation(cropped);
+      const preview = makeOrientationPreview(baseline);
+      let data;
+      try {
+        ({ data } = await worker.detect(preview));
+      } finally {
+        for (const temporary of new Set([cropped, baseline, preview])) {
+          if (temporary !== canvases[0]) { temporary.width = 1; temporary.height = 1; }
+        }
+      }
       const orientation = data.orientation_degrees ?? 0;
       const confidence = data.orientation_confidence ?? 0;
       const correction = orientation === 180 && confidence >= 8 ? 180 : 0;
@@ -1478,7 +1489,7 @@
           link.href = url;
           link.download = buildSuggestedName(index);
           link.click();
-          URL.revokeObjectURL(url);
+          window.setTimeout(() => URL.revokeObjectURL(url), 60000);
         }
         setStatus(`${outputCanvases.length}件をダウンロード保存しました。`);
       } catch (error) {
@@ -1491,6 +1502,11 @@
 
     printBtn.addEventListener("click", async () => {
       if (isMergeMode() ? !mergeFiles.length : !outputCanvases.length) return;
+      const careMode = !isMergeMode() && !isPencilMode();
+      let pdfWindow = null;
+      if (careMode) {
+        try { pdfWindow = window.open("", "_blank"); } catch (error) { console.warn("PDF tab could not be opened.", error); }
+      }
       setActionButtonsDisabled(true);
       try {
         const printPdf = isMergeMode()
@@ -1498,11 +1514,17 @@
           : isPencilMode()
             ? await buildPencilPdfBlob(sharedInputFiles)
             : await buildHighQualityCarePdfBlob();
-        downloadAndOpenPdf(printPdf, isMergeMode() ? "PDF結合.pdf" : "PDF印刷用.pdf");
-        setStatus("PDFをダウンロードして開きました。PDF画面の印刷からFAX送信してください。");
+        if (careMode) {
+          const opened = downloadAndOpenCarePdf(printPdf, "PDF印刷用.pdf", pdfWindow);
+          setStatus(opened ? "PDFをダウンロードして開きました。PDF画面の印刷からFAX送信してください。" : "PDFをダウンロードしました。開いてから印刷してください。");
+        } else {
+          downloadAndOpenPdf(printPdf, isMergeMode() ? "PDF結合.pdf" : "PDF印刷用.pdf");
+          setStatus("PDFをダウンロードして開きました。PDF画面の印刷からFAX送信してください。");
+        }
       } catch (error) {
         console.error(error);
-        setStatus("印刷画面を開けませんでした。");
+        if (pdfWindow && !pdfWindow.closed) pdfWindow.close();
+        setStatus(careMode ? "保存できませんでした。もう一度お試しください。" : "印刷画面を開けませんでした。");
       } finally {
         setActionButtonsDisabled(false);
       }
@@ -2002,8 +2024,8 @@
         for (const file of files) {
           const pdfSource = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
           const sources = pdfSource
-            ? await renderPdfPages(file, CARE_PREVIEW_RENDER_SCALE)
-            : [await renderImage(file)];
+            ? await renderPdfPages(file, CARE_PREVIEW_RENDER_SCALE, CARE_CANVAS_PIXELS)
+            : [await renderImage(file, CARE_CANVAS_PIXELS)];
           let corrections = sources.map(() => 0);
           if (selectedDocType() === "care") {
             try {
@@ -2057,13 +2079,26 @@
       `;
     }
 
-    async function renderImage(file) {
+    function cappedCanvasDimensions(width, height, maxPixels = Infinity) {
+      const scale = Math.min(1, Math.sqrt(maxPixels / (width * height)), CARE_CANVAS_SIDE / width, CARE_CANVAS_SIDE / height);
+      return { width: Math.max(1, Math.floor(width * scale)), height: Math.max(1, Math.floor(height * scale)) };
+    }
+
+    async function renderImage(file, maxPixels = Infinity) {
       const bitmap = await createImageBitmap(file);
-      const canvas = document.createElement("canvas");
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
-      canvas.getContext("2d").drawImage(bitmap, 0, 0);
-      return canvas;
+      try {
+        const canvas = document.createElement("canvas");
+        const size = Number.isFinite(maxPixels) ? cappedCanvasDimensions(bitmap.width, bitmap.height, maxPixels) : bitmap;
+        canvas.width = size.width;
+        canvas.height = size.height;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Cannot create image canvas");
+        context.imageSmoothingQuality = "high";
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        return canvas;
+      } finally {
+        bitmap.close();
+      }
     }
 
     const isPdfFile = (file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name);
@@ -2076,14 +2111,16 @@
       return new File([buildPdfBlob(imageCanvas, DPI, pageSizeForCanvas(imageCanvas))], `${baseName}.pdf`, { type: "application/pdf" });
     }
 
-    async function renderPdfPages(file, scale = 3) {
+    async function renderPdfPages(file, scale = 3, maxPixels = Infinity) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
       const data = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data }).promise;
       const canvases = [];
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
         const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale });
+        const base = page.getViewport({ scale: 1 });
+        const size = Number.isFinite(maxPixels) ? cappedCanvasDimensions(base.width * scale, base.height * scale, maxPixels) : null;
+        const viewport = page.getViewport({ scale: size ? Math.min(size.width / base.width, size.height / base.height) : scale });
         const canvas = document.createElement("canvas");
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
@@ -2093,11 +2130,13 @@
       return canvases;
     }
 
-    async function renderPdfPage(file, pageNumber, scale) {
+    async function renderPdfPage(file, pageNumber, scale, maxPixels = Infinity) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
       const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
       const page = await pdf.getPage(pageNumber);
-      const viewport = page.getViewport({ scale });
+      const base = page.getViewport({ scale: 1 });
+      const size = Number.isFinite(maxPixels) ? cappedCanvasDimensions(base.width * scale, base.height * scale, maxPixels) : null;
+      const viewport = page.getViewport({ scale: size ? Math.min(size.width / base.width, size.height / base.height) : scale });
       const canvas = document.createElement("canvas");
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
@@ -2173,12 +2212,17 @@
       const pxPerMm = Math.min(canvas.width / size.wMm, canvas.height / size.hMm);
       const margin = Math.max(24, Math.round(pxPerMm * 10));
       const out = document.createElement("canvas");
-      out.width = canvas.width + margin * 2;
-      out.height = canvas.height + margin * 2;
+      const fullWidth = canvas.width + margin * 2;
+      const fullHeight = canvas.height + margin * 2;
+      const sizeLimit = !isMergeMode() && !isPencilMode() ? cappedCanvasDimensions(fullWidth, fullHeight, CARE_CANVAS_PIXELS) : { width: fullWidth, height: fullHeight };
+      out.width = sizeLimit.width;
+      out.height = sizeLimit.height;
       const ctx = out.getContext("2d");
+      if (!ctx) throw new Error("Cannot create document canvas");
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, out.width, out.height);
-      ctx.drawImage(canvas, margin, margin);
+      const scale = Math.min(out.width / fullWidth, out.height / fullHeight);
+      ctx.drawImage(canvas, margin * scale, margin * scale, canvas.width * scale, canvas.height * scale);
       return out;
     }
 
@@ -2189,7 +2233,10 @@
       const type = selectedDocType();
       const oriented = shouldRotate ? rotateCanvas(canvas, -90) : canvas;
       const rotation = manualOrientationEnabled[type] ? manualOrientationDirections[type] : 0;
-      return rotation ? rotateCanvas(oriented, rotation) : oriented;
+      if (!rotation) return oriented;
+      const result = rotateCanvas(oriented, rotation);
+      if (oriented !== canvas) { oriented.width = 1; oriented.height = 1; }
+      return result;
     }
 
     function refreshOutputCanvases() {
@@ -2215,6 +2262,9 @@
         const cropped = cropDocument(corrected);
         const oriented = normalizeOrientation(cropped);
         sourceCanvases.push(addOuterMargin(oriented));
+        for (const temporary of new Set([corrected, cropped, oriented])) {
+          if (temporary !== loadedCanvases[index]) { temporary.width = 1; temporary.height = 1; }
+        }
       }
       refreshOutputCanvases();
     }
@@ -2992,28 +3042,59 @@
       for (let position = 0; position < indices.length; position++) {
         const pageIndex = indices[position];
         setStatus(`${position + 1}/${indices.length}ページを600dpiで作成中です。`);
-        const reuseOutput = pageInputSources[pageIndex] && !pageInputSources[pageIndex].isPdf;
-        const canvas = reuseOutput ? outputCanvases[pageIndex] : await renderHighQualityCarePage(pageIndex);
-        try {
-          pageImages.push(await encodeCarePageImage(buildA4PageMonochromeInBands(canvas, CARE_DPI)));
-        } finally {
-          if (!reuseOutput) {
-            canvas.width = 1;
-            canvas.height = 1;
+        const input = pageInputSources[pageIndex];
+        let expectedInk = canvasHasDarkPixels(outputCanvases[pageIndex]) || canvasHasDarkPixels(loadedCanvases[pageIndex]);
+        if (!expectedInk && input?.file) {
+          const probe = input.isPdf
+            ? await renderPdfPage(input.file, input.pageNumber, 1, 1000000)
+            : await renderImage(input.file, 1000000);
+          try { expectedInk = canvasHasDarkPixels(probe); } finally { probe.width = 1; probe.height = 1; }
+        }
+        let image = null;
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const reuseOutput = attempt === 0 && input && !input.isPdf;
+          let canvas = null;
+          try {
+            canvas = reuseOutput ? outputCanvases[pageIndex] : await renderHighQualityCarePage(pageIndex, CARE_CANVAS_PIXELS / (4 ** attempt));
+            const result = buildA4PageMonochromeInBands(canvas, CARE_DPI);
+            if (expectedInk && !result.hasInk) throw new Error("Document rendering was blank");
+            image = await encodeCarePageImage(result);
+            break;
+          } catch (error) {
+            lastError = error;
+            console.warn("Retrying document rendering at a smaller size.", error);
+          } finally {
+            if (canvas && !reuseOutput) { canvas.width = 1; canvas.height = 1; }
           }
         }
-        await nextFrame();
+        if (!image) throw lastError || new Error("Document rendering failed");
+        pageImages.push(image);
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
       }
       return objectsToPdfBlobFromPageImages(pageImages);
     }
 
-    async function renderHighQualityCarePage(index) {
+    function canvasHasDarkPixels(canvas) {
+      if (!canvas || canvas.width < 1 || canvas.height < 1) return false;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Cannot read document canvas");
+      for (let y = 0; y < canvas.height; y += 256) {
+        const pixels = context.getImageData(0, y, canvas.width, Math.min(256, canvas.height - y)).data;
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (pixels[i + 3] && pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114 < blackThreshold) return true;
+        }
+      }
+      return false;
+    }
+
+    async function renderHighQualityCarePage(index, maxPixels = CARE_CANVAS_PIXELS) {
       const source = pageInputSources[index];
       let canvas;
       if (source?.isPdf) {
-        canvas = await renderPdfPage(source.file, source.pageNumber, CARE_DPI / 72);
+        canvas = await renderPdfPage(source.file, source.pageNumber, CARE_DPI / 72, maxPixels);
       } else if (source?.file) {
-        canvas = await renderImage(source.file);
+        canvas = await renderImage(source.file, maxPixels);
       } else {
         // Supports data that was loaded before this version of the app.
         const fallback = document.createElement("canvas");
@@ -3023,12 +3104,18 @@
         return fallback;
       }
 
-      const correction = pageRotationCorrections[index] ?? 0;
-      if (correction) canvas = replaceCanvas(canvas, rotateCanvas(canvas, correction));
-      canvas = replaceCanvas(canvas, cropDocument(canvas));
-      canvas = replaceCanvas(canvas, normalizeOrientation(canvas));
-      canvas = replaceCanvas(canvas, addOuterMargin(canvas));
-      return replaceCanvas(canvas, toBlackWhite(canvas));
+      try {
+        const correction = pageRotationCorrections[index] ?? 0;
+        if (correction) canvas = replaceCanvas(canvas, rotateCanvas(canvas, correction));
+        canvas = replaceCanvas(canvas, cropDocument(canvas));
+        canvas = replaceCanvas(canvas, normalizeOrientation(canvas));
+        canvas = replaceCanvas(canvas, addOuterMargin(canvas));
+        return replaceCanvas(canvas, toBlackWhite(canvas));
+      } catch (error) {
+        canvas.width = 1;
+        canvas.height = 1;
+        throw error;
+      }
     }
 
     function replaceCanvas(previous, next) {
@@ -3131,6 +3218,31 @@
       window.setTimeout(() => URL.revokeObjectURL(url), 30 * 60 * 1000);
     }
 
+    function downloadAndOpenCarePdf(blob, filename, pdfWindow) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      let opened = false;
+      try {
+        if (pdfWindow && !pdfWindow.closed) {
+          pdfWindow.location.replace(url);
+          opened = true;
+        }
+      } catch (error) { console.warn("PDF tab could not be opened.", error); }
+      if (opened) {
+        const timer = window.setInterval(() => {
+          if (pdfWindow.closed) { window.clearInterval(timer); URL.revokeObjectURL(url); }
+        }, 1000);
+      } else {
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
+      return opened;
+    }
+
     function objectsToPdfBlobFromPageImages(pageImages) {
       const objects = [];
       const pageObjectIds = [];
@@ -3197,6 +3309,7 @@
       const y = Math.round((height - targetH) / 2);
       const band = document.createElement("canvas");
       band.width = width;
+      let hasInk = false;
 
       for (let startY = 0; startY < height; startY += 512) {
         band.height = Math.min(512, height - startY);
@@ -3213,6 +3326,8 @@
             const offset = (row * width + col) * 4;
             if (pixels[offset] + pixels[offset + 1] + pixels[offset + 2] >= 384) {
               packed[(startY + row) * bytesPerRow + (col >> 3)] |= 1 << (7 - (col & 7));
+            } else {
+              hasInk = true;
             }
           }
         }
@@ -3226,7 +3341,8 @@
         height,
         page,
         colorSpace: "/DeviceGray",
-        bitsPerComponent: 1
+        bitsPerComponent: 1,
+        hasInk
       };
     }
 

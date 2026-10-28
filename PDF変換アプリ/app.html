@@ -1458,10 +1458,9 @@
           }
           for (let index = 0; index < outputCanvases.length; index++) {
             setStatus(`${index + 1}/${outputCanvases.length}件目を保存中です。`);
+            const blob = await buildHighQualityCarePdfBlob([index]);
             const handle = await outputDirectory.getFileHandle(buildSuggestedName(index), { create: true });
-            const writable = await handle.createWritable();
-            await writable.write(await buildHighQualityCarePdfBlob([index]));
-            await writable.close();
+            await writeCarePdf(handle, blob);
           }
           setStatus(`${outputCanvases.length}件を同じフォルダに保存しました。`);
           return;
@@ -1469,9 +1468,7 @@
         if (window.showSaveFilePicker) {
           const handle = await pickPdfSaveFile(buildSuggestedName(0));
           const blob = await buildHighQualityCarePdfBlob([0]);
-          const writable = await handle.createWritable();
-          await writable.write(blob);
-          await writable.close();
+          await writeCarePdf(handle, blob);
           setStatus("保存しました。");
           return;
         }
@@ -1539,6 +1536,17 @@
         startIn: "desktop",
         types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }]
       });
+    }
+
+    async function writeCarePdf(handle, blob) {
+      const writable = await handle.createWritable();
+      try {
+        await writable.write(blob);
+        await writable.close();
+      } catch (error) {
+        try { await writable.abort(); } catch {}
+        throw error;
+      }
     }
 
     function setActionButtonsDisabled(disabled) {
@@ -2984,10 +2992,16 @@
       for (let position = 0; position < indices.length; position++) {
         const pageIndex = indices[position];
         setStatus(`${position + 1}/${indices.length}ページを600dpiで作成中です。`);
-        const canvas = await renderHighQualityCarePage(pageIndex);
-        pageImages.push(buildA4PageMonochromeInBands(canvas, CARE_DPI));
-        canvas.width = 1;
-        canvas.height = 1;
+        const reuseOutput = pageInputSources[pageIndex] && !pageInputSources[pageIndex].isPdf;
+        const canvas = reuseOutput ? outputCanvases[pageIndex] : await renderHighQualityCarePage(pageIndex);
+        try {
+          pageImages.push(await encodeCarePageImage(buildA4PageMonochromeInBands(canvas, CARE_DPI)));
+        } finally {
+          if (!reuseOutput) {
+            canvas.width = 1;
+            canvas.height = 1;
+          }
+        }
         await nextFrame();
       }
       return objectsToPdfBlobFromPageImages(pageImages);
@@ -3207,13 +3221,31 @@
       band.height = 1;
 
       return {
-        data: bytesToBinaryString(packed),
+        data: packed,
         width,
         height,
         page,
         colorSpace: "/DeviceGray",
         bitsPerComponent: 1
       };
+    }
+
+    async function encodeCarePageImage(image) {
+      let data = image.data;
+      if (typeof CompressionStream === "function") {
+        try {
+          const stream = new Blob([data]).stream().pipeThrough(new CompressionStream("deflate"));
+          const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
+          if (compressed.length < data.length) {
+            data = compressed;
+            image.filter = "/FlateDecode";
+          }
+        } catch (error) {
+          console.warn("PDF image compression failed; saving without compression.", error);
+        }
+      }
+      image.data = bytesToBinaryString(data);
+      return image;
     }
 
     function bytesToBinaryString(bytes) {

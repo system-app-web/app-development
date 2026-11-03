@@ -22,6 +22,7 @@ test('架空資料からAI模擬生成し、フェイスシートと他シート
     await page.locator('input[data-category="退院サマリー"]').setInputFiles({name:'架空.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-架空')});
     await page.locator('#ai-generate').click();await page.waitForFunction(()=>document.querySelector('#docs').dataset.view==='sheet');
     assert.equal((await page.evaluate(()=>window.__syntheticRequest)).documents.length,1,'資料1つで生成');
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0].fields['165']),'','165番が記載なしの場合は空欄');
     await page.locator('#tabs [data-tab="face"]').click();
     assert.equal(await page.locator('#docs textarea[data-field-id="1"]').inputValue(),'架空 太郎');
     assert.equal(await page.locator('#docs textarea[data-field-id="188"]').inputValue(),'架空の医療保険');

@@ -9,8 +9,60 @@ const browserModule = process.env.ASSESSMENT_PLAYWRIGHT;
 const browserPath = process.env.ASSESSMENT_BROWSER;
 
 test('HTML内のJavaScriptを解析できる', () => {
-  for (const match of html.matchAll(/<script(?:[^>]*)>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
+  for (const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) if (!match[1].includes('application/octet-stream')) new vm.Script(match[2]);
   assert.match(html, /portal-auth-guard\.js/);
+});
+
+test('架空データの図を作成・貼り付けし、利用者ごとに分離する', { skip: !browserModule || !browserPath, timeout: 90000 }, async () => {
+  const { chromium }=await import(pathToFileURL(browserModule));
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  try {
+    const context=await browser.newContext();const page=await context.newPage();
+    await page.route('https://**',route=>route.abort());
+    await page.goto(new URL('../app.html',import.meta.url).href);
+    const id=await page.evaluate(()=>window.getActiveAssessmentId());
+    await page.locator('[data-diagram="genogram"]').click();
+    let frame=page.frameLocator('.diagram-editor iframe');
+    await frame.locator('#svg-main').waitFor();
+    await page.locator('.diagram-editor iframe').evaluate(el=>el.contentWindow.loadSample());
+    await page.locator('[data-insert]').click();
+    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0].fields['genogram-image']);
+    let record=await page.evaluate(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0]);
+    assert.match(record.fields['genogram-image'],/^data:image\/png;base64,/);
+    assert.ok(JSON.parse(record.fields['genogram-editor-state']).persons.length);
+    await page.locator('[data-diagram="floorplan"]').click();
+    frame=page.frameLocator('.diagram-editor iframe');await frame.locator('#svg-main').waitFor();
+    await page.locator('.diagram-editor iframe').evaluate(el=>el.contentWindow.applyTemplate({name:'架空の部屋',rooms:[{name:'架空の部屋',type:'room',x:90,y:90,w:200,h:140},{name:'介護ベッド',type:'careBed',x:110,y:110,w:80,h:100}]}));
+    assert.match(await page.locator('.diagram-editor iframe').evaluate(el=>el.contentDocument.querySelector('#svg-main image')?.getAttribute('href')||''),/^data:image\//,'見取り図の部品をアプリ内から読み込む');
+    await page.locator('[data-insert]').click();
+    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0].fields['floorplan-image']);
+    record=await page.evaluate(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0]);
+    assert.match(record.fields['floorplan-image'],/^data:image\/png;base64,/);
+    assert.equal(JSON.parse(record.fields['floorplan-editor-state']).project.rooms[0].name,'架空の部屋');
+    await page.evaluate(()=>{window.print=()=>{window.__diagramPrinted=true}});
+    await page.locator('#print').click();await page.locator('#print-run').click();
+    await page.waitForFunction(()=>window.__diagramPrinted);
+    assert.equal(await page.locator('.print-bundle .family-box img,.print-bundle .housing-floorplan img').count(),2,'両方の図を印刷用に含める');
+    await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+    const [download]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.locator('#excel-export').click()]);
+    const bytes=await readFile(await download.path());
+    assert.equal(await page.evaluate(async data=>{const book=new ExcelJS.Workbook();await book.xlsx.load(new Uint8Array(data));return book.model.media.length},[...bytes]),2,'両方の図をExcelに含める');
+    assert.ok((await page.evaluate(()=>window.AssessmentSheetBackup.restore())).records[0].fields['genogram-image'],'日次バックアップに図を保存');
+    await page.locator('#new').click();
+    assert.notEqual(await page.evaluate(()=>window.getActiveAssessmentId()),id);
+    await page.locator('[data-diagram="genogram"]').click();
+    await page.frameLocator('.diagram-editor iframe').locator('#svg-main').waitFor();
+    assert.equal(await page.locator('.diagram-editor iframe').evaluate(el=>el.contentWindow.buildGenogramState().persons.length),1,'別の記録には初期状態だけを表示する');
+    await page.locator('[data-back]').click();
+    await page.locator('#tabs [data-tab="sheet"]').click();
+    const pasteImage=async selector=>page.locator(selector).evaluate(el=>{const clipboard=new DataTransfer();clipboard.items.add(new File([new Uint8Array([137,80,78,71])],'架空.png',{type:'image/png'}));el.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,clipboardData:clipboard}))});
+    await pasteImage('.family-box .template-preview');
+    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0].fields['genogram-image']);
+    await page.locator('#tabs [data-tab="sheet3"]').click();
+    await pasteImage('.housing-floorplan .diagram-preview');
+    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0].fields['floorplan-image']);
+    await context.close();
+  } finally {await browser.close()}
 });
 
 test('架空のGoogle接続で保存先・権限・失敗を確認', { skip: !browserModule || !browserPath, timeout: 60000 }, async () => {
@@ -38,11 +90,15 @@ test('架空のGoogle接続で保存先・権限・失敗を確認', { skip: !br
     await page.waitForFunction(()=>window.__fakeRequests.some(request=>request.url.includes('/upload/')));
     await page.waitForFunction(()=>document.querySelector('#drive-status').textContent.includes('保存しました'));
     assert.match(await page.evaluate(()=>window.__fakePayload),/assessment-sheet/);
+    await page.evaluate(()=>{const key='assessment-html-local-v1',records=JSON.parse(localStorage.getItem(key));records[0].fields['genogram-image']='data:image/png;base64,QUFBQQ==';records[0].fields['floorplan-image']='data:image/png;base64,QkJCQg==';localStorage.setItem(key,JSON.stringify(records))});
+    await page.locator('#drive-now').click();
+    await page.waitForFunction(()=>window.__fakePayload.includes('QkJCQg=='));
+    assert.match(await page.evaluate(()=>window.__fakePayload),/QUFBQQ==/,'図の画像も架空のドライブ保存に含む');
     assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('synthetic-token')),false,'アクセストークンを端末に保存しない');
     await page.locator('#drive-close').click();
     await page.locator('#open-sheet').click();
     await page.locator('#docs textarea[data-field-id="1"]').first().fill('自動保存の架空氏名');
-    await page.waitForFunction(()=>window.__fakeRequests.filter(request=>request.url.includes('/upload/')).length>=2,null,{timeout:20000});
+    await page.waitForFunction(()=>window.__fakePayload.includes('自動保存の架空氏名'),null,{timeout:20000});
     assert.match(await page.evaluate(()=>window.__fakePayload),/自動保存の架空氏名/,'編集後に自動保存');
     await page.locator('#drive-settings').click();
     await page.evaluate(()=>window.__fakeUploadFail=true);

@@ -5,14 +5,63 @@ import { pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 
 const html = await readFile(new URL('../app.html', import.meta.url), 'utf8');
+const browserModule = process.env.ASSESSMENT_PLAYWRIGHT;
+const browserPath = process.env.ASSESSMENT_BROWSER;
 
 test('HTML内のJavaScriptを解析できる', () => {
   for (const match of html.matchAll(/<script(?:[^>]*)>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   assert.match(html, /portal-auth-guard\.js/);
 });
 
-const browserModule = process.env.ASSESSMENT_PLAYWRIGHT;
-const browserPath = process.env.ASSESSMENT_BROWSER;
+test('架空のGoogle接続で保存先・権限・失敗を確認', { skip: !browserModule || !browserPath, timeout: 60000 }, async () => {
+  const { chromium }=await import(pathToFileURL(browserModule));
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  try {
+    const context=await browser.newContext();const page=await context.newPage();
+    await page.route('https://**',route=>route.abort());
+    await page.addInitScript(()=>{
+      window.__fakeRequests=[];window.__fakeRemote=null;window.__fakeUploadFail=false;
+      window.google={accounts:{oauth2:{initTokenClient:config=>({requestAccessToken:()=>{window.__requestedScope=config.scope;window.__includeGranted=config.include_granted_scopes;config.callback({access_token:'synthetic-token',expires_in:3600,scope:window.__fakeScopeResponse??config.scope})}})}}};
+      window.fetch=async(url,options={})=>{window.__fakeRequests.push({url:String(url),method:options.method||'GET'});if(String(url).includes('/about?'))return new Response(JSON.stringify({user:{emailAddress:'synthetic@example.invalid'}}),{status:200});if(String(url).includes('/upload/')){if(window.__fakeUploadFail)return new Response('',{status:503});const body=await options.body.text();window.__fakePayload=body;const meta=JSON.parse(body.match(/\r\n\r\n(\{[^\r]+\})\r\n--/)[1]);window.__fakeRemote={id:'synthetic-id',createdTime:new Date().toISOString(),appProperties:meta.appProperties};return new Response(JSON.stringify(window.__fakeRemote),{status:200})}if(String(url).includes('/files?'))return new Response(JSON.stringify({files:window.__fakeRemote?[window.__fakeRemote]:[]}),{status:200});return new Response('',{status:404})};
+    });
+    page.on('dialog',dialog=>dialog.accept());
+    await page.goto(new URL('../app.html',import.meta.url).href);
+    await page.locator('#drive-settings').click();
+    await page.locator('#drive-target').selectOption('company');
+    await page.locator('#drive-client').fill('123-synthetic.apps.googleusercontent.com');
+    await page.locator('#drive-connect').click();
+    await page.waitForFunction(()=>document.querySelector('#drive-now').disabled===false);
+    assert.equal(await page.evaluate(()=>window.__requestedScope),'https://www.googleapis.com/auth/drive.file');
+    assert.equal(await page.evaluate(()=>window.__includeGranted),false,'他の権限を含めない');
+    assert.match(await page.locator('#drive-status').textContent(),/会社のドライブ：synthetic@example.invalid/);
+    await page.locator('#drive-now').click();
+    await page.waitForFunction(()=>window.__fakeRequests.some(request=>request.url.includes('/upload/')));
+    await page.waitForFunction(()=>document.querySelector('#drive-status').textContent.includes('保存しました'));
+    assert.match(await page.evaluate(()=>window.__fakePayload),/assessment-sheet/);
+    assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('synthetic-token')),false,'アクセストークンを端末に保存しない');
+    await page.locator('#drive-close').click();
+    await page.locator('#open-sheet').click();
+    await page.locator('#docs textarea[data-field-id="1"]').first().fill('自動保存の架空氏名');
+    await page.waitForFunction(()=>window.__fakeRequests.filter(request=>request.url.includes('/upload/')).length>=2,null,{timeout:20000});
+    assert.match(await page.evaluate(()=>window.__fakePayload),/自動保存の架空氏名/,'編集後に自動保存');
+    await page.locator('#drive-settings').click();
+    await page.evaluate(()=>window.__fakeUploadFail=true);
+    await page.locator('#drive-now').click();
+    await page.waitForFunction(()=>document.querySelector('#drive-status').textContent.includes('接続に失敗'));
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1')).length),1,'失敗しても端末データを保持');
+    await page.evaluate(()=>{window.__fakeUploadFail=false;window.__fakeRemote={id:'newer',createdTime:new Date().toISOString(),appProperties:{localTime:'9999-01-01T00:00:00.000Z'}}});
+    const uploadCount=await page.evaluate(()=>window.__fakeRequests.filter(request=>request.url.includes('/upload/')).length);
+    await page.locator('#drive-now').click();
+    await page.waitForFunction(()=>document.querySelector('#drive-status').textContent.includes('保存を停止'));
+    assert.equal(await page.evaluate(()=>window.__fakeRequests.filter(request=>request.url.includes('/upload/')).length),uploadCount,'ドライブが新しい場合に保存を停止');
+    await page.evaluate(()=>window.__fakeScopeResponse='https://www.googleapis.com/auth/drive');
+    await page.locator('#drive-connect').click();
+    await page.waitForFunction(()=>document.querySelector('#drive-status').textContent.includes('必要な権限だけで'));
+    assert.equal(await page.locator('#drive-now').isDisabled(),true,'別の権限では保存しない');
+    await context.close();
+  } finally { await browser.close(); }
+});
+
 test('架空データの217項目と旧形式・日次バックアップ', { skip: !browserModule || !browserPath, timeout: 60000 }, async () => {
   const { chromium } = await import(pathToFileURL(browserModule));
   const browser = await chromium.launch({ headless: true, executablePath: browserPath });
@@ -21,6 +70,7 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    page.on('dialog', dialog=>dialog.accept());
     await page.route('https://**', route => route.abort());
     const oldRecord = { id:'synthetic-old-record',title:'架空の記録',createdAt:'2025-01-01T00:00:00.000Z',updatedAt:'2025-01-01T00:00:00.000Z',fields:{1:'架空の氏名',6:'架空の住所',159:'旧形式のまとめ', 'genogram-url':'https://example.invalid/'} };
     await page.addInitScript(record => { if(!localStorage.getItem('assessment-html-local-v1')) localStorage.setItem('assessment-html-local-v1',JSON.stringify([record])); }, oldRecord);
@@ -89,6 +139,9 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     await page.emulateMedia({media:'screen'});
     await page.locator('.format-toolbar [data-restore]').selectOption('100');
     assert.equal(await field.isVisible(),true);
+    await field.focus();
+    await page.locator('.format-toolbar [data-action="bold"]').click();
+    await page.locator('.format-toolbar [data-action="row-larger"]').click();
     await page.locator('#tabs [data-tab="sheet"]').click();
     const hide=async id=>{await page.locator(`#docs textarea[data-field-id="${id}"]:visible`).first().focus();await page.locator('.format-toolbar [data-action="hide"]').click()};
     const restore=async id=>page.locator('.format-toolbar [data-restore]').selectOption(id);
@@ -127,6 +180,39 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     assert.equal(await page.locator('.life-summary-section').filter({hasText:'これまでの生活'}).isVisible(),false,'単独の大項目は見出しも非表示');
     assert.equal(await page.locator('.life-summary-section').filter({hasText:'現在の状況'}).isVisible(),true,'隣の大項目は保持');
     await restore('16');
+    await hide('8');
+    await page.evaluate(()=>{window.print=()=>{window.__printCalled=true}});
+    await page.locator('#print').click();
+    await page.locator('#print-run').click();
+    await page.waitForFunction(()=>window.__printCalled===true);
+    assert.equal(await page.locator('.print-bundle > .paper').count(),3,'No.1〜3をまとめて印刷');
+    assert.equal(await page.locator('.print-bundle textarea').count(),0,'印刷用の入力文字をテキストに変換');
+    assert.equal(await page.locator('.print-bundle [hidden] .print-value').count()>0,true,'非表示項目を隠したまま印刷');
+    await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+    await page.locator('#print').click();
+    await page.locator('#print-all').check();
+    assert.equal(await page.locator('.print-options input:checked').count(),5,'すべて選択');
+    for(const name of ['sheet2','sheet3','admission','discharge']) await page.locator(`.print-options input[value="${name}"]`).uncheck();
+    await page.evaluate(()=>{window.__printCalled=false});
+    await page.locator('#print-run').click();
+    await page.waitForFunction(()=>window.__printCalled===true);
+    assert.equal(await page.locator('.print-bundle > .paper').count(),1,'選択したシートのみ印刷');
+    assert.equal(await page.locator('#docs').getAttribute('data-view'),'sheet','印刷後は元の画面に戻す');
+    await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+    await page.evaluate(()=>{const key='assessment-html-local-v1',records=JSON.parse(localStorage.getItem(key));records[0].fields['genogram-image']='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1sAAAAASUVORK5CYII=';localStorage.setItem(key,JSON.stringify(records))});
+    await page.locator('#tabs [data-tab="sheet"]').click();
+    await page.waitForSelector('.family-box img');
+    const [download]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.locator('#excel-export').click()]);
+    const xlsx=await readFile(await download.path());
+    const workbookInfo=await page.evaluate(async bytes=>{const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(new Uint8Array(bytes));const values=[];let formatted=null;workbook.eachSheet(sheet=>sheet.eachRow(row=>row.eachCell(cell=>{if(typeof cell.value==='string'){values.push(cell.value);if(cell.value==='最初')formatted={bold:cell.font.bold,locked:cell.protection?.locked}}})));return {names:workbook.worksheets.map(sheet=>sheet.name),values,images:workbook.model.media.length,formatted}},[...xlsx]);
+    assert.deepEqual(workbookInfo.names,['アセスメント No.1','アセスメント No.2','アセスメント No.3','入院時連携','退院時連携']);
+    assert.ok(workbookInfo.values.includes('架空の値217'),'退院時のデータをExcelに出力');
+    assert.ok(!workbookInfo.values.includes('架空の値8'),'非表示のデータはExcelに出さない');
+    assert.ok(workbookInfo.images>0,'架空の家族構成図をExcelに出力');
+    assert.equal(workbookInfo.formatted?.bold,true,'太字の書式を反映');
+    assert.notEqual(workbookInfo.formatted?.locked,true,'入力欄をロックしない');
+    for(let i=1;i<=217;i++)if(![8,12,100,159].includes(i))assert.ok(workbookInfo.values.includes(`架空の値${i}`),`Excelに転記番号 ${i}`);
+    await restore('8');
     for(const width of [375,1440]) {
       await page.setViewportSize({width,height:900});
       const layout=await page.evaluate(()=>({viewport:innerWidth, document:document.documentElement.scrollWidth, toolbar:document.querySelector('.format-toolbar').getBoundingClientRect().width}));
@@ -138,6 +224,12 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     await Promise.all([page.waitForEvent('load'),page.locator('#file-input').setInputFiles({name:'synthetic-legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(oldRecord))})]);
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1')).length),2);
     const restored={app:'assessment-sheet',format:'backup',version:1,data:{records:[oldRecord],active:oldRecord.id}};
+    page.removeAllListeners('dialog');
+    const cancelDialog=page.waitForEvent('dialog');
+    await page.locator('#file-input').setInputFiles({name:'synthetic-cancel.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(restored))});
+    await (await cancelDialog).dismiss();
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1')).length),2,'復元をキャンセルしたら既存データを維持');
+    page.on('dialog',dialog=>dialog.accept());
     await page.locator('#file-input').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(restored))});
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0].fields[1]==='架空の氏名');
     assert.deepEqual(errors, []);

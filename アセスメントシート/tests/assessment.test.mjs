@@ -13,6 +13,38 @@ test('HTML内のJavaScriptを解析できる', () => {
   assert.match(html, /portal-auth-guard\.js/);
 });
 
+test('架空資料からAI模擬生成し、フェイスシートと他シートを連動する', { skip: !browserModule || !browserPath, timeout: 60000 }, async()=>{
+  const {chromium}=await import(pathToFileURL(browserModule));const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  try{const context=await browser.newContext();const page=await context.newPage();await page.route('https://**',route=>route.abort());
+    await page.addInitScript(()=>{const original=window.fetch;window.fetch=async(url,options)=>{if(url==='/api/generate'){window.__syntheticRequest=JSON.parse(options.body);const lines=Array(217).fill('記載なし');lines[0]='架空 太郎';lines[1]='カクウ タロウ';lines[19]='架空の保険番号';lines[187]='架空の医療保険';return new Response(JSON.stringify({text:lines.join('\n')+'\n◆支援経過\n架空の記録'}),{status:200,headers:{'Content-Type':'application/json'}})}return original(url,options)}});
+    page.on('dialog',dialog=>dialog.accept());await page.goto(new URL('../app.html',import.meta.url).href);
+    await page.evaluate(()=>{localStorage.setItem('ktm-portal:device-id','fake-device');localStorage.setItem('ktm-portal:device-session',JSON.stringify({accessToken:'fake-session'}))});
+    await page.locator('input[data-category="退院サマリー"]').setInputFiles({name:'架空.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-架空')});
+    await page.locator('#ai-generate').click();await page.waitForFunction(()=>document.querySelector('#docs').dataset.view==='sheet');
+    assert.equal((await page.evaluate(()=>window.__syntheticRequest)).documents.length,1,'資料1つで生成');
+    await page.locator('#tabs [data-tab="face"]').click();
+    assert.equal(await page.locator('#docs textarea[data-field-id="1"]').inputValue(),'架空 太郎');
+    assert.equal(await page.locator('#docs textarea[data-field-id="188"]').inputValue(),'架空の医療保険');
+    assert.equal(await page.locator('#docs textarea[data-field-id="4"]').inputValue(),'','記載なしは空欄');
+    await page.locator('#docs textarea[data-field-id="20"]').fill('架空の変更後番号');
+    await page.locator('#tabs [data-tab="admission"]').click();assert.equal(await page.locator('#docs textarea[data-field-id="20"]').inputValue(),'架空の変更後番号');
+    await page.locator('#docs textarea[data-field-id="20"]').fill('架空の再変更');
+    await page.locator('#tabs [data-tab="face"]').click();assert.equal(await page.locator('#docs textarea[data-field-id="20"]').inputValue(),'架空の再変更');
+    await page.locator('#docs textarea[data-field-id="face-contact-2"]').fill('架空の連絡先');
+    await page.locator('#tabs [data-tab="sheet"]').click();await page.locator('#tabs [data-tab="face"]').click();assert.equal(await page.locator('#docs textarea[data-field-id="face-contact-2"]').inputValue(),'架空の連絡先');
+    await page.locator('#docs textarea[data-field-id="face-contact-2"]').focus();await page.locator('.format-toolbar [data-action="hide"]').click();
+    assert.equal(await page.locator('#docs textarea[data-field-id="face-contact-2"]').isVisible(),false,'フェイスシートの項目を非表示');
+    await page.evaluate(()=>{window.print=()=>window.__facePrinted=true});await page.locator('#print').click();
+    for(const name of ['sheet','sheet2','sheet3'])await page.locator(`.print-options input[value="${name}"]`).uncheck();
+    await page.locator('.print-options input[value="face"]').check();await page.locator('#print-run').click();await page.waitForFunction(()=>window.__facePrinted);
+    assert.equal(await page.locator('.print-bundle .paper h1').textContent(),'フェイスシート');
+    assert.equal(await page.locator('.print-bundle .manual[hidden]').count()>0,true,'非表示の項目は印刷でも非表示');
+    await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+    for(const width of [375,1440]){await page.setViewportSize({width,height:900});await page.locator('#tabs [data-tab="create"]').click();assert.ok(await page.locator('#ai-generate').isVisible());assert.equal(await page.locator('.ai-documents input').count(),8)}
+    await context.close();
+  }finally{await browser.close()}
+});
+
 test('架空データの図を作成・貼り付けし、利用者ごとに分離する', { skip: !browserModule || !browserPath, timeout: 90000 }, async () => {
   const { chromium }=await import(pathToFileURL(browserModule));
   const browser=await chromium.launch({headless:true,executablePath:browserPath});
@@ -247,8 +279,8 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
     await page.locator('#print').click();
     await page.locator('#print-all').check();
-    assert.equal(await page.locator('.print-options input:checked').count(),5,'すべて選択');
-    for(const name of ['sheet2','sheet3','admission','discharge']) await page.locator(`.print-options input[value="${name}"]`).uncheck();
+    assert.equal(await page.locator('.print-options input:checked').count(),6,'すべて選択');
+    for(const name of ['sheet2','sheet3','admission','discharge','face']) await page.locator(`.print-options input[value="${name}"]`).uncheck();
     await page.evaluate(()=>{window.__printCalled=false});
     await page.locator('#print-run').click();
     await page.waitForFunction(()=>window.__printCalled===true);
@@ -261,7 +293,7 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     const [download]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.locator('#excel-export').click()]);
     const xlsx=await readFile(await download.path());
     const workbookInfo=await page.evaluate(async bytes=>{const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(new Uint8Array(bytes));const values=[];let formatted=null;workbook.eachSheet(sheet=>sheet.eachRow(row=>row.eachCell(cell=>{if(typeof cell.value==='string'){values.push(cell.value);if(cell.value==='最初')formatted={bold:cell.font.bold,locked:cell.protection?.locked}}})));return {names:workbook.worksheets.map(sheet=>sheet.name),values,images:workbook.model.media.length,formatted}},[...xlsx]);
-    assert.deepEqual(workbookInfo.names,['アセスメント No.1','アセスメント No.2','アセスメント No.3','入院時連携','退院時連携']);
+    assert.deepEqual(workbookInfo.names,['アセスメント No.1','アセスメント No.2','アセスメント No.3','入院時連携','退院時連携','フェイスシート']);
     assert.ok(workbookInfo.values.includes('架空の値217'),'退院時のデータをExcelに出力');
     assert.ok(!workbookInfo.values.includes('架空の値8'),'非表示のデータはExcelに出さない');
     assert.ok(workbookInfo.images>0,'架空の家族構成図をExcelに出力');

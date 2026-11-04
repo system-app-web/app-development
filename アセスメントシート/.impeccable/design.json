@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-04T11:28:20Z",
+  "title": "Design System: アセスメントシート",
+  "extensions": {
+    "colorMeta": {
+      "primary": {"role":"primary","displayName":"落ち着いた深緑","tonalRamp":["#102a1e","#173c2a","#20503a","#27614a","#3a775c","#65977c","#a3c5ad","#e4f0e7"]},
+      "background": {"role":"neutral","displayName":"明るい灰緑","tonalRamp":["#242d27","#3c4640","#56615a","#77837b","#9da8a0","#c4cdc6","#e2e8e3","#f6f7f5"]},
+      "surface": {"role":"neutral","displayName":"白い面","tonalRamp":["#262626","#404040","#595959","#737373","#999999","#bfbfbf","#e0e0e0","#ffffff"]},
+      "text": {"role":"neutral","displayName":"濃い灰緑","tonalRamp":["#16211b","#25332d","#394a40","#52635a","#728279","#a1b0a6","#cbd8cf","#eef3ef"]},
+      "muted": {"role":"neutral","displayName":"補助文字","tonalRamp":["#1f2c24","#34443a","#4c5d52","#68786e","#87968c","#aebcb2","#d3dfd6","#eef4ef"]},
+      "border": {"role":"neutral","displayName":"境界線","tonalRamp":["#27312a","#3d4941","#58665c","#77867c","#98a99d","#bac8bd","#dfe7e1","#f5f8f5"]},
+      "field-label": {"role":"neutral","displayName":"帳票見出し","tonalRamp":["#242f27","#3a493e","#54645a","#73847a","#97a89d","#bdcbc0","#dce5de","#edf1ee"]},
+      "review-field": {"role":"state","displayName":"確認が必要な入力欄","tonalRamp":["#292800","#484500","#696500","#8e8800","#b5ae00","#dbd300","#fff61d","#fffdc1"]},
+      "review-notice": {"role":"state","displayName":"確認案内","tonalRamp":["#2d280f","#4b4219","#6a5d27","#8c7c3b","#ae9f58","#d0c478","#e9dda5","#fff8d7"]}
+    },
+    "breakpoints": [{"name":"mobile","value":"760px"}],
+    "shadows": [{"name":"menu","value":"0 6px 18px #1b30231a","purpose":"保存メニューの前後関係"}]
+  },
+  "components": [
+    {"name":"主な操作","kind":"button","refersTo":"button-primary","description":"資料選択や保存の主な操作。","html":"<button class=\"ds-primary\">資料を選ぶ</button>","css":".ds-primary{min-height:46px;padding:9px 22px;background:#27614a;color:#fff;border:0;border-radius:8px;font:700 16px sans-serif}.ds-primary:hover{background:#20564f}.ds-primary:focus-visible{outline:2px solid #27614a;outline-offset:3px}"},
+    {"name":"補助操作","kind":"button","description":"編集や画面移動などの補助操作。","html":"<button class=\"ds-secondary\">詳しく編集</button>","css":".ds-secondary{min-height:42px;padding:8px 12px;background:#fff;color:#345b4b;border:1px solid #cbd8d0;border-radius:8px;font:600 16px sans-serif}.ds-secondary:hover{background:#eff7f1}.ds-secondary:focus-visible{outline:2px solid #27614a;outline-offset:3px}"},
+    {"name":"文字入力","kind":"input","description":"貼り付ける文章の入力欄。","html":"<textarea class=\"ds-input\" aria-label=\"文章\" placeholder=\"ここに貼り付けます\"></textarea>","css":".ds-input{width:100%;min-height:120px;padding:12px;border:1px solid #a8b3ad;border-radius:6px;background:white;color:#25332d;font:16px sans-serif}.ds-input:focus-visible{outline:2px solid #27614a;outline-offset:2px}"},
+    {"name":"シート切り替え","kind":"nav","description":"上部のシートタブ。","html":"<nav class=\"ds-nav\"><button aria-current=\"page\">アセスメント No.1</button><button>フェイスシート</button></nav>","css":".ds-nav{display:flex;gap:2px;border-bottom:1px solid #dfe7e1;background:#fff}.ds-nav button{min-height:54px;padding:10px 13px;border:0;background:transparent;color:#52635a;font:600 15px sans-serif}.ds-nav button[aria-current]{color:#225840;border-bottom:3px solid #27614a}.ds-nav button:focus-visible{outline:2px solid #27614a}"},
+    {"name":"資料投入枠","kind":"custom","description":"資料を選ぶ、またはドラッグする入口。","html":"<div class=\"ds-drop\"><strong>ここに資料をドラッグするだけ</strong><span>PDF・画像をまとめて入れられます</span></div>","css":".ds-drop{display:grid;gap:8px;place-items:center;min-height:150px;padding:24px;border:2px dashed #98b6a3;border-radius:14px;background:#fff;color:#263e31;font:16px sans-serif}.ds-drop strong{font-size:22px}.ds-drop span{color:#627368}"}
+  ],
+  "narrative": {
+    "northStar":"資料から、次の一手へ",
+    "overview":"操作の入口を大きく、書類の中は見出しと入力欄の区別を明確にする。利用者が今必要な作業に集中できる、落ち着いた業務画面。",
+    "keyCharacteristics":["資料の投入先を中央に大きく置く。","深緑は主な操作と選択中の状態に使う。","黄色は確認が必要な空欄を示す。"],
+    "rules":[],
+    "dos":["送信や保存などの操作結果が分かる日本語を使う。","高齢のスタッフにも押しやすい大きさのボタンを使う。"],
+    "donts":["紫のグラデーションや光る効果を使う。","入力欄の黄色を装飾色として使う。"]
+  }
+}

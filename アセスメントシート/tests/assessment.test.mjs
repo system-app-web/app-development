@@ -7,6 +7,9 @@ import vm from 'node:vm';
 const html = await readFile(new URL('../app.html', import.meta.url), 'utf8');
 const browserModule = process.env.ASSESSMENT_PLAYWRIGHT;
 const browserPath = process.env.ASSESSMENT_BROWSER;
+const openSheet = async page => { await page.waitForFunction(()=>Boolean(window.getActiveAssessmentId?.())); await page.locator('#open-sheet').evaluate(el=>el.click()); await page.waitForFunction(()=>document.body.dataset.flow==='editor'); };
+const openSave = async page => { if (!await page.locator('.flow-actions').evaluate(el=>el.open)) await page.locator('.flow-actions summary').click(); };
+const openAdvanced = async page => { if (!await page.evaluate(()=>document.body.classList.contains('flow-advanced'))) await page.locator('.flow-edit').click(); };
 
 test('HTML内のJavaScriptを解析できる', () => {
   for (const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) if (!match[1].includes('application/octet-stream')) new vm.Script(match[2]);
@@ -20,10 +23,12 @@ test('架空資料からAI模擬生成し、フェイスシートと他シート
     page.on('dialog',dialog=>dialog.accept());await page.goto(new URL('../app.html',import.meta.url).href);
     await page.evaluate(()=>{localStorage.setItem('ktm-portal:device-id','fake-device');localStorage.setItem('ktm-portal:device-session',JSON.stringify({accessToken:'fake-session'}))});
     await page.locator('input[data-category="退院サマリー"]').setInputFiles({name:'架空.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-架空')});
+    await page.locator('.flow-options summary').click();
     await page.locator('#ai-generate').click();await page.waitForFunction(()=>document.querySelector('#docs').dataset.view==='sheet');
     assert.equal((await page.evaluate(()=>window.__syntheticRequest)).documents.length,1,'資料1つで生成');
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('assessment-html-local-v1'))[0].fields['165']),'','165番が記載なしの場合は空欄');
     await page.locator('#tabs [data-tab="face"]').click();
+    await openAdvanced(page);
     assert.equal(await page.locator('#docs textarea[data-field-id="1"]').inputValue(),'架空 太郎');
     assert.equal(await page.locator('#docs textarea[data-field-id="188"]').inputValue(),'架空の医療保険');
     assert.equal(await page.locator('#docs textarea[data-field-id="4"]').inputValue(),'','記載なしは空欄');
@@ -35,13 +40,13 @@ test('架空資料からAI模擬生成し、フェイスシートと他シート
     await page.locator('#tabs [data-tab="sheet"]').click();await page.locator('#tabs [data-tab="face"]').click();assert.equal(await page.locator('#docs textarea[data-field-id="face-contact-2"]').inputValue(),'架空の連絡先');
     await page.locator('#docs textarea[data-field-id="face-contact-2"]').focus();await page.locator('.format-toolbar [data-action="hide"]').click();
     assert.equal(await page.locator('#docs textarea[data-field-id="face-contact-2"]').isVisible(),false,'フェイスシートの項目を非表示');
-    await page.evaluate(()=>{window.print=()=>window.__facePrinted=true});await page.locator('#print').click();
+    await page.evaluate(()=>{window.print=()=>window.__facePrinted=true});await openSave(page);await page.locator('#print').click();
     for(const name of ['sheet','sheet2','sheet3'])await page.locator(`.print-options input[value="${name}"]`).uncheck();
     await page.locator('.print-options input[value="face"]').check();await page.locator('#print-run').click();await page.waitForFunction(()=>window.__facePrinted);
     assert.equal(await page.locator('.print-bundle .paper h1').textContent(),'フェイスシート');
     assert.equal(await page.locator('.print-bundle .manual[hidden]').count()>0,true,'非表示の項目は印刷でも非表示');
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
-    for(const width of [375,1440]){await page.setViewportSize({width,height:900});await page.locator('#tabs [data-tab="create"]').click();assert.ok(await page.locator('#ai-generate').isVisible());assert.equal(await page.locator('.ai-documents input').count(),8)}
+    for(const width of [375,1440]){await page.setViewportSize({width,height:900});if(await page.evaluate(()=>document.body.dataset.flow!=='home'))await page.locator('.flow-top-link').click();if(!await page.locator('.flow-options').evaluate(el=>el.open))await page.locator('.flow-options summary').click();assert.ok(await page.locator('#ai-generate').isVisible());assert.equal(await page.locator('.ai-documents input').count(),8)}
     await context.close();
   }finally{await browser.close()}
 });
@@ -53,6 +58,7 @@ test('架空データの図を作成・貼り付けし、利用者ごとに分�
     const context=await browser.newContext();const page=await context.newPage();
     await page.route('https://**',route=>route.abort());
     await page.goto(new URL('../app.html',import.meta.url).href);
+    await openSheet(page);
     const id=await page.evaluate(()=>window.getActiveAssessmentId());
     await page.locator('[data-diagram="genogram"]').click();
     let frame=page.frameLocator('.diagram-editor iframe');
@@ -73,15 +79,15 @@ test('架空データの図を作成・貼り付けし、利用者ごとに分�
     assert.match(record.fields['floorplan-image'],/^data:image\/png;base64,/);
     assert.equal(JSON.parse(record.fields['floorplan-editor-state']).project.rooms[0].name,'架空の部屋');
     await page.evaluate(()=>{window.print=()=>{window.__diagramPrinted=true}});
-    await page.locator('#print').click();await page.locator('#print-run').click();
+    await openSave(page);await page.locator('#print').click();await page.locator('#print-run').click();
     await page.waitForFunction(()=>window.__diagramPrinted);
     assert.equal(await page.locator('.print-bundle .family-box img,.print-bundle .housing-floorplan img').count(),2,'両方の図を印刷用に含める');
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
-    const [download]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.locator('#excel-export').click()]);
+    await openSave(page);const [download]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.locator('#excel-export').click()]);
     const bytes=await readFile(await download.path());
     assert.equal(await page.evaluate(async data=>{const book=new ExcelJS.Workbook();await book.xlsx.load(new Uint8Array(data));return book.model.media.length},[...bytes]),2,'両方の図をExcelに含める');
     assert.ok((await page.evaluate(()=>window.AssessmentSheetBackup.restore())).records[0].fields['genogram-image'],'日次バックアップに図を保存');
-    await page.locator('#new').click();
+    await page.locator('.flow-top-link').click();await page.locator('[data-flow-blank]').click();
     assert.notEqual(await page.evaluate(()=>window.getActiveAssessmentId()),id);
     await page.locator('[data-diagram="genogram"]').click();
     await page.frameLocator('.diagram-editor iframe').locator('#svg-main').waitFor();
@@ -111,6 +117,7 @@ test('架空のGoogle接続で保存先・権限・失敗を確認', { skip: !br
     });
     page.on('dialog',dialog=>dialog.accept());
     await page.goto(new URL('../app.html',import.meta.url).href);
+    await openSheet(page);await openSave(page);
     await page.locator('#drive-settings').click();
     await page.locator('#drive-target').selectOption('company');
     await page.locator('#drive-client').fill('123-synthetic.apps.googleusercontent.com');
@@ -129,11 +136,11 @@ test('架空のGoogle接続で保存先・権限・失敗を確認', { skip: !br
     assert.match(await page.evaluate(()=>window.__fakePayload),/QUFBQQ==/,'図の画像も架空のドライブ保存に含む');
     assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('synthetic-token')),false,'アクセストークンを端末に保存しない');
     await page.locator('#drive-close').click();
-    await page.locator('#open-sheet').click();
+    await openSheet(page);
     await page.locator('#docs textarea[data-field-id="1"]').first().fill('自動保存の架空氏名');
     await page.waitForFunction(()=>window.__fakePayload.includes('自動保存の架空氏名'),null,{timeout:20000});
     assert.match(await page.evaluate(()=>window.__fakePayload),/自動保存の架空氏名/,'編集後に自動保存');
-    await page.locator('#drive-settings').click();
+    await openSave(page);await page.locator('#drive-settings').click();
     await page.evaluate(()=>window.__fakeUploadFail=true);
     await page.locator('#drive-now').click();
     await page.waitForFunction(()=>document.querySelector('#drive-status').textContent.includes('接続に失敗'));
@@ -164,11 +171,11 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     const oldRecord = { id:'synthetic-old-record',title:'架空の記録',createdAt:'2025-01-01T00:00:00.000Z',updatedAt:'2025-01-01T00:00:00.000Z',fields:{1:'架空の氏名',6:'架空の住所',159:'旧形式のまとめ', 'genogram-url':'https://example.invalid/'} };
     await page.addInitScript(record => { if(!localStorage.getItem('assessment-html-local-v1')) localStorage.setItem('assessment-html-local-v1',JSON.stringify([record])); }, oldRecord);
     await page.goto(new URL('../app.html', import.meta.url).href);
-    await page.locator('#open-sheet').click();
+    await openSheet(page);
     await page.waitForSelector('#docs .reference-no1');
     assert.equal(await page.locator('#docs [data-field-id="1"]').first().inputValue(), '架空の氏名');
     assert.equal(await page.locator('#docs [data-field-id="address-combined"]').inputValue(), '架空の住所');
-    await page.locator('#tabs [data-tab="create"]').click();
+    await page.locator('.flow-top-link').click();await page.locator('[data-flow-paste]').click();
     const values = Array.from({length:217}, (_,i) => `架空の値${i+1}`);
     values[11] = '記載なし';
     await page.locator('#paste-text').fill(values.slice(0,216).join('\n'));
@@ -209,9 +216,11 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     assert.ok(expandedHeight>baseHeight, `入力欄が広がる: ${baseHeight}, ${expandedHeight}`);
     assert.ok(reducedHeight<=baseHeight+2, `入力欄が元に戻る: ${baseHeight}, ${reducedHeight}`);
     await field.focus();
+    await openAdvanced(page);
     await page.locator('.format-toolbar [data-action="row-larger"]').click();
     assert.ok(await field.evaluate(el=>el.getBoundingClientRect().height)>baseHeight, '行を高くする');
     await page.reload();
+    await openSheet(page);await openAdvanced(page);
     await page.locator('#tabs [data-tab="sheet3"]').click();
     assert.ok(await field.evaluate(el=>el.getBoundingClientRect().height)>baseHeight, '行の高さを保存する');
     await field.focus();
@@ -271,14 +280,14 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     await restore('16');
     await hide('8');
     await page.evaluate(()=>{window.print=()=>{window.__printCalled=true}});
-    await page.locator('#print').click();
+    await openSave(page);await page.locator('#print').click();
     await page.locator('#print-run').click();
     await page.waitForFunction(()=>window.__printCalled===true);
     assert.equal(await page.locator('.print-bundle > .paper').count(),3,'No.1〜3をまとめて印刷');
     assert.equal(await page.locator('.print-bundle textarea').count(),0,'印刷用の入力文字をテキストに変換');
     assert.equal(await page.locator('.print-bundle [hidden] .print-value').count()>0,true,'非表示項目を隠したまま印刷');
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
-    await page.locator('#print').click();
+    await openSave(page);await page.locator('#print').click();
     await page.locator('#print-all').check();
     assert.equal(await page.locator('.print-options input:checked').count(),6,'すべて選択');
     for(const name of ['sheet2','sheet3','admission','discharge','face']) await page.locator(`.print-options input[value="${name}"]`).uncheck();
@@ -291,7 +300,7 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     await page.evaluate(()=>{const key='assessment-html-local-v1',records=JSON.parse(localStorage.getItem(key));records[0].fields['genogram-image']='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1sAAAAASUVORK5CYII=';localStorage.setItem(key,JSON.stringify(records))});
     await page.locator('#tabs [data-tab="sheet"]').click();
     await page.waitForSelector('.family-box img');
-    const [download]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.locator('#excel-export').click()]);
+    await openSave(page);const [download]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.locator('#excel-export').click()]);
     const xlsx=await readFile(await download.path());
     const workbookInfo=await page.evaluate(async bytes=>{const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(new Uint8Array(bytes));const values=[];let formatted=null;workbook.eachSheet(sheet=>sheet.eachRow(row=>row.eachCell(cell=>{if(typeof cell.value==='string'){values.push(cell.value);if(cell.value==='最初')formatted={bold:cell.font.bold,locked:cell.protection?.locked}}})));return {names:workbook.worksheets.map(sheet=>sheet.name),values,images:workbook.model.media.length,formatted}},[...xlsx]);
     assert.deepEqual(workbookInfo.names,['アセスメント No.1','アセスメント No.2','アセスメント No.3','入院時連携','退院時連携','フェイスシート']);
@@ -327,10 +336,10 @@ test('架空データの217項目と旧形式・日次バックアップ', { ski
     const freshPage=await freshContext.newPage();
     await freshPage.route('https://**',route=>route.abort());
     await freshPage.goto(new URL('../app.html', import.meta.url).href);
-    await freshPage.locator('#open-sheet').click();
+    await openSheet(freshPage);
     await freshPage.locator('#docs textarea[data-field-id="1"]').first().fill('初回の架空氏名');
     await freshPage.reload();
-    await freshPage.locator('#open-sheet').click();
+    await openSheet(freshPage);
     assert.equal(await freshPage.locator('#docs textarea[data-field-id="1"]').first().inputValue(),'初回の架空氏名');
     await freshContext.close();
   } finally { await browser.close(); }

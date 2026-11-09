@@ -160,8 +160,12 @@ header h1{font-size:19px;font-weight:800;white-space:nowrap}
     </div>
     <div id="panelNew">
       <div class="form-row" id="rowName">
-        <label>利用者名</label>
+        <label for="fName">利用者名</label>
         <input id="fName">
+      </div>
+      <div class="form-row" id="rowFurigana" style="display:none">
+        <label for="fFurigana">ふりがな</label>
+        <input id="fFurigana" autocomplete="off" placeholder="例：やまだ たろう">
       </div>
       <div id="rowFacilitySelect" style="display:none">
         <div style="font-size:11px;font-weight:700;color:#2d5a8e;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">関係事業所（任意・複数選択可）</div>
@@ -237,6 +241,8 @@ let selectedName=null,selectedCategory=null,editIndex=null,lastDeleted=null,undo
 function loadOrder(){try{const s=localStorage.getItem(ORDER_KEY);if(s)return JSON.parse(s);}catch(e){}return null;}
 function saveOrder(n){try{localStorage.setItem(ORDER_KEY,JSON.stringify(n));}catch(e){}queueAutomaticBackup();}
 function getDisplayName(n){return n||'';}
+function getPersonFurigana(name){return allData.find(r=>r.name===name&&typeof r.furigana==='string'&&r.furigana.trim())?.furigana||'';}
+function sortPeopleByFurigana(){const names=getUniqueNames();names.sort((a,b)=>(getPersonFurigana(a)||a).localeCompare(getPersonFurigana(b)||b,'ja')||a.localeCompare(b,'ja'));saveOrder(names);}
 function getUniqueNames(){const seen=new Set();const dn=allData.filter(r=>{if(!r.name||seen.has(r.name))return false;seen.add(r.name);return true;}).map(r=>r.name);const compare=(a,b)=>a.localeCompare(b,'ja');const saved=loadOrder();if(!Array.isArray(saved)||!saved.length)return dn.sort(compare);const ord=saved.filter(n=>dn.includes(n));dn.filter(n=>!ord.includes(n)).sort(compare).forEach(n=>{const index=ord.findIndex(existing=>compare(n,existing)<0);if(index<0)ord.push(n);else ord.splice(index,0,n);});return ord;}
 function getCategories(){const c=new Set();allData.forEach(r=>{if(r.category)c.add(r.category);});return Array.from(c).sort();}
 function catClass(c){if(!c)return'';if(c.includes('病院')||c.includes('歯科')||c.includes('薬局'))return'cat-病院';if(c.includes('訪問'))return'cat-訪問';if(c.includes('保護'))return'cat-保護';return'cat-事業';}
@@ -327,6 +333,7 @@ function openModal(mode,idx){
   document.getElementById('rowFacilitySelect').style.display='none';
   document.getElementById('rowFacilityFields').style.display='block';
   document.getElementById('rowName').style.display='block';
+  document.getElementById('rowFurigana').style.display='none';
   if(mode==='edit'&&idx!=null){
     const r=allData[idx];
     document.getElementById('modalTitle').textContent='事業所を編集';
@@ -336,6 +343,8 @@ function openModal(mode,idx){
   }else if(mode==='edit-person'){
     document.getElementById('modalTitle').textContent='利用者を編集';
     document.getElementById('fName').value=selectedName||'';
+    document.getElementById('fFurigana').value=getPersonFurigana(selectedName);
+    document.getElementById('rowFurigana').style.display='block';
     document.getElementById('fName').disabled=false;
     document.getElementById('rowFacilityFields').style.display='none';
     document.getElementById('rowFacilitySelect').style.display='block';
@@ -356,6 +365,7 @@ function openModal(mode,idx){
   }else{
     document.getElementById('modalTitle').textContent='利用者 新規登録';
     document.getElementById('fName').value='';document.getElementById('fName').disabled=false;
+    document.getElementById('fFurigana').value='';document.getElementById('rowFurigana').style.display='block';
     document.getElementById('rowFacilityFields').style.display='none';
     document.getElementById('rowFacilitySelect').style.display='block';
     personCatSelected=null;personSelectedFacilities=new Set();document.getElementById('personFacilitySearch').value='';renderPersonCatFilter();renderPersonFacilityList('');
@@ -363,7 +373,7 @@ function openModal(mode,idx){
   document.getElementById('modalOverlay').classList.add('open');
 }
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
-function closeModalOnOverlay(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
+function closeModalOnOverlay(e){if(e.target===document.getElementById('modalOverlay')&&modalMode!=='add-facility'&&modalMode!=='edit-person')closeModal();}
 function switchTab(tab){
   document.getElementById('tabExist').classList.toggle('active',tab==='exist');
   document.getElementById('tabNew').classList.toggle('active',tab==='new');
@@ -407,7 +417,7 @@ function getPersonSelectedFacilities(){const facilities=new Map(getUniqueFacilit
 function saveExistingFacilities(){
   const cbs=document.querySelectorAll('.fc-checkbox:checked');
   if(!cbs.length){alert('事業所を1件以上選択してください');return;}
-  cbs.forEach(cb=>allData.push({name:selectedName,facility:cb.dataset.facility,fax:cb.dataset.fax,category:cb.dataset.category}));
+  cbs.forEach(cb=>allData.push({name:selectedName,furigana:getPersonFurigana(selectedName),facility:cb.dataset.facility,fax:cb.dataset.fax,category:cb.dataset.category}));
   saveData();closeModal();render();showToast(cbs.length+'件の事業所を追加しました');
 }
 function validateFax(){const v=document.getElementById('fFax').value;document.getElementById('faxHint').style.display=v&&!/^[\d-]+$/.test(v)?'block':'none';}
@@ -415,24 +425,26 @@ function saveEntry(){
   if(modalMode==='add-person'){
     const name=document.getElementById('fName').value.trim();
     if(!name){alert('利用者名を入力してください');return;}
+    const furigana=document.getElementById('fFurigana').value.trim();
     const facilities=getPersonSelectedFacilities();
-    if(facilities.length>0){facilities.forEach(f=>allData.push({name,facility:f.facility,fax:f.fax,category:f.category}));}
-    else{allData.push({name,facility:null,fax:null,category:null});}
-    saveData();closeModal();selectedName=name;render();showToast('「'+getDisplayName(name)+'」さんを登録しました');return;
+    if(facilities.length>0){facilities.forEach(f=>allData.push({name,furigana,facility:f.facility,fax:f.fax,category:f.category}));}
+    else{allData.push({name,furigana,facility:null,fax:null,category:null});}
+    sortPeopleByFurigana();saveData();closeModal();selectedName=name;render();showToast('「'+getDisplayName(name)+'」さんを登録しました');return;
   }
   if(modalMode==='edit-person'){
     const name=document.getElementById('fName').value.trim();
     if(!name){alert('利用者名を入力してください');return;}
+    const furigana=document.getElementById('fFurigana').value.trim();
     if(name!==selectedName&&allData.some(r=>r.name===name)){alert('同じ名前の利用者がすでに登録されています');return;}
     const previousName=selectedName;
     const existingByFacility=new Map(allData.filter(r=>r.name===previousName&&r.facility).map(r=>[r.facility,r]));
-    const updatedRecords=getPersonSelectedFacilities().map(f=>Object.assign({},existingByFacility.get(f.facility)||f,{name}));
-    if(!updatedRecords.length)updatedRecords.push({name,facility:null,fax:null,category:null});
+    const updatedRecords=getPersonSelectedFacilities().map(f=>Object.assign({},existingByFacility.get(f.facility)||f,{name,furigana}));
+    if(!updatedRecords.length)updatedRecords.push({name,furigana,facility:null,fax:null,category:null});
     let inserted=false;
     allData=allData.reduce((records,r)=>{if(r.name!==previousName){records.push(r);return records;}if(!inserted){records.push(...updatedRecords);inserted=true;}return records;},[]);
     const order=loadOrder();
     if(order)saveOrder(order.map(n=>n===previousName?name:n));
-    selectedName=name;saveData();closeModal();render();showToast('利用者を更新しました');return;
+    selectedName=name;sortPeopleByFurigana();saveData();closeModal();render();showToast('利用者を更新しました');return;
   }
   const nameEl=document.getElementById('rowName');
   const name=nameEl.style.display==='none'?(selectedName||''):document.getElementById('fName').value.trim();
@@ -441,8 +453,8 @@ function saveEntry(){
   const category=document.getElementById('fCategory').value;
   if(facility&&!fax){alert('FAX番号も入力してください');return;}
   if(fax&&!/^[\d-]+$/.test(fax)){if(!confirm('FAX番号に数字・ハイフン以外が含まれています。このまま保存しますか？'))return;}
-  if(editIndex!==null){allData[editIndex]={name,facility,fax,category};}
-  else{allData.push({name,facility,fax,category});}
+  if(editIndex!==null){allData[editIndex]={...allData[editIndex],name,facility,fax,category};}
+  else{allData.push({name,furigana:getPersonFurigana(name),facility,fax,category});}
   saveData();closeModal();if(name&&!selectedName)selectedName=name;render();
   showToast(editIndex!==null?'更新しました':'登録しました');
 }
@@ -485,7 +497,7 @@ function localDateKey(date=new Date()){const y=date.getFullYear(),m=String(date.
 function backupChecksum(text){let hash=2166136261;for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16).padStart(8,'0');}
 function cloneBackupData(value){return JSON.parse(JSON.stringify(value));}
 function buildBackupData(){return {records:cloneBackupData(allData),order:cloneBackupData(loadOrder()||[]),templates:cloneBackupData(templates)};}
-function isValidBackupData(data){if(!data||typeof data!=='object'||!Array.isArray(data.records)||!Array.isArray(data.order)||!Array.isArray(data.templates))return false;return data.records.every(r=>r&&typeof r==='object'&&typeof r.name==='string'&&(r.name.trim()!==''||(typeof r.facility==='string'&&r.facility.trim()!==''))&&[r.facility,r.fax,r.category].every(v=>v===null||typeof v==='string'))&&data.order.every(n=>typeof n==='string')&&data.templates.every(t=>t&&typeof t==='object'&&typeof t.id==='string'&&typeof t.name==='string'&&typeof t.body==='string');}
+function isValidBackupData(data){if(!data||typeof data!=='object'||!Array.isArray(data.records)||!Array.isArray(data.order)||!Array.isArray(data.templates))return false;return data.records.every(r=>r&&typeof r==='object'&&typeof r.name==='string'&&(r.furigana===undefined||typeof r.furigana==='string')&&(r.name.trim()!==''||(typeof r.facility==='string'&&r.facility.trim()!==''))&&[r.facility,r.fax,r.category].every(v=>v===null||typeof v==='string'))&&data.order.every(n=>typeof n==='string')&&data.templates.every(t=>t&&typeof t==='object'&&typeof t.id==='string'&&typeof t.name==='string'&&typeof t.body==='string');}
 function buildBackupPayload(){return {appId:BACKUP_APP_ID,schemaVersion:BACKUP_EXPORT_SCHEMA_VERSION,data:buildBackupData()};}
 function makeAutomaticBackupSnapshot(){const payload=buildBackupPayload(),text=JSON.stringify(payload);return {schemaVersion:AUTO_BACKUP_SCHEMA_VERSION,dateKey:localDateKey(),updatedAt:new Date().toISOString(),checksum:backupChecksum(text),payload};}
 function isValidAutomaticBackupSnapshot(snapshot){if(!snapshot||typeof snapshot!=='object'||snapshot.schemaVersion!==AUTO_BACKUP_SCHEMA_VERSION||!/^\d{4}-\d{2}-\d{2}$/.test(String(snapshot.dateKey||''))||!snapshot.payload||typeof snapshot.checksum!=='string'||Number.isNaN(Date.parse(snapshot.updatedAt||'')))return false;try{return snapshot.checksum===backupChecksum(JSON.stringify(snapshot.payload))&&snapshot.payload.appId===BACKUP_APP_ID&&snapshot.payload.schemaVersion===BACKUP_EXPORT_SCHEMA_VERSION&&isValidBackupData(snapshot.payload.data);}catch(e){return false;}}

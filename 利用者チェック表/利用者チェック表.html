@@ -2361,9 +2361,9 @@ function undoLastChange() {
   render();
 }
 
-function sortClientsByName(data) {
+function sortClientsByName(data, mode = orderMode) {
   return [...data].sort((a, b) => {
-    if (orderMode === 'custom') {
+    if (mode === 'custom') {
       const aOrder = Number.isFinite(a.manualOrder) ? a.manualOrder : Number.MAX_SAFE_INTEGER;
       const bOrder = Number.isFinite(b.manualOrder) ? b.manualOrder : Number.MAX_SAFE_INTEGER;
       if (aOrder !== bOrder) return aOrder - bOrder;
@@ -3646,6 +3646,10 @@ function saveVisitTextEditor() {
 }
 
 function openAddClient(fromRowEditor) {
+  if (orderMode !== 'name') {
+    alert('利用者の追加は「名前順」に切り替えてから行ってください。');
+    return;
+  }
   returnToRowEditorAfterAdd = Boolean(fromRowEditor);
   closeModal();
   addClientDraft = defaultAddClientDraft();
@@ -3653,6 +3657,7 @@ function openAddClient(fromRowEditor) {
 }
 
 function addClient() {
+  if (orderMode !== 'name') return;
   syncAddClientDraft();
   syncAddClientSehoDraft();
   const name = String(addClientDraft?.name || '').trim();
@@ -3660,7 +3665,7 @@ function addClient() {
     alert('同じ利用者名があります。追加せず既存データを確認してください');
     return;
   }
-  currentData.push(newClientData({
+  const client = newClientData({
     name,
     kana: String(addClientDraft?.kana || '').trim(),
     customAdded: true,
@@ -3672,7 +3677,12 @@ function addClient() {
     planS: addClientDraft?.planS || '',
     seho: addClientDraft?.seho || '',
     sehoCw: addClientDraft?.sehoCw || ''
-  }));
+  });
+  const namePosition = sortClientsByName([...currentData.filter(item => !item.deleted), client], 'name').indexOf(client);
+  const customRows = sortClientsByName(currentData.filter(item => !item.deleted), 'custom');
+  customRows.splice(namePosition, 0, client);
+  customRows.forEach((item, index) => { item.manualOrder = index; });
+  currentData.push(client);
   addClientDraft = null;
   saveMonthData(curYear, curMonth, currentData, { syncFutureClients: true });
   if (returnToRowEditorAfterAdd) {

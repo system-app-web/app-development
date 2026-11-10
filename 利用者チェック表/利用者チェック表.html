@@ -1973,6 +1973,9 @@ function isCustomDateColumn(key) {
 }
 
 let activeOfficeColumn = 'fax';
+const PLAN_OFFICE_KEY = '__planDeliveryOffices';
+const PLAN_EXCLUDED_KEY = '__planDeliveryExcluded';
+const PLAN_FUTURE_EXCLUDED_KEY = '__planDeliveryFutureExcluded';
 
 function getOfficeList(item, key = activeOfficeColumn) {
   return normalizeFaxOffices(key === 'fax' ? item?.faxOffices : item?.customFields?.[key]);
@@ -1985,6 +1988,27 @@ function setOfficeList(item, offices, key = activeOfficeColumn) {
   } else {
     item.customFields = normalizeCustomFieldValues(item.customFields);
     item.customFields[key] = normalizeFaxOffices(offices);
+  }
+}
+
+function importFaxOfficesForPlan(item) {
+  const fields = normalizeCustomFieldValues(item.customFields);
+  const excluded = new Set(Array.isArray(fields[PLAN_EXCLUDED_KEY]) ? fields[PLAN_EXCLUDED_KEY] : []);
+  const offices = getOfficeList(item, PLAN_OFFICE_KEY);
+  const ids = new Set(offices.map(office => office.id));
+  const missing = getOfficeList(item, 'fax').filter(office => !ids.has(office.id) && !excluded.has(office.id));
+  if (!missing.length) return false;
+  setOfficeList(item, [...offices, ...missing.map(office => ({ ...office, checked: false }))], PLAN_OFFICE_KEY);
+  return true;
+}
+
+function excludePlanOffice(item, id, includeFuture = false) {
+  const fields = normalizeCustomFieldValues(item.customFields);
+  const excluded = Array.isArray(fields[PLAN_EXCLUDED_KEY]) ? fields[PLAN_EXCLUDED_KEY] : [];
+  item.customFields = { ...fields, [PLAN_EXCLUDED_KEY]: [...new Set([...excluded, id])] };
+  if (includeFuture) {
+    const futureExcluded = Array.isArray(fields[PLAN_FUTURE_EXCLUDED_KEY]) ? fields[PLAN_FUTURE_EXCLUDED_KEY] : [];
+    item.customFields[PLAN_FUTURE_EXCLUDED_KEY] = [...new Set([...futureExcluded, id])];
   }
 }
 
@@ -2551,6 +2575,13 @@ function resetMonthlyWorkFields(item) {
     assess: 0
   };
   next.customFields = { ...normalizeCustomFieldValues(item.customFields) };
+  if (Array.isArray(next.customFields[PLAN_EXCLUDED_KEY])) {
+    next.customFields[PLAN_EXCLUDED_KEY] = Array.isArray(next.customFields[PLAN_FUTURE_EXCLUDED_KEY])
+      ? [...next.customFields[PLAN_FUTURE_EXCLUDED_KEY]] : [];
+  }
+  if (Object.prototype.hasOwnProperty.call(next.customFields, PLAN_OFFICE_KEY)) {
+    next.customFields[PLAN_OFFICE_KEY] = getOfficeList(item, PLAN_OFFICE_KEY).map(office => ({ ...office, checked: false }));
+  }
   customColumns.filter(column => column.type === 'office').forEach(column => {
     next.customFields[column.key] = getOfficeList(item, column.key).map(office => ({ ...office, checked: false }));
   });
@@ -2731,12 +2762,14 @@ function syncFutureFaxOffices(all, sourceKey, sourceList, officeKey = 'fax') {
         const futureOffices = getOfficeList(future, officeKey);
         const sourceById = new Map(sourceOffices.map(office => [office.id, office]));
         const futureIds = new Set(futureOffices.map(office => office.id));
+        const excluded = officeKey === PLAN_OFFICE_KEY && Array.isArray(future.customFields?.[PLAN_EXCLUDED_KEY])
+          ? new Set(future.customFields[PLAN_EXCLUDED_KEY]) : new Set();
         const updatedOffices = futureOffices.map(office => {
           const sourceOffice = sourceById.get(office.id);
           return sourceOffice ? { ...office, name: sourceOffice.name } : office;
         });
         sourceOffices.forEach(office => {
-          if (!futureIds.has(office.id)) {
+          if (!futureIds.has(office.id) && !excluded.has(office.id)) {
             updatedOffices.push({ ...office, checked: false });
           }
         });
@@ -2986,6 +3019,9 @@ function openFaxOfficeChecklist(i, officeKey = activeOfficeColumn) {
   activeOfficeColumn = officeKey;
   modalIndex = i;
   const item = currentData[i];
+  if (officeKey === PLAN_OFFICE_KEY && importFaxOfficesForPlan(item)) {
+    saveMonthData(curYear, curMonth, currentData);
+  }
   const offices = getOfficeList(item);
   const rows = offices.length
     ? offices.map(office => `
@@ -2998,15 +3034,16 @@ function openFaxOfficeChecklist(i, officeKey = activeOfficeColumn) {
         </div>
       </div>`).join('')
     : '<div class="office-empty-note">事業所を追加してください</div>';
-  showModal(activeOfficeColumn === 'fax' ? '次月提供票' : getColumnLabel(activeOfficeColumn), item.name,
+  showModal(activeOfficeColumn === 'fax' ? '次月提供票' : activeOfficeColumn === PLAN_OFFICE_KEY ? 'プラン交付チェック' : getColumnLabel(activeOfficeColumn), item.name,
     `<div class="office-check-list">${rows}</div>
      <div class="office-modal-actions">
        <button class="mact green" onclick="openFaxOfficeAdd()">事業所追加</button>
        <button class="mact green" onclick="importPreviousFaxOffices()">前月の事業所を取り込む</button>
-       <button class="mact green" onclick="closeModal();render();">OK</button>
+       <button class="mact green" onclick="${officeKey === PLAN_OFFICE_KEY ? 'openMeeting(modalIndex)' : 'closeModal();render();'}">OK</button>
      </div>`
   );
   document.getElementById('modal').classList.add('fax-office-picker');
+  if (officeKey === PLAN_OFFICE_KEY) document.querySelector('#modal .modal-close').onclick = () => openMeeting(modalIndex);
 }
 
 function saveFaxOfficeState(options = {}) {
@@ -3118,6 +3155,7 @@ function deleteFaxOffice(id, includeFuture = false) {
         const monthList = key === currentKey ? currentData : dedupeClients(all[key]);
         const target = matchingClientInList(monthList, item);
         if (!target) return;
+        if (activeOfficeColumn === PLAN_OFFICE_KEY) excludePlanOffice(target, id, true);
         setOfficeList(target, getOfficeList(target).filter(office => office.id !== id));
         all[key] = key === currentKey ? sortClientsByName(dedupeClients(monthList)) : monthList;
       });
@@ -3125,6 +3163,7 @@ function deleteFaxOffice(id, includeFuture = false) {
     saveAll(all);
     updateUndoButton();
   } else {
+    if (activeOfficeColumn === PLAN_OFFICE_KEY) excludePlanOffice(item, id);
     setOfficeList(item, getOfficeList(item).filter(office => office.id !== id));
     saveFaxOfficeState();
   }
@@ -3282,6 +3321,7 @@ function openMeeting(i) {
         <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
       </div>
       <div class="calendar-grid" id="visit-calendar-grid"></div>
+      <button class="mact green" style="width:100%;margin-top:12px" onclick="openFaxOfficeChecklist(modalIndex, PLAN_OFFICE_KEY)">プラン交付チェック</button>
       <div class="visit-free-inputs">
         <input class="modal-input" id="meeting-date-free" placeholder="日付" value="${esc(current.meetingDate || '')}" oninput="updateMeetingFreeField('meetingDate', this.value)">
         <input class="modal-input" id="meeting-tag1-free" placeholder="下段1" value="${esc(current.meetingTag1 || '')}" oninput="updateMeetingFreeField('meetingTag1', this.value)">

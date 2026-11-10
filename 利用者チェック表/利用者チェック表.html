@@ -1916,7 +1916,7 @@ function loadCustomColumns() {
       .map(item => ({
         key: String(item.key || '').trim(),
         label: String(item.label || '').trim(),
-        type: item.type === 'date' ? 'date' : 'check'
+        type: ['date', 'office'].includes(item.type) ? item.type : 'check'
       }))
       .filter(item => item.key && item.label);
   } catch {
@@ -1970,6 +1970,22 @@ function isCustomCheckColumn(key) {
 
 function isCustomDateColumn(key) {
   return getCustomColumn(key)?.type === 'date';
+}
+
+let activeOfficeColumn = 'fax';
+
+function getOfficeList(item, key = activeOfficeColumn) {
+  return normalizeFaxOffices(key === 'fax' ? item?.faxOffices : item?.customFields?.[key]);
+}
+
+function setOfficeList(item, offices, key = activeOfficeColumn) {
+  if (key === 'fax') {
+    item.faxOffices = normalizeFaxOffices(offices);
+    syncFaxDone(item);
+  } else {
+    item.customFields = normalizeCustomFieldValues(item.customFields);
+    item.customFields[key] = normalizeFaxOffices(offices);
+  }
 }
 
 function makeCustomColumnKey() {
@@ -2534,6 +2550,10 @@ function resetMonthlyWorkFields(item) {
     shokai: 0,
     assess: 0
   };
+  next.customFields = { ...normalizeCustomFieldValues(item.customFields) };
+  customColumns.filter(column => column.type === 'office').forEach(column => {
+    next.customFields[column.key] = getOfficeList(item, column.key).map(office => ({ ...office, checked: false }));
+  });
   return next;
 }
 
@@ -2585,7 +2605,7 @@ function syncBasicFieldsFromPreviousMonth(currentList, previousList) {
       // the displayed month. Keep an existing month's edits intact.
       customFields: current
         ? { ...normalizeCustomFieldValues(prev.customFields), ...normalizeCustomFieldValues(current.customFields) }
-        : normalizeCustomFieldValues(prev.customFields)
+        : normalizeCustomFieldValues(source.customFields)
     };
   });
   currentNormalized.forEach(item => {
@@ -2637,7 +2657,7 @@ function saveMonthData(y, m, data, options = {}) {
     syncFutureProfileFields(all, monthKey(y, m), all[monthKey(y, m)]);
   }
   if (options.syncFutureFaxOffices) {
-    syncFutureFaxOffices(all, monthKey(y, m), all[monthKey(y, m)]);
+    syncFutureFaxOffices(all, monthKey(y, m), all[monthKey(y, m)], options.officeKey || 'fax');
   }
   saveAll(all);
   updateUndoButton();
@@ -2698,7 +2718,7 @@ function syncFutureProfileFields(all, sourceKey, sourceList) {
 }
 
 // Share office names and additions forward without copying or shifting checks.
-function syncFutureFaxOffices(all, sourceKey, sourceList) {
+function syncFutureFaxOffices(all, sourceKey, sourceList, officeKey = 'fax') {
   Object.keys(all)
     .filter(key => key > sourceKey && Array.isArray(all[key]))
     .sort()
@@ -2707,20 +2727,20 @@ function syncFutureFaxOffices(all, sourceKey, sourceList) {
       sourceList.forEach(source => {
         const future = matchingClientInList(futureList, source);
         if (!future) return;
-        const sourceOffices = normalizeFaxOffices(source.faxOffices);
-        const futureOffices = normalizeFaxOffices(future.faxOffices);
+        const sourceOffices = getOfficeList(source, officeKey);
+        const futureOffices = getOfficeList(future, officeKey);
         const sourceById = new Map(sourceOffices.map(office => [office.id, office]));
         const futureIds = new Set(futureOffices.map(office => office.id));
-        future.faxOffices = futureOffices.map(office => {
+        const updatedOffices = futureOffices.map(office => {
           const sourceOffice = sourceById.get(office.id);
           return sourceOffice ? { ...office, name: sourceOffice.name } : office;
         });
         sourceOffices.forEach(office => {
           if (!futureIds.has(office.id)) {
-            future.faxOffices.push({ ...office, checked: false });
+            updatedOffices.push({ ...office, checked: false });
           }
         });
-        syncFaxDone(future);
+        setOfficeList(future, updatedOffices, officeKey);
       });
       all[key] = futureList;
     });
@@ -2953,7 +2973,7 @@ function setOrderMode(mode) {
 
 function tog(i, key) {
   if (key === 'fax') {
-    openFaxOfficeChecklist(i);
+    openFaxOfficeChecklist(i, 'fax');
     return;
   }
   const current = getFieldValue(currentData[i], key);
@@ -2962,13 +2982,13 @@ function tog(i, key) {
   render();
 }
 
-function openFaxOfficeChecklist(i) {
+function openFaxOfficeChecklist(i, officeKey = activeOfficeColumn) {
+  activeOfficeColumn = officeKey;
   modalIndex = i;
   const item = currentData[i];
-  item.faxOffices = normalizeFaxOffices(item.faxOffices);
-  syncFaxDone(item);
-  const rows = item.faxOffices.length
-    ? item.faxOffices.map(office => `
+  const offices = getOfficeList(item);
+  const rows = offices.length
+    ? offices.map(office => `
       <div class="office-check-row">
         <div class="office-check-name">${esc(office.name)}</div>
         <button class="office-check-mark${office.checked ? ' is-on' : ''}" ondblclick="toggleFaxOffice('${esc(office.id)}')">${office.checked ? '✓' : '○'}</button>
@@ -2978,7 +2998,7 @@ function openFaxOfficeChecklist(i) {
         </div>
       </div>`).join('')
     : '<div class="office-empty-note">事業所を追加してください</div>';
-  showModal('次月提供票', item.name,
+  showModal(activeOfficeColumn === 'fax' ? '次月提供票' : getColumnLabel(activeOfficeColumn), item.name,
     `<div class="office-check-list">${rows}</div>
      <div class="office-modal-actions">
        <button class="mact green" onclick="openFaxOfficeAdd()">事業所追加</button>
@@ -2992,17 +3012,16 @@ function openFaxOfficeChecklist(i) {
 function saveFaxOfficeState(options = {}) {
   const item = currentData[modalIndex];
   if (!item) return;
-  item.faxOffices = normalizeFaxOffices(item.faxOffices);
-  syncFaxDone(item);
-  saveMonthData(curYear, curMonth, currentData, options);
+  setOfficeList(item, getOfficeList(item));
+  saveMonthData(curYear, curMonth, currentData, { ...options, officeKey: activeOfficeColumn });
 }
 
 function toggleFaxOffice(id) {
   const item = currentData[modalIndex];
   if (!item) return;
-  item.faxOffices = normalizeFaxOffices(item.faxOffices).map(office =>
+  setOfficeList(item, getOfficeList(item).map(office =>
     office.id === id ? { ...office, checked: !office.checked } : office
-  );
+  ));
   saveFaxOfficeState();
   render();
   openFaxOfficeChecklist(modalIndex);
@@ -3025,7 +3044,7 @@ function saveFaxOfficeAdd() {
     return;
   }
   const item = currentData[modalIndex];
-  item.faxOffices = [...normalizeFaxOffices(item.faxOffices), { id: makeOfficeId(), name, checked: false }];
+  setOfficeList(item, [...getOfficeList(item), { id: makeOfficeId(), name, checked: false }]);
   saveFaxOfficeState({ syncFutureFaxOffices: true });
   openFaxOfficeChecklist(modalIndex);
 }
@@ -3041,22 +3060,22 @@ function importPreviousFaxOffices() {
     alert('前月の事業所データがありません');
     return;
   }
-  const existingIds = new Set(normalizeFaxOffices(item.faxOffices).map(office => office.id));
-  const missing = normalizeFaxOffices(previousItem.faxOffices)
+  const existingIds = new Set(getOfficeList(item).map(office => office.id));
+  const missing = getOfficeList(previousItem)
     .filter(office => !existingIds.has(office.id))
     .map(office => ({ ...office, checked: false }));
   if (missing.length === 0) {
     alert('取り込める事業所はありません');
     return;
   }
-  item.faxOffices = [...normalizeFaxOffices(item.faxOffices), ...missing];
+  setOfficeList(item, [...getOfficeList(item), ...missing]);
   saveFaxOfficeState();
   openFaxOfficeChecklist(modalIndex);
 }
 
 function openFaxOfficeEdit(id) {
   const item = currentData[modalIndex];
-  const office = normalizeFaxOffices(item?.faxOffices).find(entry => entry.id === id);
+  const office = getOfficeList(item).find(entry => entry.id === id);
   if (!office) return;
   showModal('事業所名変更', currentData[modalIndex]?.name || '',
     `<input class="modal-input" id="fax-office-name" placeholder="事業所名" value="${esc(office.name)}">
@@ -3078,9 +3097,9 @@ function saveFaxOfficeEdit(id) {
     return;
   }
   const item = currentData[modalIndex];
-  item.faxOffices = normalizeFaxOffices(item.faxOffices).map(office =>
+  setOfficeList(item, getOfficeList(item).map(office =>
     office.id === id ? { ...office, name } : office
-  );
+  ));
   saveFaxOfficeState({ syncFutureFaxOffices: true });
   openFaxOfficeChecklist(modalIndex);
 }
@@ -3099,15 +3118,14 @@ function deleteFaxOffice(id, includeFuture = false) {
         const monthList = key === currentKey ? currentData : dedupeClients(all[key]);
         const target = matchingClientInList(monthList, item);
         if (!target) return;
-        target.faxOffices = normalizeFaxOffices(target.faxOffices).filter(office => office.id !== id);
-        syncFaxDone(target);
+        setOfficeList(target, getOfficeList(target).filter(office => office.id !== id));
         all[key] = key === currentKey ? sortClientsByName(dedupeClients(monthList)) : monthList;
       });
     currentData = all[currentKey];
     saveAll(all);
     updateUndoButton();
   } else {
-    item.faxOffices = normalizeFaxOffices(item.faxOffices).filter(office => office.id !== id);
+    setOfficeList(item, getOfficeList(item).filter(office => office.id !== id));
     saveFaxOfficeState();
   }
   render();
@@ -3116,7 +3134,7 @@ function deleteFaxOffice(id, includeFuture = false) {
 
 function confirmDeleteFaxOffice(id) {
   const item = currentData[modalIndex];
-  const office = normalizeFaxOffices(item?.faxOffices).find(entry => entry.id === id);
+  const office = getOfficeList(item).find(entry => entry.id === id);
   if (!office) return;
   document.getElementById('cf-title').textContent = '事業所を削除';
   document.getElementById('cf-msg').textContent = `${office.name} をどの範囲から削除しますか？`;
@@ -4052,6 +4070,7 @@ function openAddColumnModal() {
      <select class="modal-input" id="add-column-type">
        <option value="check">〇のチェック項目</option>
        <option value="date">カレンダー項目</option>
+       <option value="office">事業所交付チェック</option>
      </select>
      <button class="mact green" style="width:100%;margin-top:8px" onclick="saveAddedColumn()">追加する</button>`
   );
@@ -4181,7 +4200,8 @@ function saveColumnLabelEdit(key) {
 
 function saveAddedColumn() {
   const label = (document.getElementById('add-column-label')?.value || '').trim();
-  const type = document.getElementById('add-column-type')?.value === 'date' ? 'date' : 'check';
+  const selectedType = document.getElementById('add-column-type')?.value;
+  const type = ['date', 'office'].includes(selectedType) ? selectedType : 'check';
   const target = 'seho';
   if (!label) {
     alert('項目名を入力してください');
@@ -4199,7 +4219,7 @@ function saveAddedColumn() {
   saveColumnOrder();
   currentData.forEach(item => {
     item.customFields = normalizeCustomFieldValues(item.customFields);
-    item.customFields[key] = type === 'check' ? 0 : '';
+    item.customFields[key] = type === 'office' ? [] : type === 'check' ? 0 : '';
   });
   const all = loadAll();
   saveUndoSnapshot(all);
@@ -4210,7 +4230,7 @@ function saveAddedColumn() {
     all[month] = list.map(item => {
       const customFields = normalizeCustomFieldValues(item.customFields);
       if (Object.prototype.hasOwnProperty.call(customFields, key)) return item;
-      return { ...item, customFields: { ...customFields, [key]: type === 'check' ? 0 : '' } };
+      return { ...item, customFields: { ...customFields, [key]: type === 'office' ? [] : type === 'check' ? 0 : '' } };
     });
   });
   all[monthKey(curYear, curMonth)] = sortClientsByName(dedupeClients(currentData));
@@ -4985,7 +5005,7 @@ function render() {
       td.innerHTML = `<span class="circle ${done ? 'on' : 'off'}">${done ? '✓' : '○'}</span>`;
       td.addEventListener('dblclick', event => {
         event.stopPropagation();
-        if (key === 'fax') openFaxOfficeChecklist(originalIndex);
+        if (key === 'fax') openFaxOfficeChecklist(originalIndex, 'fax');
         else tog(originalIndex, key);
       });
       columnCells[key] = td;
@@ -5024,6 +5044,20 @@ function render() {
     columnCells.seho = sehoTd;
 
     customColumns.forEach(column => {
+      if (column.type === 'office') {
+        const td = document.createElement('td');
+        const offices = getOfficeList(item, column.key);
+        const complete = offices.length > 0 && offices.every(office => office.checked);
+        td.dataset.colKey = column.key;
+        td.className = 'td-cc td-custom-col';
+        td.innerHTML = `<span class="circle ${complete ? 'on' : 'off'}">${complete ? '✓' : '○'}</span>`;
+        td.addEventListener('dblclick', event => {
+          event.stopPropagation();
+          openFaxOfficeChecklist(originalIndex, column.key);
+        });
+        columnCells[column.key] = td;
+        return;
+      }
       if (column.type === 'check') {
         const td = document.createElement('td');
         const value = Number(getFieldValue(item, column.key)) === 1 ? 1 : 0;
